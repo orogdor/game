@@ -69,6 +69,7 @@ const Game = (() => {
   }
 
   function boot(hotData) {
+    try { const vt = document.getElementById('verTag'); if (vt) vt.textContent = 'K73 ' + (typeof K73_VERSION !== 'undefined' ? K73_VERSION : ''); } catch (e) { /* */ }
     canvas = document.getElementById('gl');
     let ok = false;
     let initErr = '';

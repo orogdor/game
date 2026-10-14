@@ -1,5 +1,5 @@
 {
- "version": "v42",
+ "version": "v43",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -75,6 +75,7 @@
   }
  ],
  "code": [
+  "js/00a_version.js",
   "js/01_util.js",
   "js/02_gfx.js",
   "js/03_models.js",

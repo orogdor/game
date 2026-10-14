@@ -350,6 +350,7 @@ body.touch #hudBL { bottom: calc(10px + var(--sb)); width: 150px; }
   #crFace { width: 70px; height: 86px; }
   .crRow { padding: 4px 0; }
 }
+#verTag { position: absolute; right: 14px; bottom: 10px; z-index: 3; font-family: var(--font-num); font-size: 12px; letter-spacing: .08em; color: rgba(230, 215, 195, .55); pointer-events: none; }
 #title { position: absolute; inset: 0; z-index: 20; display: flex; align-items: stretch; pointer-events: auto; background: linear-gradient(90deg, rgba(10, 7, 6, .92) 0%, rgba(10, 7, 6, .7) 42%, rgba(10, 7, 6, .05) 75%); overflow-y: auto; touch-action: pan-y; }
 #titleIn { width: min(560px, 100%); padding: calc(28px + var(--st)) 24px calc(28px + var(--sb)) calc(28px + var(--sl)); display: flex; flex-direction: column; gap: 18px; }
 .logo { font-family: var(--font-display); font-weight: 800; font-size: clamp(54px, 11vw, 104px); line-height: .82; letter-spacing: .02em; margin: 0; text-transform: uppercase; color: var(--bone); }
