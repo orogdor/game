@@ -1,0 +1,107 @@
+{
+ "version": "v41",
+ "data": [
+  {
+   "var": "MODEL_DATA",
+   "json": "data/models.json",
+   "size": 1550800,
+   "bin": "data/models.bin"
+  },
+  {
+   "var": "CHAR_DATA",
+   "json": "data/characters.json",
+   "size": 4346109,
+   "bin": "data/characters.bin"
+  },
+  {
+   "var": "KISKJA_DATA",
+   "json": "data/predator.json",
+   "size": 393085,
+   "bin": "data/predator.bin"
+  },
+  {
+   "var": "PREY_DATA",
+   "json": "data/prey.json",
+   "size": 308238,
+   "bin": "data/prey.bin"
+  },
+  {
+   "var": "GUN_DATA",
+   "json": "data/weapons.json",
+   "size": 2399206,
+   "bin": "data/weapons.bin"
+  },
+  {
+   "var": "FURN_DATA",
+   "json": "data/furniture.json",
+   "size": 1015450,
+   "bin": "data/furniture.bin"
+  },
+  {
+   "var": "ARCH_DATA",
+   "json": "data/architecture.json",
+   "size": 290727,
+   "bin": "data/architecture.bin"
+  },
+  {
+   "var": "TECH_DATA",
+   "json": "data/machines.json",
+   "size": 927862,
+   "bin": "data/machines.bin"
+  },
+  {
+   "var": "CRE_DATA",
+   "json": "data/creatures.json",
+   "size": 1466614,
+   "bin": "data/creatures.bin"
+  },
+  {
+   "var": "BASE_DATA",
+   "json": "data/base.json",
+   "size": 1275494,
+   "bin": "data/base.bin"
+  },
+  {
+   "var": "PROP_DATA",
+   "json": "data/props.json",
+   "size": 3708478,
+   "bin": "data/props.bin"
+  },
+  {
+   "var": "GEAR_DATA",
+   "json": "data/gear.json",
+   "size": 254950,
+   "bin": "data/gear.bin"
+  }
+ ],
+ "code": [
+  "js/01_util.js",
+  "js/02_gfx.js",
+  "js/03_models.js",
+  "js/03b_chars.js",
+  "js/03c_look.js",
+  "js/03g_gunsinit.js",
+  "js/04_world.js",
+  "js/05_base.js",
+  "js/06_audio.js",
+  "js/07_ents.js",
+  "js/07b_kiskja.js",
+  "js/07c_prey.js",
+  "js/08_fx.js",
+  "js/09_econ.js",
+  "js/09b_inv.js",
+  "js/10_player.js",
+  "js/11_comets.js",
+  "js/12_crew.js",
+  "js/13_rivals.js",
+  "js/14_boss.js",
+  "js/14b_waves.js",
+  "js/15_objectives.js",
+  "js/16_input.js",
+  "js/17_build.js",
+  "js/18_ui.js",
+  "js/18b_creator.js",
+  "js/19_game.js",
+  "js/20_net.js"
+ ]
+}
