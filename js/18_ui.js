@@ -743,12 +743,13 @@ const UI = (() => {
         <label>Resolution</label><div class="seg">${[[null, 'Auto'], [0.5, '50%'], [0.75, '75%'], [1, '100%'], [1.5, '150%'], [2, '200%']].map(([v, n]) => `<button data-act="gres:${v}" class="${gf.res === v ? 'on' : ''}">${n}</button>`).join('')}</div>
         <label for="sView">View distance</label><div class="rowv"><input type="range" id="sView" min="300" max="1400" step="50" value="${gf.view || 1000}"><span id="sViewV">${gf.view || 1000} m</span></div>
         <label for="sFov">Field of view</label><div class="rowv"><input type="range" id="sFov" min="65" max="110" step="1" value="${gf.fov || 88}"><span id="sFovV">${gf.fov || 88}°</span></div>
+        <label>Texture quality</label><div class="seg">${[[null, 'Auto'], ['low', 'Low'], ['mid', 'Medium'], ['high', 'High']].map(([v, n]) => `<button data-act="gtex:${v}" class="${(gf.tex || null) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
         <label>Shadows</label><div class="seg">${[[null, 'Auto'], ['off', 'Off'], ['mid', 'Medium'], ['high', 'High']].map(([v, n]) => `<button data-act="gsh:${v}" class="${gf.shadows === v ? 'on' : ''}">${n}</button>`).join('')}</div>
         <label>Effects</label><div class="seg">${[[null, 'Auto'], [0.5, 'Low'], [0.8, 'Medium'], [1, 'High']].map(([v, n]) => `<button data-act="gfx:${v}" class="${gf.fx === v ? 'on' : ''}">${n}</button>`).join('')}</div>
         <label>Glow and smoothing</label><div class="seg">${[[null, 'Auto'], [false, 'Off'], [true, 'On']].map(([v, n]) => `<button data-act="gpo:${v}" class="${gf.post === v ? 'on' : ''}">${n}</button>`).join('')}</div>
         <label>Show FPS</label><div class="seg"><button data-act="gfps:0" class="${!gf.fps ? 'on' : ''}">No</button><button data-act="gfps:1" class="${gf.fps ? 'on' : ''}">Yes</button></div>
         <label>Fullscreen</label><div>${btn('fs', 'Toggle')}</div></div>
-        <p class="note" style="margin-top:14px">Rendering at ${Game.pixels[0]}×${Game.pixels[1]} pixels. If the game stutters, lower the resolution or view distance first, then shadows. "Auto" follows the graphics preset.</p>`;
+        <p class="note" style="margin-top:14px">Rendering at ${Game.pixels[0]}×${Game.pixels[1]} pixels. If the game stutters, lower the resolution or view distance first, then shadows and texture quality. "Auto" follows the graphics preset.</p>`;
     } else {
       h = G.log.slice().reverse().map((l) => `<div class="row"><div class="grow"><div class="s num" style="font-size:11px">P${l.day} · ${l.t}</div><div>${esc(l.text)}</div></div></div>`).join('') || '<div class="empty">The radio is silent.</div>';
     }
@@ -775,6 +776,7 @@ const UI = (() => {
       gsh: (v) => { Input.settings.gfx.shadows = ((v) => (v === 'null' ? null : v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v))(v); Input.saveSettings(); Game.applyGfx(); renderPanel(); },
       gfx: (v) => { Input.settings.gfx.fx = ((v) => (v === 'null' ? null : v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v))(v); Input.saveSettings(); Game.applyGfx(); renderPanel(); },
       gpo: (v) => { Input.settings.gfx.post = ((v) => (v === 'null' ? null : v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v))(v); Input.saveSettings(); Game.applyGfx(); renderPanel(); },
+      gtex: (v) => { Input.settings.gfx.tex = v === 'null' ? null : v; Input.saveSettings(); Game.applyGfx(); renderPanel(); toast(v === 'low' ? 'Textures: low (fastest)' : v === 'mid' ? 'Textures: medium' : v === 'high' ? 'Textures: high (sharpest)' : 'Textures: follow the graphics preset'); },
       gfps: (v) => { Input.settings.gfx.fps = v === '1'; Input.saveSettings(); renderPanel(); },
       fs: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => toast('Fullscreen isn\'t allowed here')); } catch (e) { toast('Fullscreen isn\'t allowed here'); } },
     });

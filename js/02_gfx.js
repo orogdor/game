@@ -192,12 +192,14 @@ void main(){
       vec3 w = pow(abs(nb), vec3(4.0)); w /= (w.x + w.y + w.z);
       vec3 al = texture(uMatA, vec3(p.zy, L)).rgb*w.x + texture(uMatA, vec3(p.xz, L)).rgb*w.y + texture(uMatA, vec3(p.xy, L)).rgb*w.z;
       base *= mix(vec3(1.0), al*2.0, kA*mf);
+      if (uMatOn > 1.5) {
       vec3 tX = texture(uMatN, vec3(p.zy, L)).xyz*2.0 - 1.0, tY = texture(uMatN, vec3(p.xz, L)).xyz*2.0 - 1.0, tZ = texture(uMatN, vec3(p.xy, L)).xyz*2.0 - 1.0;
       tX = vec3(tX.xy + nb.zy, abs(tX.z)*nb.x); tY = vec3(tY.xy + nb.xz, abs(tY.z)*nb.y); tZ = vec3(tZ.xy + nb.xy, abs(tZ.z)*nb.z);
       vec3 np = normalize(tX.zyx*w.x + tY.xzy*w.y + tZ.xyz*w.z);
       if (!wrl) np = rotTo(nb, normalize(vN), np);
       if (!gl_FrontFacing) np = -np;
       N = normalize(mix(N, np, kN*mf));
+      }
     }
   }
 #endif
@@ -360,6 +362,7 @@ precision highp float;
 in vec2 vP; out vec4 oC;
 uniform mat4 uInvVP; uniform vec3 uCam; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uZen; uniform vec3 uHor; uniform vec3 uFogCol;
 uniform float uNight; uniform float uExposure; uniform float uTime; uniform vec3 uPlDir;
+uniform mediump sampler2DArray uMatA; uniform float uCloudOn;
 vec3 tm(vec3 x){ x = max(x, 0.0); return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
 float h31(vec3 p){ p=fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
 float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
@@ -370,8 +373,9 @@ void main(){
   float h = d.y;
   vec3 col = mix(uHor, uZen, pow(clamp(h,0.0,1.0),0.55));
   if(uNight>0.01 && h>0.0){
-    vec3 g = floor(d*260.0); float s = h31(g);
-    float st = step(0.9972, s)*(0.55+0.45*sin(uTime*1.7+s*300.0));
+    vec3 q = d*260.0, g = floor(q); float s = h31(g);
+    vec3 sp = g + 0.5 + (vec3(h31(g+1.3), h31(g+2.7), h31(g+4.1)) - 0.5)*0.5;   // täht raku sees, ümar ja pehme
+    float st = step(0.9972, s)*smoothstep(0.6, 0.05, length(q - sp))*(0.6+0.4*sin(uTime*1.7+s*300.0))*1.6;
     vec3 sc = mix(vec3(0.75,0.82,1.0), vec3(1.0,0.85,0.7), h31(g+7.0));
     col += sc*st*uNight*smoothstep(0.0,0.2,h);
     vec3 g2 = floor(d*520.0); float s2 = h31(g2+3.0);
@@ -405,14 +409,30 @@ void main(){
     col = mix(col, mix(pcol, col, haze), rim);
   }
   float sd = max(dot(d,uSunDir),0.0);
-  // kõrged kiudpilved, mis triivivad aeglaselt; päikese poolt valgustatud servad
+  // pilvekiht: taeva tasandile projitseeritud pilvetekstuur (kiht 8), tuul, valgustus päikese poolt, isevari
   if(h>0.0){
-    vec2 cp = d.xz/(h+0.12)*0.55 + vec2(uTime*0.0035, uTime*0.0012);
-    float c = cn(cp*vec2(0.9,2.6)*1.4)*0.65 + cn(cp*vec2(1.8,5.0)*1.4 + 3.0)*0.35;
-    c = smoothstep(0.5, 0.82, c)*smoothstep(0.0, 0.18, h)*(1.0 - smoothstep(0.55, 0.95, h));
-    vec3 cc = mix(uHor*1.05, uZen*0.6 + uSunCol*0.55, 0.45) + uSunCol*pow(sd, 5.0)*0.9;
-    cc = mix(cc, vec3(0.035,0.03,0.045), uNight*0.85);
-    col = mix(col, cc, c*0.55);
+    vec2 cp = d.xz/(h+0.06)*0.11 + vec2(uTime*0.0016, uTime*0.0007);
+    float fade = smoothstep(0.0, 0.16, h);
+    float dens;
+    if (uCloudOn > 0.5) {
+      vec4 t1 = texture(uMatA, vec3(cp, 8.0));
+      vec4 t2 = texture(uMatA, vec3(cp*3.7 + vec2(0.31, 0.77) + vec2(uTime*0.004, 0.0), 8.0));
+      dens = t1.r*0.72 + t2.g*0.28;
+      vec2 toSun = normalize(uSunDir.xz + vec2(1e-4))*0.025;
+      float dS = texture(uMatA, vec3(cp + toSun, 8.0)).r*0.72 + t2.g*0.28;
+      float cov = 0.5;
+      float c = smoothstep(cov, cov + 0.3, dens)*fade;
+      float shade = clamp(1.0 - (dS - dens)*4.0, 0.35, 1.25);           // päikese poolt valgem, vastaskülg tumedam
+      vec3 lit = uSunCol*0.6*shade + uZen*0.55 + uHor*0.3;
+      lit += uSunCol*pow(sd, 6.0)*(1.0 - smoothstep(cov, cov + 0.35, dens))*1.4;   // hõbedane serv päikese ees
+      lit = mix(lit, vec3(0.03, 0.026, 0.04), uNight*0.88);
+      col = mix(col, lit, c*0.85);
+    } else {
+      dens = cn(cp*6.0)*0.65 + cn(cp*14.0 + 3.0)*0.35;
+      float c = smoothstep(0.55, 0.85, dens)*fade;
+      vec3 lit = mix(uSunCol*0.6 + uZen*0.55, vec3(0.03, 0.026, 0.04), uNight*0.88);
+      col = mix(col, lit, c*0.7);
+    }
   }
   col += uSunCol*(smoothstep(0.9993,0.9996,sd)*7.0 + pow(sd,260.0)*0.9 + pow(sd,24.0)*0.28 + pow(sd,4.0)*0.10);
   float hz = exp(-max(h,0.0)*9.0);
@@ -951,7 +971,7 @@ void main(){
     gl.activeTexture(gl.TEXTURE0); return t;
   }
   function initMatTex() {
-    S.matOn = true;
+    S.matOn = 2;
     // ajutised neutraalsed (enne pildi laadimist): hall albeedo, tasane normaal
     arrTex(6, [128, 128, 128, 255]); arrTex(7, [128, 128, 255, 255]);
     if (typeof MAT_TEX === 'undefined') return;
@@ -1161,7 +1181,7 @@ void main(){
     gl.uniform1i(pr.u('uShadow'), 0);
     gl.uniform4fv(pr.u('uLP'), lightPos); gl.uniform4fv(pr.u('uLC'), lightCol);
     gl.uniform1i(pr.u('uNL'), Math.min(12, lights.length));
-    gl.uniform1f(pr.u('uMatOn'), S.matOn && matA ? 1 : 0); gl.uniform1i(pr.u('uMatA'), 6); gl.uniform1i(pr.u('uMatN'), 7);
+    gl.uniform1f(pr.u('uMatOn'), matA ? (+S.matOn || 0) : 0); gl.uniform1i(pr.u('uMatA'), 6); gl.uniform1i(pr.u('uMatN'), 7);
   }
   function pickLights() {
     for (const l of lights) { l.score = Math.max(0, Math.hypot(l.x - cam.pos.x, l.y - cam.pos.y, l.z - cam.pos.z) - l.r) - l.i * 2; }
@@ -1248,6 +1268,7 @@ void main(){
     gl.uniform3fv(progSky.u('uFogCol'), env.fogCol); gl.uniform1f(progSky.u('uNight'), env.night);
     gl.uniform1f(progSky.u('uExposure'), env.exposure); gl.uniform1f(progSky.u('uTime'), env.time);
     gl.uniform3fv(progSky.u('uPlDir'), env.planetDir);
+    gl.uniform1i(progSky.u('uMatA'), 6); gl.uniform1f(progSky.u('uCloudOn'), matA ? 1 : 0);
     gl.bindVertexArray(skyVao); gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
     gl.activeTexture(gl.TEXTURE0);

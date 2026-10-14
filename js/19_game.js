@@ -187,7 +187,10 @@ const Game = (() => {
     GFX.setTerrain(null, false); World.setTerrainShadow(sh === 'high');
     FX.setQuality(g.fx == null ? q.fx : g.fx);
     GFX.S.viewMul = (g.view || 1000) / 1000;
-    GFX.S.matOn = qKey !== 'low';   // materjalitekstuurid (madalal kvaliteedil välja)
+    // tekstuuri kvaliteet: madal = materjalitekstuurid väljas + tegelased 1024, keskmine = ainult värvitekstuur + 2048, kõrge = ka normaalkaardid + 4096
+    const tq = g.tex || (qKey === 'low' ? 'low' : qKey === 'mid' ? 'mid' : 'high');
+    GFX.S.matOn = tq === 'low' ? 0 : tq === 'mid' ? 1 : 2;
+    if (Chars.setTexQuality) Chars.setTexQuality(tq);
     resize();
   }
   function resize() {

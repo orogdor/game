@@ -5,8 +5,9 @@
 const Chars = (() => {
 
   // 4096 atlas: nõrgemal seadmel (väike MAX_TEXTURE_SIZE / vähe mälu) vähendame enne üleslaadimist 2048-le
+  let texLim = 4096;   // tekstuuri kvaliteet: low 1024, mid 2048, high 4096
   function fitTex(im) {
-    let lim = 4096;
+    let lim = texLim;
     try { lim = Math.min(lim, GFX.gl.getParameter(GFX.gl.MAX_TEXTURE_SIZE)); } catch (e) {}
     const mem = navigator.deviceMemory || 8;
     if (mem <= 3 || /Android.*Mobile|iPhone/.test(navigator.userAgent) && mem < 6) lim = Math.min(lim, 2048);
@@ -117,7 +118,7 @@ const Chars = (() => {
       }
       types[name] = T;
       if (name !== 'soldier') try { T.gear = buildGear(T); } catch (e) { console.error(e); T.gear = []; }
-      const im = new Image(); im.onload = () => { try { T.alb = GFX.texFromImage(fitTex(im)); } catch (e) { console.error(e); } }; im.onerror = () => console.error('char tex fail', name); im.src = d.tex;
+      const im = new Image(); im.onload = () => { try { T.albImg = im; T.alb = GFX.texFromImage(fitTex(im)); } catch (e) { console.error(e); } }; im.onerror = () => console.error('char tex fail', name); im.src = d.tex;
       const mk = new Image(); mk.onload = () => { T.mask = GFX.texFromImage(mk, { mask: true }); }; mk.src = d.mask;
     }
     ready = true;
@@ -659,5 +660,12 @@ const Chars = (() => {
     }
     return t;
   }
-  return { init, draw, drawFP, portrait, makeTints, types, clips, get ready() { return ready; }, REG };
+  // tekstuuri kvaliteedi muutmine: tegelaste albeedo laaditakse uue suurusega uuesti üles
+  function setTexQuality(q) {
+    const lim = q === 'low' ? 1024 : q === 'mid' ? 2048 : 4096;
+    if (lim === texLim) return;
+    texLim = lim;
+    for (const T of Object.values(types)) if (T.albImg) { try { const old = T.alb; T.alb = GFX.texFromImage(fitTex(T.albImg)); if (old) GFX.gl.deleteTexture(old); } catch (e) { console.error(e); } }
+  }
+  return { init, draw, drawFP, portrait, makeTints, setTexQuality, types, clips, get ready() { return ready; }, REG };
 })();
