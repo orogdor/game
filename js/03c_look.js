@@ -2,6 +2,35 @@
 //  INIMESE VÄLIMUSE GENERAATOR: sugu, nahatoon, juuksed, habe,
 //  pikkus, kehaehitus, riided. Kasutab realistlikke mudeleid (Chars).
 // ============================================================
+// ---------- nimed: eesnimi soo järgi + perekonnanimi (eesti ja rahvusvahelised, kosmosekolonistide segu) ----------
+const Names = (() => {
+  const M = ['Tõnu', 'Kalev', 'Margus', 'Rein', 'Andres', 'Indrek', 'Jaan', 'Peeter', 'Viktor', 'Kaspar', 'Oskar', 'Toomas', 'Rasmus', 'Jaak', 'Gustav',
+    'Hugo', 'Arvo', 'Ilmar', 'Priit', 'Sander', 'Ervin', 'Mihkel', 'Tõnis', 'Joosep', 'Ott', 'Siim', 'Marko', 'Raul', 'Urmas', 'Aivar', 'Henrik', 'Karl',
+    'Erik', 'Lars', 'Mats', 'Nils', 'Anton', 'Felix', 'Leo', 'Max', 'Victor', 'Dmitri', 'Ivan', 'Yuri', 'Pavel', 'Marek', 'Tomasz', 'Jonas', 'Elias',
+    'Diego', 'Mateo', 'Rafael', 'Kenji', 'Hiro', 'Ravi', 'Omar', 'Kofi', 'Malik', 'Connor', 'Jack', 'Wade', 'Hicks', 'Dallas', 'Rico', 'Zane', 'Cole'];
+  const F = ['Kersti', 'Maarja', 'Tiina', 'Liina', 'Kristi', 'Triin', 'Helen', 'Ene', 'Aino', 'Mirt', 'Liisi', 'Brita', 'Helmi', 'Ülle', 'Malle', 'Eeva',
+    'Signe', 'Kertu', 'Nora', 'Anu', 'Riina', 'Pille', 'Laura', 'Kadi', 'Marta', 'Kaisa', 'Grete', 'Kärt', 'Elo', 'Merit', 'Hanna', 'Liis', 'Sigrid',
+    'Ingrid', 'Astrid', 'Freya', 'Elsa', 'Mila', 'Nadia', 'Olga', 'Irina', 'Vera', 'Katja', 'Zofia', 'Lena', 'Sofia', 'Lucia', 'Carmen', 'Yuki', 'Mei',
+    'Priya', 'Amara', 'Zara', 'Ripley', 'Rachel', 'Dizzy', 'Jo', 'Sam', 'Tess', 'Kate', 'Ada', 'Iris', 'Nova'];
+  const L = ['Kask', 'Lell', 'Saar', 'Ojamets', 'Raud', 'Kuld', 'Hiis', 'Vares', 'Lepp', 'Tamm', 'Pärn', 'Kivi', 'Rebane', 'Kotkas', 'Põld', 'Kaljurand',
+    'Vaher', 'Mänd', 'Sepp', 'Valk', 'Koger', 'Leht', 'Aas', 'Mets', 'Kallas', 'Rand', 'Kuusk', 'Ilves', 'Org', 'Tuul', 'Rist', 'Laine', 'Kangur', 'Paju',
+    'Ots', 'Kruus', 'Põder', 'Karu', 'Hunt', 'Sarapuu', 'Kõiv', 'Järv', 'Lind', 'Nurk', 'Oja', 'Vask', 'Tina', 'Sild', 'Torn',
+    'Novak', 'Kowalski', 'Ivanov', 'Petrov', 'Sokolov', 'Lindqvist', 'Berg', 'Holm', 'Strand', 'Virtanen', 'Koskinen', 'Nieminen', 'Moreau', 'Laurent',
+    'Costa', 'Silva', 'Reyes', 'Ortega', 'Tanaka', 'Sato', 'Nakamura', 'Chen', 'Wong', 'Patel', 'Okafor', 'Mensah', 'Hale', 'Cross', 'Stone', 'Ward',
+    'Hudson', 'Gorman', 'Bishop', 'Drake', 'Frost', 'Kane', 'Rook', 'Vance', 'Mercer', 'Holt', 'Quinn', 'Reed'];
+  const MS = new Set(M), FS = new Set(F);
+  const pk = (a) => a[Math.floor(Math.random() * a.length)];
+  function first(sex) { return pk(sex === 'female' ? F : M); }
+  function random(sex, used) {
+    sex = sex || (Math.random() < 0.5 ? 'male' : 'female');
+    for (let i = 0; i < 40; i++) { const n = first(sex) + ' ' + pk(L); if (!used || !used.has(n)) return n; }
+    return first(sex) + ' ' + pk(L) + ' ' + (2 + Math.floor(Math.random() * 8));
+  }
+  // sugu nime järgi (eesnimi); tundmatu -> null
+  function sexOf(name) { const f = String(name || '').trim().split(/\s+/)[0]; return FS.has(f) ? 'female' : MS.has(f) ? 'male' : null; }
+  return { M, F, L, first, random, sexOf };
+})();
+
 const Look = (() => {
   // nahatoonid heledast tumedani (sRGB, ligikaudu päris nahatoonide järgi)
   const SKIN = [[0.97, 0.83, 0.73], [0.93, 0.75, 0.63], [0.87, 0.67, 0.53], [0.80, 0.60, 0.46], [0.70, 0.50, 0.36], [0.58, 0.40, 0.28], [0.45, 0.30, 0.21], [0.34, 0.22, 0.15]];
@@ -11,12 +40,13 @@ const Look = (() => {
   const TOPS = [[0.30, 0.32, 0.24], [0.38, 0.35, 0.28], [0.22, 0.24, 0.27], [0.17, 0.19, 0.24], [0.42, 0.34, 0.24], [0.27, 0.27, 0.28], [0.20, 0.22, 0.17], [0.13, 0.13, 0.14], [0.29, 0.23, 0.18]];
   const BOTTOMS = [[0.18, 0.18, 0.19], [0.30, 0.32, 0.24], [0.17, 0.19, 0.24], [0.30, 0.24, 0.18], [0.36, 0.33, 0.27], [0.24, 0.24, 0.25]];
   const SHOES = [[0.075, 0.07, 0.065], [0.12, 0.10, 0.085], [0.15, 0.15, 0.14]];
-  const STYLES_M = ['bald', 'buzz', 'short', 'medium', 'long'];
-  const STYLES_F = ['pixie', 'bob', 'bun', 'ponytail', 'long'];
-  const BEARDS = ['none', 'stubble', 'moustache', 'goatee', 'full'];
-  const BEARD_NAMES = { none: 'Clean-shaven', stubble: 'Stubble', moustache: 'Moustache', goatee: 'Goatee', full: 'Full beard' };
-  const STYLE_NAMES = { bald: 'Bald', buzz: 'Buzz cut', short: 'Short', medium: 'Medium', long: 'Long', pixie: 'Pixie', bob: 'Bob', bun: 'Bun', ponytail: 'Ponytail' };
-  const FEMALE = new Set(['Aino', 'Mirt', 'Liisi', 'Brita', 'Helmi', 'Ülle', 'Malle', 'Eeva', 'Signe', 'Kertu', 'Nora', 'Anu', 'Riina', 'Pille', 'Laura', 'Kadi', 'Marta']);
+  const STYLES_M = ['bald', 'buzz', 'short', 'sidepart', 'slick', 'mohawk', 'curly', 'medium', 'long', 'manbun'];
+  const STYLES_F = ['pixie', 'bob', 'bun', 'ponytail', 'braid', 'long', 'wavy', 'curly', 'undercut'];
+  const BEARDS = ['none', 'stubble', 'moustache', 'goatee', 'vandyke', 'chinstrap', 'mutton', 'short', 'full', 'long'];
+  const BEARD_NAMES = { none: 'Clean-shaven', stubble: 'Stubble', moustache: 'Moustache', goatee: 'Goatee', vandyke: 'Van Dyke', chinstrap: 'Chinstrap',
+    mutton: 'Mutton chops', short: 'Short beard', full: 'Full beard', long: 'Long beard' };
+  const STYLE_NAMES = { bald: 'Bald', buzz: 'Buzz cut', short: 'Crew cut', sidepart: 'Side part', slick: 'Slicked back', mohawk: 'Mohawk', curly: 'Curly',
+    medium: 'Medium', long: 'Long', manbun: 'Man bun', pixie: 'Pixie', bob: 'Bob', bun: 'Bun', ponytail: 'Ponytail', braid: 'Braid', wavy: 'Wavy', undercut: 'Undercut' };
   const jit = (c, a) => c.map((v) => clamp(v * (1 + (Math.random() - 0.5) * a), 0, 1));
 
   function random(sex) {
@@ -28,15 +58,16 @@ const Look = (() => {
       sex, type: sex,
       skin: jit(SKIN[Math.floor(Math.random() * SKIN.length)], 0.06),
       hair: jit(hair, 0.1),
-      hairStyle: sex === 'male' ? pick(age > 0.75 ? ['bald', 'buzz', 'short'] : ['buzz', 'short', 'short', 'medium', 'medium', 'long']) : pick(['pixie', 'bob', 'bun', 'ponytail', 'ponytail', 'long']),
-      beardStyle: sex === 'male' ? pick(['none', 'none', 'stubble', 'stubble', 'moustache', 'goatee', 'full', 'full']) : 'none',
+      hairStyle: sex === 'male' ? pick(age > 0.75 ? ['bald', 'bald', 'buzz', 'short', 'sidepart', 'slick'] : ['buzz', 'short', 'short', 'sidepart', 'sidepart', 'slick', 'mohawk', 'curly', 'medium', 'medium', 'long', 'manbun'])
+        : pick(['pixie', 'bob', 'bob', 'bun', 'ponytail', 'ponytail', 'braid', 'long', 'long', 'wavy', 'curly', 'undercut']),
+      beardStyle: sex === 'male' ? pick(['none', 'none', 'none', 'stubble', 'stubble', 'stubble', 'moustache', 'goatee', 'vandyke', 'chinstrap', 'mutton', 'short', 'short', 'full', 'full', 'long']) : 'none',
       top: jit(pick(TOPS), 0.12), bottom: jit(pick(BOTTOMS), 0.1), shoes: pick(SHOES),
       height: sex === 'male' ? rand(1.68, 1.94) : rand(1.56, 1.80), gear: pick([1, 2, 2, 3]), gearCol: randi(0, 4),
       build: rand(0.9, 1.14),
     };
     return L;
   }
-  function forName(name) { const first = (name || '').split(' ')[0]; return random(FEMALE.has(first) ? 'female' : 'male'); }
+  function forName(name) { return random(Names.sexOf(name) || (Math.random() < 0.5 ? 'male' : 'female')); }
   function rival(team) {
     const armor = team === 'krell' ? [0.55, 0.16, 0.12] : team === 'klann' ? [0.34, 0.24, 0.50] : [0.5, 0.5, 0.5];
     return { sex: 'male', type: 'soldier', armor: jit(armor, 0.12), accent: team === 'krell' ? [0.85, 0.55, 0.15] : [0.85, 0.85, 0.80], height: rand(1.78, 1.95), build: rand(0.98, 1.1) };

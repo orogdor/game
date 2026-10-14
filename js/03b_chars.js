@@ -75,7 +75,7 @@ const Chars = (() => {
       const morph = d.morph ? { idx: b64(d.morph.idx, Uint32Array), dq: b64(d.morph.d, Int16Array), sc: d.morph.sc / 32767, n: d.morph.n } : null;
       const mesh = new GFX.SkinMesh({ pos, nor: b64(d.nor, Int8Array), uv: b64(d.uv, Uint16Array), jn: b64(d.jn, Uint8Array), wt: b64(d.wt, Uint8Array), idx: d.i32 ? b64(d.idx, Uint32Array) : b64(d.idx, Uint16Array), morph });
       const nj = d.joints.length;
-      const T = { name, mesh, alb: null, mask: null, nj, avg: d.avg, morphNames: d.morph ? d.morph.names : [], height: d.height, hairStyles: d.hairStyles || [], beardStyles: d.beardStyles || [], idxOf: {},
+      const T = { name, mesh, alb: null, mask: null, nj, avg: d.avg, morphNames: d.morph ? d.morph.names : [], height: d.height, hairStyles: d.hairStyles || [], beardStyles: d.beardStyles || [], hairR: d.hairR || null, beardR: d.beardR || null, rcache: {}, idxOf: {},
         parent: new Int16Array(nj), bp: new Float32Array(nj * 3), bq: new Float32Array(nj * 4), tq: new Float32Array(nj * 4), off: new Float32Array(nj * 3), ibm: new Float32Array(nj * 16), clipMap: {}, desc: [] };
       d.joints.forEach((j, k) => {
         T.idxOf[j.n] = k; T.parent[k] = j.p;
@@ -343,6 +343,21 @@ const Chars = (() => {
   }
   // tagastab: { gun: maailmamaatriks või null } ; m = mudeli maailmamaatriks
   const DEF_OPT = {};
+  // joonistatavad indeksivahemikud: varustuse aste + valitud soeng + valitud habe (teisi ei joonistata üldse)
+  function rangesFor(T, gear, tints) {
+    if (!T.rng) return null;
+    const g = clamp(gear === undefined ? 2 : gear, 1, 3);
+    if (!T.hairR) return T.rng[g];
+    const hs = (tints && tints.hs) || '', bs = (tints && tints.bs) || '', key = g + '|' + hs + '|' + bs;
+    let r = T.rcache[key];
+    if (!r) {
+      r = T.rng[g].slice();
+      if (T.hairR[hs]) r.push(T.hairR[hs]);
+      if (T.beardR && T.beardR[bs]) r.push(T.beardR[bs]);
+      T.rcache[key] = r;
+    }
+    return r;
+  }
   const res = { gun: M4.create(), hasGun: false, head: { x: 0, y: 0, z: 0 }, prop: M4.create(), hasProp: false, back: M4.create(), hasBack: false };
   const pf = new Float32Array(3), pq = new Float32Array(3), backT = M4.create();
   function draw(st, m, tint, opt) {
@@ -352,7 +367,7 @@ const Chars = (() => {
     const row = GFX.boneRow(); if (row < 0) return null;
     pose(T, st);
     writeBones(T, row);
-    if (T.rng) (opt = opt || DEF_OPT).ranges = T.rng[clamp(st.gear === undefined ? 2 : st.gear, 1, 3)]; else if (opt) opt.ranges = null;
+    if (T.rng) (opt = opt || DEF_OPT).ranges = rangesFor(T, st.gear, st.tints); else if (opt) opt.ranges = null;
     GFX.drawSkinned(T, m, row, st.tints || defaultTints(T), tint, 1.3, opt);
     if (T.gear && T.gear.length) {
       if (poolFrame !== GFX.S.frame) { poolFrame = GFX.S.frame; poolI = 0; }
@@ -414,7 +429,7 @@ const Chars = (() => {
     T.handScale = 0.8;
     writeBones(T, row, T.fpHide);
     T.handScale = 0;
-    if (T.rng) (opt = opt || DEF_OPT).ranges = T.rng[clamp(st.gear === undefined ? 2 : st.gear, 1, 3)]; else if (opt) opt.ranges = null;
+    if (T.rng) (opt = opt || DEF_OPT).ranges = rangesFor(T, st.gear, st.tints); else if (opt) opt.ranges = null;
     GFX.drawSkinned(T, outM, row, st.tints || defaultTints(T), null, 1.3, opt);
     M4.mul(gunOut, outM, gunM);
     return gunOut;
@@ -438,8 +453,9 @@ const Chars = (() => {
     else { eye = [0.0, hy + 0.02, 0.75]; tgt = [0, hy - 0.06, 0]; fov = 0.52; }
     if (o.eye) { eye = o.eye; tgt = o.tgt; fov = o.fov || 0.5; }
     pst.gear = Look.gearLvl(look); pst.eq = look.eq || null; pst.gearTint = Look.gearTint(look);
-    const ex = gearExtras(T, pst, pM, []); ex.morph = o.face || null; ex.ranges = T.rng ? T.rng[clamp(pst.gear, 1, 3)] : null;
-    return GFX.portrait(T, GFX.PORTRAIT_ROW, Look.tints(look), pM, eye, tgt, fov, w, hh, o.canvas, ex);
+    const lt = Look.tints(look);
+    const ex = gearExtras(T, pst, pM, []); ex.morph = o.face || null; ex.ranges = rangesFor(T, pst.gear, lt);
+    return GFX.portrait(T, GFX.PORTRAIT_ROW, lt, pM, eye, tgt, fov, w, hh, o.canvas, ex);
   }
 
   // ---------- Doom 3 stiilis varustus (jäigad osad luude küljes, sidumispoosi ruumis) ----------
@@ -596,29 +612,35 @@ const Chars = (() => {
     if (REG.brow !== undefined && look.skin && a.skin && a.brow) { const hc = look.hair || [0.2, 0.14, 0.1], k = 0.3; set(REG.brow, [0, 1, 2].map((i) => (look.skin[i] * (1 - k) + hc[i] * k) / a.skin[i]), 0); }
     const gray = (reg, key, col) => { if (!col) return; const L = Math.max(0.05, lum(a[key] || [0.5, 0.5, 0.5])); set(reg, [col[0] / L, col[1] / L, col[2] / L], 1); };
     gray(REG.top, 'top', look.top); gray(REG.bottom, 'bottom', look.bottom); gray(REG.shoes, 'shoes', look.shoes);
+    t.hs = ''; t.bs = '';
     if (type === 'male' || type === 'female') {
-      const names = T.hairStyles.map(([n]) => n);
-      const st = look.hairStyle === 'bald' ? 'bald' : names.includes(look.hairStyle) ? look.hairStyle : (type === 'male' ? 'short' : 'bun');
-      for (const [name, reg] of T.hairStyles) { if (name === st && st !== 'bald') gray(reg, 'hair', look.hair); else hide(reg); }
-      // peanahk juuste all: juuksevärvi poole, et juuksepiir ei oleks terav serv
-      if (REG.scalp !== undefined && a.scalp && look.skin) {
-        const sk = look.skin, hc = look.hair || [0.2, 0.14, 0.1], k = st === 'bald' ? 0.07 : st === 'buzz' ? 0.5 : 0.62;
-        set(REG.scalp, [(sk[0] * (1 - k) + hc[0] * k) / a.scalp[0], (sk[1] * (1 - k) + hc[1] * k) / a.scalp[1], (sk[2] * (1 - k) + hc[2] * k) / a.scalp[2]], 0);
-      }
-      // habe: maalitud kõrrepiirkond (beard) + 3D habemed (vuntsid / kits / täishabe)
-      const bst = beardStyle(look);
-      const bs = T.beardStyles || [];
-      for (const [name, reg] of bs) { if (name === bst) gray(reg, 'beard3d', look.hair || [0.2, 0.14, 0.1]); else hide(reg); }
-      if (type === 'male' && a.beard && look.skin) {
-        const sk = look.skin, hc = look.hair || [0.2, 0.14, 0.1];
-        const k = bst === 'none' ? 0 : bst === 'stubble' ? 0.32 : 0.45;
-        const c = [sk[0] * (1 - k) + hc[0] * k, sk[1] * (1 - k) + hc[1] * k, sk[2] * (1 - k) + hc[2] * k];
-        set(REG.beard, [c[0] / a.beard[0], c[1] / a.beard[1], c[2] / a.beard[2]], 0);
+      const eq0 = look.eq || {}, hc = look.hair || [0.2, 0.14, 0.1], sk = look.skin || [0.87, 0.67, 0.53];
+      const skinT = look.skin && a.skin ? [sk[0] / a.skin[0], sk[1] / a.skin[1], sk[2] / a.skin[2]] : [1, 1, 1];
+      if (T.hairR) {
+        // v2: soeng ja habe = eraldi indeksivahemikud; juuksed alfa-testiga (režiim 1.25)
+        const keys = Object.keys(T.hairR);
+        let st = look.hairStyle === 'bald' ? 'bald' : T.hairR[look.hairStyle] ? look.hairStyle : (type === 'male' ? 'short' : 'bob');
+        if (eq0.helmet) st = 'bald';
+        t.hs = st === 'bald' ? '' : st;
+        gray(REG.hair, 'hair', hc); t[REG.hair * 4 + 3] = 1.25;
+        const bst = beardStyle(look);
+        t.bs = T.beardR && T.beardR[bst] && eq0.helmet !== 'helmet2' ? bst : '';
+        if (REG.beard_f !== undefined) { gray(REG.beard_f, 'beard3d', [hc[0] * 0.92, hc[1] * 0.92, hc[2] * 0.92]); t[REG.beard_f * 4 + 3] = 1.25; }
+        // kõrred, peanahk, kulmud: nahatoon (tihedus maski G/B kanalis teeb ülemineku sujuvaks)
+        for (const r of [REG.beard, REG.scalp]) if (r !== undefined) set(r, skinT, 0);
+        const bk = type !== 'male' ? 0 : { none: 0, stubble: 0.4, moustache: 0.16, goatee: 0.18, vandyke: 0.16, chinstrap: 0.22, mutton: 0.22, short: 0.7, full: 0.8, long: 0.8 }[bst] || 0;
+        const sk2 = st === 'bald' ? 0.1 : st === 'buzz' ? 0.85 : 0.7;
+        set(30, [hc[0] * 0.85, hc[1] * 0.85, hc[2] * 0.85], bk);
+        set(31, [hc[0] * 0.9, hc[1] * 0.9, hc[2] * 0.9], sk2);
+      } else {
+        const names = T.hairStyles.map(([n]) => n);
+        const st = look.hairStyle === 'bald' ? 'bald' : names.includes(look.hairStyle) ? look.hairStyle : (type === 'male' ? 'short' : 'bun');
+        for (const [name, reg] of T.hairStyles) { if (name === st && st !== 'bald') gray(reg, 'hair', look.hair); else hide(reg); }
+        if (eq0.helmet) for (const [, reg] of T.hairStyles) hide(reg);
       }
       // Doom 3 soomus: vormitud plaadid (regioon armor = rinnaplaat, pads = õlakud/käsivarred/põlved)
       const gear = Look.gearLvl(look), gt = Look.gearTint(look), eq = look.eq || {};
       if (eq.boots) set(REG.shoes, [0.07 / Math.max(0.05, lum(a.shoes || [0.1, 0.1, 0.1])), 0.07 / Math.max(0.05, lum(a.shoes || [0.1, 0.1, 0.1])), 0.065 / Math.max(0.05, lum(a.shoes || [0.1, 0.1, 0.1]))], 2);
-      if (eq.helmet) for (const [, reg] of T.hairStyles) hide(reg);
       const pc = [ARMOR_BASE[0] * gt[0], ARMOR_BASE[1] * gt[1], ARMOR_BASE[2] * gt[2]];
       // kolm astet: 1 kerge (vöö), 2 keskmine (kuulivest + põlve-/säärekaitsmed), 3 raske (täismetallist turvis)
       if (REG.heavy !== undefined && a.heavy) {

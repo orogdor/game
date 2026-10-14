@@ -5,14 +5,13 @@ const Creator = (() => {
   let look = null, name = '', yaw = 0.35, onDone = null, drag = null, dirty = true;
   const $ = (id) => document.getElementById(id);
   const css = (c) => `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
-  const NAMES_M = ['Tõnu', 'Kalev', 'Margus', 'Rein', 'Andres', 'Indrek', 'Jaan', 'Peeter'], NAMES_F = ['Kersti', 'Maarja', 'Tiina', 'Liina', 'Kristi', 'Triin', 'Helen', 'Ene'];
   const same = (a, b) => a && b && Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 0.04;
 
   function open(done) {
     openT = 0;
     onDone = done;
     look = G.look ? JSON.parse(JSON.stringify(Look.clean(G.look))) : Look.player();
-    name = G.pname || 'Tõnu';
+    name = G.pname || Names.random(look.type);
     $('creator').hidden = false; $('title').hidden = true;
     render();
     const cv = $('crCv');
@@ -63,7 +62,7 @@ const Creator = (() => {
     const build = look.build || 1;
     const bName = build < 0.95 ? 'Slim' : build < 1.05 ? 'Medium' : build < 1.11 ? 'Strong' : 'Stocky';
     $('crCtl').innerHTML = `<h2>Your character</h2><div class="sub">The last hope of a family in debt. Who are you?</div>
-      <div class="crRow"><span>Name</span><input type="text" id="crName" maxlength="24" value="${name.replace(/"/g, '&quot;')}"></div>
+      <div class="crRow"><span>Name</span><div class="nmRow"><input type="text" id="crName" maxlength="24" value="${name.replace(/"/g, '&quot;')}"><button id="crNameRnd" title="Random name" aria-label="Random name">⚄</button></div></div>
       <div class="crRow"><span>Body</span>${seg('crSex', [['male', 'Male'], ['female', 'Female']], look.type)}</div>
       <div class="crRow"><span>Skin tone</span>${sw('crSkin', Look.SKIN, look.skin)}</div>
       <div class="crRow"><span>Hairstyle</span>${seg('crStyle', (male ? Look.STYLES_M : Look.STYLES_F).map((k) => [k, Look.STYLE_NAMES[k]]), look.hairStyle)}</div>
@@ -78,14 +77,17 @@ const Creator = (() => {
       <div class="crRow"><span>Trousers</span>${sw('crBot', Look.BOTTOMS, look.bottom)}</div>
       <div id="crBtns"><button class="primary" id="crGo">Start</button><button id="crRnd">Random</button><button id="crBack">Back</button></div>`;
     $('crName').oninput = (e) => { name = e.target.value; };
+    $('crNameRnd').onclick = () => { name = Names.random(look.type); $('crName').value = name; Audio2.ui(); };
     const bindSw = (id, key, list) => $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { look[key] = list[+b.dataset.i].slice(); Audio2.ui(); changed(); }));
     bindSw('crSkin', 'skin', Look.SKIN); bindSw('crHair', 'hair', Look.HAIR); bindSw('crTop', 'top', Look.TOPS); bindSw('crBot', 'bottom', Look.BOTTOMS);
     $('crSex').querySelectorAll('button').forEach((b) => (b.onclick = () => {
       if (look.type === b.dataset.k) return;
       look.type = look.sex = b.dataset.k;
       look.height = b.dataset.k === 'male' ? 1.8 : 1.68;
-      if (b.dataset.k === 'female') { look.beard = false; look.beardStyle = 'none'; look.hairStyle = 'bun'; if (NAMES_M.includes(name)) name = NAMES_F[0]; }
-      else { look.hairStyle = 'short'; if (NAMES_F.includes(name)) name = NAMES_M[0]; }
+      if (b.dataset.k === 'female') { look.beard = false; look.beardStyle = 'none'; look.hairStyle = 'bob'; }
+      else { look.hairStyle = 'short'; }
+      // nimi teise soo omaks, kui see oli selgelt eelmise soo nimi
+      const ns = Names.sexOf(name); if (!name.trim() || (ns && ns !== b.dataset.k)) name = Names.random(b.dataset.k);
       Audio2.ui(); changed();
     }));
     $('crExpr').querySelectorAll('button').forEach((b) => (b.onclick = () => { expr = b.dataset.k; Audio2.ui(); changed(); }));
@@ -98,10 +100,10 @@ const Creator = (() => {
     $('crH').oninput = (e) => { look.height = +e.target.value / 100; e.target.nextElementSibling.textContent = e.target.value + ' cm'; dirty = true; };
     $('crB').oninput = (e) => { look.build = +e.target.value / 100; dirty = true; };
     $('crB').onchange = () => render();
-    $('crRnd').onclick = () => { const r = Look.random(); look = r; name = pick(r.type === 'male' ? NAMES_M : NAMES_F); Audio2.ui(); changed(); };
+    $('crRnd').onclick = () => { const r = Look.random(); r.gear = look.gear; r.gearCol = look.gearCol; look = r; name = Names.random(r.type); Audio2.ui(); changed(); };
     $('crBack').onclick = () => { Audio2.ui(); close(); };
     $('crGo').onclick = () => {
-      G.look = look; G.pname = (name || '').trim() || (look.type === 'male' ? 'Tõnu' : 'Kersti');
+      G.look = look; G.pname = (name || '').trim() || Names.random(look.type);
       const f = onDone; close(true); if (f) f();
     };
     dirty = true;

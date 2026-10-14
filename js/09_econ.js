@@ -101,8 +101,6 @@ const TRAITS = {
   laisk: { name: 'Lazy', desc: 'Works slowly, but is cheap.' },
   veteran: { name: 'Former mercenary', desc: 'Tough in a fight, expensive to pay.' },
 };
-const FIRST = ['Aino', 'Viktor', 'Mirt', 'Kaspar', 'Liisi', 'Oskar', 'Brita', 'Toomas', 'Helmi', 'Rasmus', 'Ülle', 'Jaak', 'Malle', 'Gustav', 'Eeva', 'Hugo', 'Signe', 'Arvo', 'Kertu', 'Ilmar', 'Nora', 'Priit', 'Sander', 'Anu', 'Ervin', 'Riina', 'Mihkel', 'Pille', 'Tõnis', 'Laura', 'Joosep', 'Kadi', 'Ott', 'Marta'];
-const LAST = ['Kask', 'Lell', 'Saar', 'Ojamets', 'Raud', 'Kuld', 'Hiis', 'Vares', 'Lepp', 'Tamm', 'Pärn', 'Kivi', 'Rebane', 'Kotkas', 'Põld', 'Kaljurand', 'Vaher', 'Mänd', 'Sepp', 'Valk', 'Koger', 'Leht', 'Wind', 'Aas', 'Mets', 'Kallas', 'Rand', 'Kuusk', 'Ilves', 'Org'];
 const STORIES = [
   'Left two kids and a debt at home. Just like you.', 'Once mined on Titan and talks about it far too much.', 'Can\'t remember the last time they saw the sun.',
   'Sent their last wages to their mother. Needs work right now.', 'Former banker. Won\'t say why former.', 'Sings while working. Badly.', 'Lost their ship in a card game.',
@@ -268,7 +266,7 @@ const Econ = (() => {
       if (trait === 'ahne') wage *= 1.35; if (trait === 'laisk') wage *= 0.75; if (trait === 'veteran') wage *= 1.25;
       wage = Math.round(wage);
       let name;
-      do { name = pick(FIRST) + ' ' + pick(LAST); } while (used.has(name)); used.add(name);
+      name = Names.random(null, used); used.add(name);
       const story = spy && Math.random() < 0.6 ? pick(SPY_STORIES) : pick(STORIES);
       out.push({ id: Math.random().toString(36).slice(2, 8), look: Look.clean(Look.forName(name)), name, role, skill, trait, wage, fee: wage * 2, story, spy, spyFor: pick(['krell', 'klann']) });
     }

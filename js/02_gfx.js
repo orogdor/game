@@ -108,18 +108,34 @@ uniform vec4 uTints[32];
 #endif
 #endif
 void main(){
-  float shiny = 0.0;
+  float shiny = 0.0, hairK = 0.0;
 #ifdef SKIN
-  vec3 tx = texture(uAlb, vUV).rgb;
-  int rg = int(texture(uMask, vUV).r*255.0+0.5);
+  vec4 mk = texture(uMask, vUV);
+  int rg = int(mk.r*255.0+0.5);
+  float fwUV = length(fwidth(vUV));
 #ifdef TINTTEX
   vec4 tt = texelFetch(uTintTex, ivec2(clamp(rg,0,31),0), 0);
 #else
   vec4 tt = uTints[clamp(rg,0,31)];
 #endif
   if(tt.a < -0.5) discard;
+  // juuksed/habe (režiim 1.25): salkude alfa maski G-kanalis
+  if (tt.a > 1.1 && tt.a < 1.4) { if (mk.g < 0.5) discard; hairK = 1.0; }
+  vec3 tx = texture(uAlb, vUV).rgb;
   vec3 base = (tt.a > 0.5 ? vec3(dot(tx, vec3(0.3,0.59,0.11))) : tx)*tt.rgb*uTint.rgb;
   float m = 0.2; shiny = tt.a > 1.5 ? 1.0 : 0.0;
+  // kõrred (G) ja peanaha juuksepiir (B): pehme tihedus + pikslitera; värv ja tugevus tooniplaatidest 30/31
+  if (tt.a > -0.5 && tt.a < 0.5 && mk.g + mk.b > 0.004) {
+#ifdef TINTTEX
+    vec4 sb = texelFetch(uTintTex, ivec2(30,0), 0), ss = texelFetch(uTintTex, ivec2(31,0), 0);
+#else
+    vec4 sb = uTints[30], ss = uTints[31];
+#endif
+    float gr = fract(sin(dot(floor(vUV*4096.0), vec2(12.9898,78.233)))*43758.5453);
+    gr = mix(gr, 0.5, clamp(fwUV*4096.0 - 0.8, 0.0, 1.0));
+    base = mix(base, sb.rgb*uTint.rgb*(0.75+0.35*gr), clamp(mk.g*sb.a*(0.4+1.2*gr), 0.0, 1.0));
+    base = mix(base, ss.rgb*uTint.rgb*(0.8+0.3*gr), clamp(mk.b*ss.a*(0.45+1.1*gr), 0.0, 1.0));
+  }
 #else
   vec3 base = vC.rgb*uTint.rgb;
   float m = vC.a;
@@ -261,6 +277,7 @@ void main(){
   vec3 Vd = normalize(uCam-vW); vec3 H = normalize(uSunDir+Vd);
   float spec = pow(max(dot(N,H),0.0), 32.0)*sh*ndl;
   float specK = (m>0.35 && m<0.6) ? 0.3 : mix(0.06, 0.22, shiny);
+  if (hairK > 0.5) { specK = 0.2; spec = pow(max(dot(N,H),0.0), 16.0)*sh*ndl; }
   if (m > 0.785 && m < 0.85) { specK = m > 0.825 ? 0.16 : 0.38; spec = pow(max(dot(N,H),0.0), m > 0.825 ? 20.0 : 40.0)*sh*ndl; }
 #ifndef SKIN
   if (m > 0.08 && m < 0.16) { specK = 0.42; spec = pow(max(dot(N,H),0.0), 48.0)*sh*ndl + pow(max(dot(N,H),0.0), 8.0)*0.08; }

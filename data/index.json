@@ -1,5 +1,5 @@
 {
- "version": "v41",
+ "version": "v42",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -10,7 +10,7 @@
   {
    "var": "CHAR_DATA",
    "json": "data/characters.json",
-   "size": 4346109,
+   "size": 9959150,
    "bin": "data/characters.bin"
   },
   {
