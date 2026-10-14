@@ -104,6 +104,7 @@ const Boss = (() => {
     if (e.heartHp <= 0) die(e, { team: r.team, rival: r });
   }
   function die(e, src) {
+    setTimeout(() => Save.auto(true), 1500);
     e.alive = false; e.state = 'dead'; e.deathT = 0; e.heartHp = 0;
     G.flags.bossDead = true;
     local(e, HEART, tmp);

@@ -122,6 +122,18 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brass)
 #wname { font-size: 12px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 #ammo { font-family: var(--font-num); font-size: 28px; line-height: 1; } #ammo small { font-size: 14px; color: var(--muted); }
 #ammo.reload { color: var(--brass); font-size: 16px; }
+#saveInd { position: absolute; z-index: 40; left: 14px; bottom: calc(14px + var(--sb, 0px)); display: flex; align-items: center; gap: 7px; font-family: var(--font-num); font-size: 11px; letter-spacing: .12em; color: rgba(238, 223, 198, .85); background: rgba(10, 7, 6, .55); border: 1px solid var(--line-2); border-radius: 3px; padding: 5px 9px; opacity: 0; transition: opacity .35s; pointer-events: none; }
+#saveInd.on { opacity: 1; }
+#saveInd i { width: 9px; height: 9px; border-radius: 50%; background: var(--rust-hi); box-shadow: 0 0 8px var(--rust-hi); }
+.svList { display: flex; flex-direction: column; gap: 8px; }
+.svRow { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 4px; background: rgba(255, 255, 255, .025); }
+.svRow.bad { border-color: var(--danger); }
+.svThumb { width: 112px; height: 63px; border-radius: 3px; background: rgba(0, 0, 0, .4) center / cover no-repeat; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; }
+.svName { font-weight: 700; font-size: 15px; } .svName small { font-weight: 500; color: var(--muted); margin-left: 6px; font-size: 12px; }
+.svMeta { color: var(--muted); font-size: 13px; margin: 2px 0 6px; }
+.svBtns { display: flex; flex-wrap: wrap; gap: 5px; } .svBtns .pbtn { height: 30px; padding: 0 10px; font-size: 13px; }
+.svImp { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 560px) { .svRow { grid-template-columns: 84px 1fr; } .svThumb { width: 84px; height: 47px; } }
 #toast { left: 50%; bottom: calc(22% + var(--sb)); transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line-2); padding: 7px 14px; border-radius: 3px; font-size: 14px; opacity: 0; transition: opacity .3s; max-width: 80vw; text-align: center; }
 #toast.on { opacity: 1; }
 #banner { left: 0; right: 0; top: 22%; text-align: center; opacity: 0; transition: opacity .6s; pointer-events: none; }

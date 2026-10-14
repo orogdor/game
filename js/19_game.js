@@ -2,28 +2,162 @@
 //  SALVESTUS
 // ============================================================
 const Save = (() => {
-  const KEY = 'roostes-lootus-v1';
+  // Salvestused IndexedDB-s: 3 käsitsi kohta, 3 vahelduvat automaatset, 1 imporditud fail.
+  // Iga kirje: { id, kind, t, gid, fmt, ver, meta, thumb, json, sum } — json + kontrollsumma (rikutud kirjet ei laadita).
+  const LEGACY = 'roostes-lootus-v1', MIRROR = 'k73-last-save', DBN = 'k73', ST = 'saves', FMT = 2;
+  const SLOTS = ['slot1', 'slot2', 'slot3'], AUTOS = ['auto1', 'auto2', 'auto3'];
+  const NAMES = { slot1: 'Slot 1', slot2: 'Slot 2', slot3: 'Slot 3', auto1: 'Autosave', auto2: 'Autosave', auto3: 'Autosave', import: 'Imported file' };
+  const AUTO_EVERY = 150, AUTO_MIN = 25;   // sekundid
+  let db = null, ready = false, lastAuto = -1e9, thumbFor = null, lastThumb = '', persistAsked = false;
+  const cache = {};
   function data() {
     return {
-      v: 1, seed: G.seed, diff: G.diff, time: G.time, res: G.res, carry: G.carry, debt: G.debt, up: G.up, scan: G.scan,
+      v: FMT, seed: G.seed, diff: G.diff, time: G.time, res: G.res, carry: G.carry, debt: G.debt, up: G.up, scan: G.scan,
       flags: Object.assign({}, G.flags, { music: false }), stats: G.stats, market: G.market, candidates: G.candidates,
       player: { x: Player.pos.x, z: Player.pos.z, yaw: Player.yaw, hp: Player.hp },
       base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(),
       wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
       pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data })),
-      look: Look.clean(G.look), pname: G.pname, inv: Inv.serialize(), pmag: Player.mag,
+      look: Look.clean(G.look), pname: G.pname, inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
     };
   }
-  function save() {
+  function hash(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); }
+  function valid(d) { return !!(d && typeof d === 'object' && d.seed !== undefined && d.time && d.player && isFinite(d.player.x) && isFinite(d.player.z) && d.base && d.res); }
+  // vanemad salvestusvormingud -> praegune
+  function migrate(d) {
+    if (!d.v || d.v < 2) { d.v = 2; d.stats = d.stats || {}; d.gid = d.gid || 'g' + (d.seed || 0); }
+    return d;
+  }
+  function parseRec(r) {
+    if (!r || typeof r.json !== 'string') return null;
+    if (r.sum && hash(r.json) !== r.sum) return null;
+    try { const d = JSON.parse(r.json); return valid(d) ? migrate(d) : null; } catch (e) { return null; }
+  }
+  function meta() {
+    return { day: G.time.day, debt: G.debt.left, cr: Math.round(G.res.cr || 0), pname: G.pname || '', diff: G.diff, play: Math.round(G.stats.play || 0), crew: (typeof Crew.count === 'function' ? Crew.count() : 0) };
+  }
+  // ---------- IndexedDB ----------
+  function idb(mode, fn) {
+    return new Promise((ok, no) => {
+      if (!db) { no(new Error('no db')); return; }
+      const tx = db.transaction(ST, mode), st = tx.objectStore(ST); let res;
+      const r = fn(st); if (r) r.onsuccess = () => { res = r.result; };
+      tx.oncomplete = () => ok(res); tx.onerror = () => no(tx.error); tx.onabort = () => no(tx.error);
+    });
+  }
+  function init() {
+    return new Promise((ok) => {
+      let done = false; const fin = () => { if (done) return; done = true; ready = true; migrateLegacy(); ok(); };
+      setTimeout(fin, 2500);
+      try {
+        const rq = indexedDB.open(DBN, 1);
+        rq.onupgradeneeded = () => { rq.result.createObjectStore(ST, { keyPath: 'id' }); };
+        rq.onsuccess = () => { db = rq.result; idb('readonly', (st) => st.getAll()).then((all) => { for (const r of all || []) cache[r.id] = r; fin(); }).catch(fin); };
+        rq.onerror = fin; rq.onblocked = fin;
+      } catch (e) { fin(); }
+    });
+  }
+  // vana (v1) salvestus localStorage'ist -> esimene automaatne koht
+  function migrateLegacy() {
+    try {
+      for (const k of [LEGACY, MIRROR]) {
+        const s = localStorage.getItem(k); if (!s) continue;
+        let rec = null;
+        if (k === MIRROR) { rec = JSON.parse(s); } else { const d = JSON.parse(s); if (!valid(d)) continue; const json = JSON.stringify(d); rec = { id: 'auto1', kind: 'auto', t: Date.now() - 1000, gid: 'g' + d.seed, fmt: 1, ver: 'v1', meta: { day: d.time.day, debt: d.debt && d.debt.left, pname: d.pname || '', diff: d.diff }, thumb: '', json, sum: hash(json) }; }
+        if (!rec || !rec.id) continue;
+        if (!cache[rec.id] || (cache[rec.id].t || 0) < rec.t) { cache[rec.id] = rec; put(rec); }
+        if (k === LEGACY) localStorage.removeItem(LEGACY);
+      }
+    } catch (e) { /* */ }
+  }
+  function put(rec) {
+    cache[rec.id] = rec;
+    if (db) idb('readwrite', (st) => st.put(rec)).catch(() => { UI.toast('Saving failed in this browser'); });
+    // hädavaru: viimane salvestus ka localStorage'is (kui mahub)
+    try { if (rec.json.length < 3.5e6) localStorage.setItem(MIRROR, JSON.stringify(rec)); } catch (e) { /* täis */ }
+  }
+  function askPersist() {
+    if (persistAsked) return; persistAsked = true;
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* */ }
+  }
+  // ---------- kirjutamine ----------
+  function canSave() {
     if (G.mode !== 'play' && G.mode !== 'build') return false;
     if (typeof Net !== 'undefined' && Net.role === 'guest') return false;   // külaline ei kirjuta oma salvestust üle
-    try { localStorage.setItem(KEY, JSON.stringify(data())); return true; } catch (e) { return false; }
+    return true;
   }
-  function load() { try { const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
-  function has() { return !!load(); }
-  function clear() { try { localStorage.removeItem(KEY); } catch (e) { /* ignoreeri */ } }
-  function auto() { save(); }
-  return { data, save, load, has, clear, auto };
+  function write(id, kind) {
+    if (!canSave()) return false;
+    if (!G.gid) G.gid = 'g' + Date.now().toString(36);
+    let json;
+    try { json = JSON.stringify(data()); } catch (e) { console.error(e); return false; }
+    const rec = { id, kind, t: Date.now(), gid: G.gid, fmt: FMT, ver: typeof K73_VERSION !== 'undefined' ? K73_VERSION : '', meta: meta(), thumb: lastThumb, json, sum: hash(json) };
+    put(rec); thumbFor = id; askPersist(); indicator();
+    return true;
+  }
+  function auto(force) {
+    if (!canSave()) return false;
+    const now = performance.now() / 1000;
+    if (!force && now - lastAuto < AUTO_MIN) return false;
+    lastAuto = now;
+    // kõige vanem automaatne koht kirjutatakse üle
+    const id = AUTOS.slice().sort((a, b) => ((cache[a] && cache[a].t) || 0) - ((cache[b] && cache[b].t) || 0))[0];
+    return write(id, 'auto');
+  }
+  function save() { return auto(true); }
+  function saveSlot(id) { return SLOTS.includes(id) ? write(id, 'manual') : false; }
+  function tick(dt) { if (G.mode === 'play' && performance.now() / 1000 - lastAuto > AUTO_EVERY) auto(); }
+  // pisipilt pärast kaadri joonistamist (WebGL lõuendi sisu on olemas ainult samas ülesandes)
+  function afterRender(cv) {
+    if (!thumbFor || !cv) return;
+    const id = thumbFor; thumbFor = null;
+    try {
+      const c = document.createElement('canvas'); c.width = 192; c.height = 108;
+      c.getContext('2d').drawImage(cv, 0, 0, 192, 108);
+      lastThumb = c.toDataURL('image/jpeg', 0.62);
+      const r = cache[id]; if (r) { r.thumb = lastThumb; if (db) idb('readwrite', (st) => st.put(r)).catch(() => {}); }
+    } catch (e) { /* */ }
+  }
+  let indT = 0;
+  function indicator() {
+    const el = document.getElementById('saveInd'); if (!el) return;
+    el.classList.add('on'); clearTimeout(indT); indT = setTimeout(() => el.classList.remove('on'), 1400);
+  }
+  // ---------- lugemine ----------
+  function list() { return Object.values(cache).filter((r) => r && r.json).sort((a, b) => b.t - a.t); }
+  function load(id) {
+    if (id) return parseRec(cache[id]);
+    for (const r of list()) { const d = parseRec(r); if (d) return d; }   // uusim korras salvestus
+    return null;
+  }
+  function has() { return list().length > 0; }
+  function ok(id) { return !!parseRec(cache[id]); }
+  function remove(id) { delete cache[id]; if (db) idb('readwrite', (st) => st.delete(id)).catch(() => {}); try { const m = JSON.parse(localStorage.getItem(MIRROR) || 'null'); if (m && m.id === id) localStorage.removeItem(MIRROR); } catch (e) { /* */ } }
+  // mäng läbi: selle mängu automaatsed salvestused kustutatakse (käsitsi kohad jäävad)
+  function clear() { for (const id of AUTOS) if (cache[id] && cache[id].gid === G.gid) remove(id); try { localStorage.removeItem(MIRROR); } catch (e) { /* */ } }
+  // ---------- fail ----------
+  function exportFile(id) {
+    const r = cache[id]; if (!r) return false;
+    const file = JSON.stringify({ k73save: 1, rec: r });
+    const nm = (r.meta && r.meta.pname ? r.meta.pname.replace(/[^\wÀ-ſ-]+/g, '_') : 'K73') + '_day' + ((r.meta && r.meta.day) || 0) + '.k73';
+    try {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([file], { type: 'application/json' })); a.download = nm;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      return true;
+    } catch (e) { return false; }
+  }
+  function importFile(file) {
+    return file.text().then((txt) => {
+      let o; try { o = JSON.parse(txt); } catch (e) { throw new Error('Not a K73 save file'); }
+      let rec = o && o.k73save ? o.rec : null;
+      if (!rec && valid(o)) { const json = JSON.stringify(o); rec = { kind: 'import', t: Date.now(), gid: o.gid || 'imp', fmt: o.v || 1, ver: '', meta: { day: o.time.day, debt: o.debt && o.debt.left, pname: o.pname || '', diff: o.diff }, thumb: '', json, sum: hash(json) }; }
+      if (!rec || !parseRec(rec)) throw new Error('The save file is damaged or from another game');
+      rec = Object.assign({}, rec, { id: 'import', kind: 'import' });
+      put(rec);
+      return rec;
+    });
+  }
+  return { init, data, save, auto, saveSlot, tick, afterRender, list, load, has, ok, remove, clear, exportFile, importFile, SLOTS, AUTOS, NAMES, isReady: () => ready };
 })();
 
 // ============================================================
@@ -53,6 +187,7 @@ const Game = (() => {
     GFX.setTerrain(null, false); World.setTerrainShadow(sh === 'high');
     FX.setQuality(g.fx == null ? q.fx : g.fx);
     GFX.S.viewMul = (g.view || 1000) / 1000;
+    GFX.S.matOn = qKey !== 'low';   // materjalitekstuurid (madalal kvaliteedil välja)
     resize();
   }
   function resize() {
@@ -91,10 +226,12 @@ const Game = (() => {
     G.time.t = 0.555; G.time.day = 1;
     window.addEventListener('resize', resize);
     window.addEventListener('orientationchange', () => setTimeout(resize, 200));
-    document.addEventListener('visibilitychange', () => { if (document.hidden && (G.mode === 'play')) { Save.auto(); } });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && (G.mode === 'play' || G.mode === 'build')) { Save.auto(true); } });
+    window.addEventListener('pagehide', () => { if (G.mode === 'play' || G.mode === 'build') Save.auto(true); });
     // avaekraan
     G.mode = 'title';
     UI.showTitle(Save.has());
+    Save.init().then(() => { if (G.mode === 'title') UI.showTitle(Save.has()); });
     document.getElementById('loading').hidden = true;
     if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
       try { window.claude.hot.snapshot(() => (G.mode === 'play' || G.mode === 'build' ? { save: Save.data() } : {})); } catch (e) { /* ignoreeri */ }
@@ -148,6 +285,7 @@ const Game = (() => {
     UI.msg('The main building is dark and rusty. The generator is broken, but there are 40 scrap in storage.', 'warn');
     setTimeout(() => { if (G.mode === 'play') UI.msg('Bank: first debt payment ' + fmtInt(G.debt.amount) + ' ₵ is due on the morning of day 4.', 'money'); }, 6000);
     Objectives.check();
+    G.gid = 'g' + Date.now().toString(36);
     Save.save();
   }
   function continueGame(d) {
@@ -160,6 +298,7 @@ const Game = (() => {
     Object.assign(G.up, d.up); Object.assign(G.scan, d.scan); G.flags = d.flags || {}; Object.assign(G.stats, d.stats); Object.assign(G.market, d.market);
     G.candidates = d.candidates || []; G.log = d.log || [];
     if (d.look) G.look = d.look; if (d.pname) G.pname = d.pname;
+    G.gid = d.gid || ('g' + d.seed);
     Inv.deserialize(d.inv, d.carry);
     UI.waypoint = d.waypoint || null;
     Base.deserialize(d.base);
@@ -322,6 +461,7 @@ const Game = (() => {
     const inp = Input.frame(dt);
     Player.zoom = inp.zoom;
     if (G.mode === 'play' || G.mode === 'build') handleKeys();
+    if (G.mode === 'play' && !G.paused) { G.stats.play = (G.stats.play || 0) + dt; Save.tick(dt); }
     if (Net.role === 'guest' && (G.mode === 'play' || G.mode === 'build')) {
       // co-op külaline: maailm tuleb peremehelt, kohapeal ainult oma tegelane
       if (G.mode === 'play' && !G.paused) Player.update(dt, inp);
@@ -360,6 +500,7 @@ const Game = (() => {
     Build.draw();
     if (G.mode === 'play') Player.drawViewmodel(dt);
     GFX.render(sc);
+    Save.afterRender(GFX.gl && GFX.gl.canvas);
     UI.update(dt);
   }
   // testimiseks: simuleeri ilma joonistamata

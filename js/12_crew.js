@@ -129,6 +129,7 @@ const Crew = (() => {
     note('hired', cand.name.split(' ')[0]);
     Audio2.cash();
     Objectives.check();
+    Save.auto();
     return { ok: true, e };
   }
   function fire(e) {

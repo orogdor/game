@@ -524,6 +524,7 @@ const UI = (() => {
     else if (panelKind === 'help') renderHelp(body);
     else if (panelKind === 'inv') renderInv(body);
     else if (panelKind === 'coop') Net.renderPanel(body);
+    else if (panelKind === 'saves') renderSaves(body);
     if (soft) body.scrollTop = scroll;
   }
   function btn(id, label, opts = {}) { return `<button class="pbtn ${opts.primary ? 'primary' : ''}" data-act="${id}" ${opts.disabled ? 'disabled' : ''}>${label}</button>`; }
@@ -729,9 +730,9 @@ const UI = (() => {
         <button data-act="build">${ICON.hammer} Build</button>
         <button data-act="coop">${ICON.people} ${Net.active ? (Net.role === 'host' ? 'Co-op: ' + Net.peerCount() + ' joined' : 'Co-op: connected') : 'Co-op: invite a friend'}</button>
         <button data-act="help">${ICON.help} How to play</button>
-        <button data-act="save">${ICON.save} Save</button>
+        <button data-act="save">${ICON.save} Save / load</button>
         <button data-act="quit">${ICON.exit} To main menu</button></div>
-        <p class="note" style="margin-top:12px">The game also saves by itself every morning and after building. The save stays only in this browser.</p>`;
+        <p class="note" style="margin-top:12px">The game saves by itself every few minutes, every morning and after important events (3 rotating autosaves). Use Save / load to keep a game in a slot or to move it to another device as a file.</p>`;
     } else if (panelTab === 'seaded') {
       const q = Game.quality(), gf = Input.settings.gfx;
       h = `<div class="set">
@@ -766,7 +767,7 @@ const UI = (() => {
       build: () => { closePanel(); Game.toggleBuild(); },
       coop: () => { openPanel('coop', Net.role === 'guest' ? 'join' : 'host'); },
       help: () => { openPanel('help'); },
-      save: () => { toast(Save.save() ? 'Saved' : 'Saving failed in this browser'); },
+      save: () => { openPanel('saves'); },
       quit: () => { Save.save(); closePanel(); Net.leave(); Game.toTitle(); },
       inv: (v) => { Input.settings.invert = v === '1'; Input.saveSettings(); renderPanel(); },
       q: (v) => { Game.setQuality(v); renderPanel(); },
@@ -777,6 +778,47 @@ const UI = (() => {
       gfps: (v) => { Input.settings.gfx.fps = v === '1'; Input.saveSettings(); renderPanel(); },
       fs: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => toast('Fullscreen isn\'t allowed here')); } catch (e) { toast('Fullscreen isn\'t allowed here'); } },
     });
+  }
+  // ---------- salvestused ----------
+  let svConfirm = null;
+  function fmtPlay(sec) { const m = Math.round((sec || 0) / 60); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+  function renderSaves(body) {
+    $('pTitle').textContent = 'Saved games'; $('pTabs').innerHTML = '';
+    const inGame = (G.mode === 'play' || G.mode === 'build') && Net.role !== 'guest';
+    const byId = {}; for (const r of Save.list()) byId[r.id] = r;
+    const ids = [...Save.SLOTS, ...Save.AUTOS.filter((k) => byId[k]).sort((a, b) => byId[b].t - byId[a].t), ...(byId.import ? ['import'] : [])];
+    const rows = ids.map((id) => {
+      const r = byId[id], manual = Save.SLOTS.includes(id);
+      const title = Save.NAMES[id] || id;
+      if (!r) return `<div class="svRow"><div class="svThumb">empty</div><div><div class="svName">${title}</div><div class="svMeta">Empty slot</div>
+        <div class="svBtns">${inGame ? btn('ss:' + id, 'Save here', { primary: true }) : ''}</div></div></div>`;
+      const ok = Save.ok(id), m = r.meta || {};
+      const meta = ok ? `${esc(m.pname || '')} · Day ${m.day || '?'} · Debt ${fmtInt(m.debt || 0)} ₵${m.play ? ' · ' + fmtPlay(m.play) : ''}<br>${new Date(r.t).toLocaleString()}${r.ver ? ' · ' + esc(r.ver) : ''}`
+        : 'This save is damaged and can\'t be loaded. An older save may still work.';
+      const c = svConfirm && svConfirm.id === id ? svConfirm.kind : null;
+      return `<div class="svRow ${ok ? '' : 'bad'}"><div class="svThumb" style="${r.thumb ? `background-image:url(${r.thumb})` : ''}">${r.thumb ? '' : 'K73'}</div><div>
+        <div class="svName">${title}${r.kind === 'auto' ? '<small>automatic</small>' : ''}</div><div class="svMeta">${meta}</div>
+        <div class="svBtns">${ok ? btn('ld:' + id, c === 'ld' ? 'Confirm load' : 'Load', { primary: true }) : ''}${manual && inGame ? btn('ss:' + id, c === 'ss' ? 'Confirm overwrite' : 'Save here') : ''}${ok ? btn('ex:' + id, 'Save to file') : ''}${btn('rm:' + id, c === 'rm' ? 'Confirm delete' : 'Delete')}</div></div></div>`;
+    }).join('');
+    body.innerHTML = `<div class="svList">${rows}</div>
+      <div class="svImp">${btn('imp', 'Open a save file…')}<input type="file" id="svFile" accept=".k73,.json,application/json" hidden></div>
+      <p class="note" style="margin-top:10px">Saves are kept in this browser. "Save to file" downloads a .k73 file you can keep as a backup or open on another device with "Open a save file".</p>`;
+    const confirm2 = (kind, id, f) => { if (svConfirm && svConfirm.id === id && svConfirm.kind === kind) { svConfirm = null; f(); } else { svConfirm = { kind, id }; renderPanel(true); } };
+    bindActs(body, {
+      ss: (id) => { const go = () => { toast(Save.saveSlot(id) ? 'Saved to ' + Save.NAMES[id] : 'Saving failed'); setTimeout(() => renderPanel(true), 60); }; if (byId[id]) confirm2('ss', id, go); else go(); },
+      ld: (id) => {
+        const go = () => { const d = Save.load(id); if (!d) { toast('This save can\'t be loaded'); return; } closePanel(); Audio2.init(); Audio2.resume(); Net.leave(); Game.continueGame(d); };
+        if (inGame) confirm2('ld', id, go); else go();
+      },
+      ex: (id) => { toast(Save.exportFile(id) ? 'Save file downloaded' : 'Download isn\'t allowed here'); },
+      rm: (id) => confirm2('rm', id, () => { Save.remove(id); renderPanel(true); if (G.mode === 'title') showTitle(Save.has()); }),
+      imp: () => { $('svFile').click(); },
+    });
+    $('svFile').onchange = (e) => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      Save.importFile(f).then(() => { toast('Save file opened. Press Load to play it.'); renderPanel(true); if (G.mode === 'title') showTitle(Save.has()); })
+        .catch((er) => toast(er.message || 'Couldn\'t open the file'));
+    };
   }
   function openHelp() { openPanel('help'); }
   function openMap() { openPanel('map'); }
@@ -848,7 +890,8 @@ const UI = (() => {
     ds.innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button class="${G.diff === k ? 'on' : ''}" data-d="${k}">${d.name}</button>`).join('');
     ds.querySelectorAll('button').forEach((b) => (b.onclick = () => { G.diff = b.dataset.d; Audio2.ui(); showTitle(hasSave); }));
     const tb = $('titleBtns');
-    tb.innerHTML = `<button class="primary" id="tNew">Start a new game</button>${hasSave ? '<button id="tCont">Continue</button>' : ''}<button id="tJoin">Join a friend (co-op)</button><button id="tHelp">How to play</button>`;
+    tb.innerHTML = `${hasSave ? '<button class="primary" id="tCont">Continue</button>' : ''}<button class="${hasSave ? '' : 'primary'}" id="tNew">Start a new game</button><button id="tLoad">Load game</button><button id="tJoin">Join a friend (co-op)</button><button id="tHelp">How to play</button>`;
+    $('tLoad').onclick = () => { Audio2.init(); openPanel('saves'); };
     $('tJoin').onclick = () => { Audio2.init(); Audio2.resume(); Creator.open(() => { showTitle(hasSave); openPanel('coop', 'join'); }); };
     $('tNew').onclick = () => { Audio2.init(); Audio2.resume(); Creator.open(() => Game.newGame()); };
     if (hasSave) $('tCont').onclick = () => { Audio2.init(); Audio2.resume(); Game.continueGame(); };

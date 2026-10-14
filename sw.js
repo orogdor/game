@@ -1,6 +1,6 @@
 // K73 teenustöötaja: kõik mängu failid (kood, mudelid, tekstuurid) vahemällu -> töötab ka ilma internetita.
 // Iga uus versioon saab uue vahemälu nime (ehitusskript lisab failide räsi), vana kustutatakse.
-const CACHE = 'k73-v43-27c994a6';
+const CACHE = 'k73-v44-fa62572a';
 const FILES = [
 "./",
 "./css/k73.css",
@@ -19,6 +19,7 @@ const FILES = [
 "./data/index.json",
 "./data/machines.bin",
 "./data/machines.json",
+"./data/materials.json",
 "./data/models.bin",
 "./data/models.json",
 "./data/predator.bin",
@@ -31,6 +32,8 @@ const FILES = [
 "./data/tex/female_tex.jpg",
 "./data/tex/male_mask.png",
 "./data/tex/male_tex.jpg",
+"./data/tex/materials_albedo.jpg",
+"./data/tex/materials_normal.jpg",
 "./data/tex/soldier_mask.png",
 "./data/tex/soldier_tex.jpg",
 "./data/weapons.bin",

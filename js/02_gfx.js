@@ -83,6 +83,11 @@ uniform vec4 uTint;
 uniform vec4 uLP[12]; uniform vec4 uLC[12]; uniform int uNL;
 uniform sampler2DShadow uShadow;
 out vec4 oC;
+#ifndef SKIN
+// materjalitekstuurid (tekstuurimassiiv): 0 liiv 1 kivi 2 betoon 3 värvitud metall 4 harjatud metall 5 rooste 6 kangas 7 orgaaniline
+uniform mediump sampler2DArray uMatA; uniform mediump sampler2DArray uMatN; uniform float uMatOn;
+vec3 rotTo(vec3 a, vec3 b, vec3 v) { vec3 c = cross(a, b); float d = dot(a, b); if (d < -0.999) return -v; return v*d + cross(c, v) + c*(dot(c, v)/(1.0 + d)); }
+#endif
 vec3 tm(vec3 x){ x = max(x, 0.0); return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
 float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f);
@@ -168,6 +173,34 @@ void main(){
   }
 #endif
   vec3 N = normalize(vN); if(!gl_FrontFacing) N = -N;
+#ifndef SKIN
+  // ---- materjalitekstuur: triplanaarne albeedo + normaalkaart (objekti ruumis, maastik maailma ruumis) ----
+  if (uMatOn > 0.5 && m < 0.85) {
+    float mf = 1.0 - smoothstep(22.0, 52.0, tdist);
+    if (mf > 0.0) {
+      float L = 2.0, sc = 1.2, kA = 1.0, kN = 1.0; bool wrl = false;
+      if (m < 0.08) { kA = 0.6; kN = 0.6; }
+      else if (m < 0.16) { L = 7.0; sc = 3.5; }
+      else if (m < 0.24) { L = 6.0; sc = 4.0; kA = 0.7; }
+      else if (m < 0.35) { L = 2.0; sc = 1.4; }
+      else if (m < 0.6) { L = 5.0; sc = 1.8; }
+      else if (m < 0.785) { L = 0.0; sc = 0.55; wrl = true; kA = 0.8; kN = 0.6; }
+      else if (m < 0.825) { L = 4.0; sc = 1.6; kA = 0.8; }
+      else { L = 3.0; sc = 1.3; kA = 0.9; }
+      vec3 nb = wrl ? normalize(vN) : normalize(vNo);
+      vec3 p = (wrl ? vW : vO) * sc;
+      vec3 w = pow(abs(nb), vec3(4.0)); w /= (w.x + w.y + w.z);
+      vec3 al = texture(uMatA, vec3(p.zy, L)).rgb*w.x + texture(uMatA, vec3(p.xz, L)).rgb*w.y + texture(uMatA, vec3(p.xy, L)).rgb*w.z;
+      base *= mix(vec3(1.0), al*2.0, kA*mf);
+      vec3 tX = texture(uMatN, vec3(p.zy, L)).xyz*2.0 - 1.0, tY = texture(uMatN, vec3(p.xz, L)).xyz*2.0 - 1.0, tZ = texture(uMatN, vec3(p.xy, L)).xyz*2.0 - 1.0;
+      tX = vec3(tX.xy + nb.zy, abs(tX.z)*nb.x); tY = vec3(tY.xy + nb.xz, abs(tY.z)*nb.y); tZ = vec3(tZ.xy + nb.xy, abs(tZ.z)*nb.z);
+      vec3 np = normalize(tX.zyx*w.x + tY.xzy*w.y + tZ.xyz*w.z);
+      if (!wrl) np = rotTo(nb, normalize(vN), np);
+      if (!gl_FrontFacing) np = -np;
+      N = normalize(mix(N, np, kN*mf));
+    }
+  }
+#endif
   float dist = length(vW-uCam);
   float fog = 1.0-exp(-dist*uFogDen);
   fog *= clamp(1.0-(vW.y-uFogH)*0.0035, 0.5, 1.0);
@@ -910,11 +943,47 @@ void main(){
   const ident = M4.create();
   const WHITE = [1, 1, 1, 0], ZERO3 = [0, 0, 0];
 
+  // ---------- materjalitekstuurid (8-kihiline massiiv, ühikud 6 = albeedo, 7 = normaalid) ----------
+  let matA = null, matN = null;
+  function arrTex(unit, pix) {
+    const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pix));
+    gl.activeTexture(gl.TEXTURE0); return t;
+  }
+  function initMatTex() {
+    S.matOn = true;
+    // ajutised neutraalsed (enne pildi laadimist): hall albeedo, tasane normaal
+    arrTex(6, [128, 128, 128, 255]); arrTex(7, [128, 128, 255, 255]);
+    if (typeof MAT_TEX === 'undefined') return;
+    const load = (src, unit, done) => {
+      const im = new Image();
+      im.onload = () => {
+        try {
+          const n = Math.round(im.height / im.width), t = gl.createTexture();
+          gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+          gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+          gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, im.width, im.width, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, im);
+          gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.BROWSER_DEFAULT_WEBGL);
+          gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+          gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+          const an = gl.getExtension('EXT_texture_filter_anisotropic');
+          if (an) gl.texParameterf(gl.TEXTURE_2D_ARRAY, an.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(4, gl.getParameter(an.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+          gl.activeTexture(gl.TEXTURE0);
+          done(t);
+        } catch (e) { console.error('mat tex', e); }
+      };
+      im.src = src;
+    };
+    load(MAT_TEX.albedo, 6, (t) => { matA = t; });
+    load(MAT_TEX.normal, 7, (t) => { matN = t; });
+  }
   function init(cv, opts = {}) {
     canvas = cv;
     gl = canvas.getContext('webgl2', { antialias: opts.antialias !== false, alpha: false, depth: true, stencil: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opts.preserve });
     if (!gl) return false;
     progLit = compile(LIT_VS, LIT_FS, '');
+    initMatTex();
     progLitI = compile(LIT_VS, LIT_FS, '#define INST 1\n');
     progDepth = compile(DEPTH_VS, DEPTH_FS, '');
     progDepthI = compile(DEPTH_VS, DEPTH_FS, '#define INST 1\n');
@@ -1092,6 +1161,7 @@ void main(){
     gl.uniform1i(pr.u('uShadow'), 0);
     gl.uniform4fv(pr.u('uLP'), lightPos); gl.uniform4fv(pr.u('uLC'), lightCol);
     gl.uniform1i(pr.u('uNL'), Math.min(12, lights.length));
+    gl.uniform1f(pr.u('uMatOn'), S.matOn && matA ? 1 : 0); gl.uniform1i(pr.u('uMatA'), 6); gl.uniform1i(pr.u('uMatN'), 7);
   }
   function pickLights() {
     for (const l of lights) { l.score = Math.max(0, Math.hypot(l.x - cam.pos.x, l.y - cam.pos.y, l.z - cam.pos.z) - l.r) - l.i * 2; }

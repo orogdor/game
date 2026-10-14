@@ -1,5 +1,5 @@
 {
- "version": "v43",
+ "version": "v44",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -12,6 +12,11 @@
    "json": "data/characters.json",
    "size": 9959150,
    "bin": "data/characters.bin"
+  },
+  {
+   "var": "MAT_TEX",
+   "json": "data/materials.json",
+   "size": 83
   },
   {
    "var": "KISKJA_DATA",

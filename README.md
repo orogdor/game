@@ -14,9 +14,13 @@ WebGL2 FPS ja baasiehitus kõrbeplaneedil. Brauseris töötav veebirakendus (PWA
 | `js/01_util.js … 20_net.js` | mängu kood (graafika, maailm, tegelased, relvad, ehitus, kasutajaliides, võrk) |
 | `data/index.json` | andmefailide ja koodifailide nimekiri |
 | `data/*.json` + `data/*.bin` | 3D-mudelid: kirjeldus (JSON) + geomeetria (binaarne) |
-| `data/tex/` | tegelaste tekstuurid (4096 albeedo, regioonimaskid) |
+| `data/tex/` | tegelaste tekstuurid (4096 albeedo, regioonimaskid) ja materjalitekstuurid (liiv, kivi, betoon, metall, rooste, kangas, orgaaniline: albeedo + normaalkaart) |
 | `sw.js` | teenustöötaja: kõik failid vahemällu, töötab ilma internetita |
 | `manifest.webmanifest`, `icons/` | rakenduse nimi ja ikoonid |
+
+## Salvestused
+
+Mäng salvestab ise iga paari minuti järel, igal hommikul ja tähtsate sündmuste järel (3 vahelduvat automaatset salvestust, IndexedDB). Menüüs **Save / load**: 3 käsitsi salvestuskohta, laadimine, **Save to file** (laeb alla `.k73` faili) ja **Open a save file** (avab faili teises seadmes). Rikutud salvestust ei laadita, siis kasutatakse eelmist korras salvestust.
 
 ## Kohalik käivitamine
 

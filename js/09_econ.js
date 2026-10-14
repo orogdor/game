@@ -198,7 +198,7 @@ const Econ = (() => {
     if (typeof Rivals !== 'undefined') Rivals.daily();
     Spawner.daily();
     G.flags.dayStartKris = G.res.kris;
-    Save.auto();
+    Save.auto(true);
   }
   function dayLine() {
     const dd = G.debt.nextDay - G.time.day;
@@ -238,14 +238,14 @@ const Econ = (() => {
     if (SHOP[kind] && SHOP[kind].once && Inv.hasWeapon(SHOP[kind].id)) return false;
     const o = offers[kind]; if (!o) return false;
     if (G.res.cr < o.cost) return false;
-    G.res.cr -= o.cost; o.give(); Audio2.cash(); return true;
+    G.res.cr -= o.cost; o.give(); Audio2.cash(); Save.auto(); return true;
   }
   function payDebtEarly() {
     if (G.res.cr < G.debt.amount) return false;
     G.res.cr -= G.debt.amount; G.debt.left = Math.max(0, G.debt.left - G.debt.amount);
     G.debt.idx++; G.debt.nextDay = Math.max(G.debt.nextDay, G.time.day + 1) + 3; G.debt.amount = Math.min(G.debt.left, debtAmount(G.debt.idx)); G.debt.grace = false; G.debt.warned = false;
     Audio2.cash();
-    if (G.debt.left <= 0) setTimeout(() => Game.victory(true), 600);
+    if (G.debt.left <= 0) setTimeout(() => Game.victory(true), 600); else Save.auto(true);
     return true;
   }
 
