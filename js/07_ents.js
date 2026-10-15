@@ -9,7 +9,7 @@ const Ents = (() => {
   let nextId = 1;
   const tmpV = { x: 0, y: 0, z: 0 };
 
-  function groundY(x, z) { return Math.max(World.heightAt(x, z), Bases.floorAt(x, z)); }
+  function groundY(x, z, y) { return Math.max(World.heightAt(x, z), Bases.floorAt(x, z, y)); }
 
   function spawn(kind, team, x, z, o = {}) {
     const e = Object.assign({
@@ -34,8 +34,24 @@ const Ents = (() => {
   function noise(x, z, r, kind) { noises.push({ x, z, r, kind, t: 0.6 }); if (typeof Crew !== 'undefined' && Crew.hear && (kind === 'shot' || kind === 'boom')) Crew.hear(x, z, r, kind); }
 
   // ---------- liikumine ----------
-  function goTo(e, x, z, goalCells) {
-    const p = Bases.pathWorld(e.pos.x, e.pos.z, x, z, goalCells);
+  function goTo(e, x, z, goalCells, lv) {
+    lv = lv || 0;
+    // korrused: kui siht on teisel korrusel (või tuleb alla), mine läbi lähima sisetrepi
+    const BB = Bases.at(e.pos.x, e.pos.z) || Bases.at(x, z);
+    const cur = BB && BB.levelAt ? BB.levelAt(e.pos.x, e.pos.z, e.pos.y) : 0;
+    let p = null;
+    if (BB && (cur || lv)) {
+      if (cur === lv) p = BB.pathUp(e.pos.x, e.pos.z, x, z) || [{ x, z }];
+      else {
+        const r = BB.stairRoute(lv > cur ? x : e.pos.x, lv > cur ? z : e.pos.z, lv > cur);
+        if (r) {
+          if (cur === 0) { const a = Bases.pathWorld(e.pos.x, e.pos.z, r.entry.x, r.entry.z) || [r.entry]; p = [...a, ...r.via, r.exit, ...(BB.pathUp(r.exit.x, r.exit.z, x, z) || [{ x, z }])]; }
+          else { const a = BB.pathUp(e.pos.x, e.pos.z, r.entry.x, r.entry.z) || [r.entry]; const b = Bases.pathWorld(r.exit.x, r.exit.z, x, z, goalCells) || [{ x, z }]; p = [...a, ...r.via, r.exit, ...b]; }
+        }
+      }
+    }
+    if (!p) p = Bases.pathWorld(e.pos.x, e.pos.z, x, z, goalCells);
+    e.goalLv = lv;
     e.path = p || [{ x, z }]; e.pathI = 0; e.goal = { x, z }; e.goalCells = goalCells || null; e.stuckT = 0; e.detour = null; e.stuckN = 0; e.wpBest = 1e9; e.wpT = 0;
     return !!p;
   }
@@ -56,7 +72,7 @@ const Ents = (() => {
     if (e.wpT > 2.6 && !e.detour) {
       e.wpT = 0; e.wpBest = 1e9;
       if (e.pathI < e.path.length - 1 && !tgt.door) e.pathI++;
-      else if (e.goal) { const keep = e.stuckN || 0; goTo(e, e.goal.x, e.goal.z, e.goalCells); e.stuckN = keep; }
+      else if (e.goal) { const keep = e.stuckN || 0; goTo(e, e.goal.x, e.goal.z, e.goalCells, e.goalLv); e.stuckN = keep; }
       return false;
     }
     const sl = World.slopeAt(e.pos.x, e.pos.z);
@@ -105,7 +121,7 @@ const Ents = (() => {
     const want = Math.atan2(mx, mz);
     e.yaw += angDiff(e.yaw, want) * Math.min(1, dt * (e.kind === 'human' ? 6.5 : 10));
     World.collideCircle(e.pos, e.radius, e.pos.y + 0.3, e.pos.y + 1.7, isHuman(e));
-    e.pos.y = groundY(e.pos.x, e.pos.z);
+    e.pos.y = groundY(e.pos.x, e.pos.z, e.pos.y);
     e.moveAmt = Math.min(1, e.moveAmt + dt * 5);
     e.speed = sp;
     // kinnijäämine: astmeline vabanemine (ukse taga ootamine ei ole kinnijäämine)
@@ -120,12 +136,12 @@ const Ents = (() => {
         const nxt = e.path[e.pathI];
         if (n >= 5 && nxt && Math.hypot(nxt.x - e.pos.x, nxt.z - e.pos.z) < 4.5 && freeSpot(nxt.x, nxt.z, e.radius)) {
           // viimane abinõu: astu otse järgmisse vahepunkti (see on alati vaba)
-          e.pos.x = nxt.x; e.pos.z = nxt.z; e.pos.y = groundY(e.pos.x, e.pos.z); e.detour = null;
+          e.pos.x = nxt.x; e.pos.z = nxt.z; e.pos.y = groundY(e.pos.x, e.pos.z, e.pos.y); e.detour = null;
         } else if (BB.inGrid(cc.i, cc.j) && e.goal) {
           const ctr = (n >= 3 && BB.escapeCell(cc.i, cc.j)) || BB.cellCenter(cc.i, cc.j);
           const k2 = n >= 3 ? 1 : 0.6;
           e.pos.x += (ctr.x - e.pos.x) * k2; e.pos.z += (ctr.z - e.pos.z) * k2;
-          goTo(e, e.goal.x, e.goal.z, e.goalCells);
+          goTo(e, e.goal.x, e.goal.z, e.goalCells, e.goalLv);
           e.stuckN = n;
         } else {
           // väljas: proovi kordamööda mõlemat külge, iga kord kaugemale; vali vaba koht

@@ -2,7 +2,7 @@
 //  EHITUSREŽIIM (Sims-stiilis)
 // ============================================================
 const Build = (() => {
-  const S = { tool: 'look', cat: 'elu', item: null, rot: 0, rotManual: false, style: 1 };
+  const S = { tool: 'look', cat: 'elu', item: null, rot: 0, rotManual: false, style: 1, level: 0 };
   const cam = { tx: 0, tz: 4, yaw: 0.7, pitch: 0.92, dist: 26, vyaw: 0 };
   let hover = null, drag = null, pending = null, lastPointer = null;
   const undo = [];
@@ -36,6 +36,7 @@ const Build = (() => {
     const bb = Base.bounds(); cam.tx = clamp(Math.hypot(p.x, p.z) < bb + 12 ? p.x * 0.5 : 0, -30, 30); cam.tz = clamp(Math.hypot(p.x, p.z) < bb + 12 ? p.z * 0.5 + 3 : 3, -30, 30);
     cam.yaw = Player.yaw + Math.PI; cam.dist = 26;
     pending = null; drag = null; hover = null;
+    S.level = 0; Base.viewLevel = 0;
     undo.length = 0;
     UI.showBuild(true);
     setTool(Input.isTouch ? 'look' : 'wall');
@@ -43,6 +44,7 @@ const Build = (() => {
   }
   function exit() {
     pending = null; drag = null; GFX.cam.shiftY = 0;
+    S.level = 0; Base.viewLevel = 0;
     G.mode = 'play';
     UI.showBuild(false);
     Crew.assignBeds();
@@ -51,7 +53,15 @@ const Build = (() => {
     Save.auto();
     Objectives.check();
   }
+  function setLevel(lv) {
+    S.level = lv ? 1 : 0; Base.viewLevel = S.level; pending = null; drag = null; hover = null;
+    if (S.level && (S.tool === 'wall' || S.tool === 'door' || S.tool === 'window')) S.tool = 'look';
+    UI.buildTools(S); UI.buildConfirm(null); info();
+    UI.toast(S.level ? 'Floor 2 – place items upstairs' : 'Floor 1');
+  }
   function setTool(t) {
+    if (t === 'level') { setLevel(!S.level); return; }
+    if (S.level && (t === 'wall' || t === 'door' || t === 'window')) { deny('Walls, doors and windows are built on floor 1 – the upper floor follows them.'); return; }
     S.tool = t; pending = null; drag = null;
     if (t !== 'obj') S.item = null;
     UI.buildTools(S);
@@ -62,7 +72,7 @@ const Build = (() => {
     S.item = type; S.rotManual = false; S.tool = 'obj';
     const c = { x: cam.tx, z: cam.tz };
     const cell = Base.toCell(c.x, c.z);
-    if (Input.isTouch) { pending = { kind: 'obj', type, i: cell.i, j: cell.j, rot: Base.autoRot(type, cell.i, cell.j) }; showPendingConfirm(); }
+    if (Input.isTouch) { pending = { kind: 'obj', type, i: cell.i, j: cell.j, rot: Base.autoRot(type, cell.i, cell.j), lv: S.level }; showPendingConfirm(); }
     UI.buildTools(S);
     info();
   }
@@ -71,7 +81,7 @@ const Build = (() => {
   function update(dt) {
     const k = (c) => Input.keys.has(c);
     const sp = cam.dist * 0.9 * dt;
-    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
+    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     let mx = 0, mz = 0;
     if (k('KeyW') || k('ArrowUp')) { mx += fx; mz += fz; }
     if (k('KeyS') || k('ArrowDown')) { mx -= fx; mz -= fz; }
@@ -88,9 +98,9 @@ const Build = (() => {
     const C = GFX.cam;
     const pitch = lerp(0.62, 1.05, clamp((cam.dist - 12) / 50, 0, 1));
     C.useTarget = true;
-    C.target.x = cam.tx; C.target.y = 0; C.target.z = cam.tz;
+    C.target.x = cam.tx; C.target.y = S.level ? Base.WH : 0; C.target.z = cam.tz;
     C.pos.x = cam.tx + Math.sin(cam.yaw) * Math.cos(pitch) * cam.dist;
-    C.pos.y = Math.sin(pitch) * cam.dist;
+    C.pos.y = C.target.y + Math.sin(pitch) * cam.dist;
     C.pos.z = cam.tz + Math.cos(cam.yaw) * Math.cos(pitch) * cam.dist;
     C.fov = 55 * DEG;
     const bb = document.getElementById('bBottom'), tb = document.getElementById('bTop');
@@ -111,7 +121,7 @@ const Build = (() => {
   function groundAt(sx, sy) {
     const r = GFX.screenRay(sx, sy);
     if (Math.abs(r.d.y) < 1e-4) return null;
-    const t = (Base.FLOOR_Y - r.o.y) / r.d.y;
+    const t = (Base.FLOOR_Y + (S.level ? Base.WH : 0) - r.o.y) / r.d.y;
     if (t < 0) return null;
     return { x: r.o.x + r.d.x * t, z: r.o.z + r.d.z * t };
   }
@@ -127,7 +137,7 @@ const Build = (() => {
     if (!p) { hover = null; return; }
     const c = Base.toCell(p.x, p.z);
     hover = { x: p.x, z: p.z, i: c.i, j: c.j, vi: Math.round((p.x - Base.X0) / Base.CS), vj: Math.round((p.z - Base.Z0) / Base.CS) };
-    if (S.tool === 'door' || S.tool === 'window' || S.tool === 'demolish') hover.edge = edgeAt(p);
+    if (S.tool === 'door' || S.tool === 'window' || (S.tool === 'demolish' && !S.level)) hover.edge = edgeAt(p);
     if (S.tool === 'obj' && S.item) {
       const [w, h] = Base.footprint(S.item, S.rot);
       hover.oi = Math.round((p.x - Base.X0) / Base.CS - w / 2); hover.oj = Math.round((p.z - Base.Z0) / Base.CS - h / 2);
@@ -200,6 +210,11 @@ const Build = (() => {
       else commitEdge(hover.edge, S.tool);
     } else if (S.tool === 'paint' && hover && moved < 25) {
       paintAt(hover);
+    } else if (S.tool === 'upper' && hover && moved < 25) {
+      const rid = Base.roomAt(hover.i, hover.j);
+      if (!rid) deny('Tap a room to give it a second floor.');
+      else if (touch) { pending = { kind: 'upper', rid }; showPendingConfirm(); }
+      else commitUpper(rid);
     } else if (S.tool === 'demolish' && hover && moved < 25) {
       if (touch) { const tg = demolishTarget(hover); if (tg) { pending = { kind: 'demolish', tg }; showPendingConfirm(); } }
       else demolishAt(hover);
@@ -208,14 +223,14 @@ const Build = (() => {
   }
   function movePendingObj() {
     if (!hover || !S.item) return;
-    pending = { kind: 'obj', type: S.item, i: hover.oi, j: hover.oj, rot: hover.rot };
+    pending = { kind: 'obj', type: S.item, i: hover.oi, j: hover.oj, rot: hover.rot, lv: S.level };
   }
   function pinchDist() { const a = [...pointers.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); }
   function pinchAng() { const a = [...pointers.values()]; return Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x); }
   function pinchCenter() { const a = [...pointers.values()]; return { x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2 }; }
   function panBy(dx, dy) {
     const k = cam.dist / Math.max(300, window.innerHeight) * 1.4;
-    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
+    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     cam.tx = clamp(cam.tx - (rx * dx - fx * dy) * k, -42, 42);
     cam.tz = clamp(cam.tz - (rz * dx - fz * dy) * k, -42, 42);
   }
@@ -254,20 +269,34 @@ const Build = (() => {
     Objectives.check();
     return true;
   }
-  function commitObj(type, i, j, rot) {
-    const ok = Base.canPlaceObj(type, i, j, rot);
+  function commitObj(type, i, j, rot, lv) {
+    if (lv === undefined) lv = S.level;
+    const ok = Base.canPlaceObj(type, i, j, rot, lv);
     if (!ok.ok) { deny(ok.why); return false; }
     const cost = OBJ[type].cost;
     const af = afford(cost); if (af) { deny(af); return false; }
     pay(cost);
-    const o = Base.addObj(type, i, j, rot);
+    const o = Base.addObj(type, i, j, rot, lv ? { lv: 1 } : null);
     undo.push({ type: 'obj', id: o.id, cost });
     Audio2.build();
-    FX.dust(o.cx, 0.4, o.cz, 8, 1);
+    FX.dust(o.cx, o.y + 0.3, o.cz, 8, 1);
     if (Input.isTouch) { pending = null; UI.buildConfirm(null); }
     if (OBJ[type].beds) Crew.assignBeds();
     Base.updatePower(!Econ.isNight());
     Objectives.check();
+    return true;
+  }
+  const upperCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 6 });
+  function commitUpper(rid) {
+    if (Base.roomHasUpper(rid)) { deny('This room already has a second floor. Use Demolish on floor 2 to remove it.'); return false; }
+    const r = Base.rooms.get(rid);
+    if (r.cells.length < 4) { deny('The room is too small for a second floor.'); return false; }
+    const cost = upperCost(rid), af = afford(cost); if (af) { deny(af); return false; }
+    pay(cost); Base.setUpper(rid, true);
+    undo.push({ type: 'upper', rid, cost });
+    Audio2.build(); pending = null; UI.buildConfirm(null);
+    let hasStairs = false; for (const o of Base.objs.values()) if (o.type === 'sisetrepp' && Base.roomAt(o.i, o.j) === rid) hasStairs = true;
+    UI.toast(hasStairs ? 'Second floor built.' : 'Second floor built. Add Indoor stairs (Items → Living) so people can get up.');
     return true;
   }
   function commitEdge(ed, type) {
@@ -309,6 +338,13 @@ const Build = (() => {
     Base.markDirty(); Audio2.ui();
   }
   function demolishTarget(h) {
+    if (S.level) {
+      const uid = Base.objUpAt(h.i, h.j);
+      if (uid) return { kind: 'obj', o: Base.objs.get(uid) };
+      const rid = Base.roomAt(h.i, h.j);
+      if (rid && Base.upAt(h.i, h.j)) return { kind: 'upper', rid };
+      return null;
+    }
     if (h.edge && Base.isWall(h.edge.t, h.edge.i, h.edge.j)) return { kind: 'walls', edges: [[h.edge.t, h.edge.i, h.edge.j]] };
     const oid = Base.objAt(h.i, h.j);
     if (oid) return { kind: 'obj', o: Base.objs.get(oid) };
@@ -320,6 +356,13 @@ const Build = (() => {
     doDemolish(tg);
   }
   function doDemolish(tg) {
+    if (tg.kind === 'upper') {
+      for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === tg.rid && (o.lv || o.type === 'sisetrepp')) { deny('Remove the stairs and the upstairs items first.'); return; }
+      const ref = half(upperCost(tg.rid)); pay(ref, -1);
+      Base.setUpper(tg.rid, false);
+      UI.toast('Second floor removed. Refund: ' + costStr(ref));
+      Audio2.build(); pending = null; UI.buildConfirm(null); undo.length = 0; return;
+    }
     if (tg.kind === 'obj') {
       const o = tg.o;
       if (OBJ[o.type].fixed) { deny(OBJ[o.type].name + ' is part of the main building and stays.'); return; }
@@ -346,6 +389,7 @@ const Build = (() => {
     if (u.type === 'walls') { const r = Base.removeWalls(u.edges, true); if (!r.ok) { deny(r.why); undo.push(u); return; } pay(u.cost, -1); for (const o of r.lost || []) pay(OBJ[o.type].cost, -1); }
     else if (u.type === 'obj') { Base.removeObj(u.id); pay(u.cost, -1); }
     else if (u.type === 'edge') { Base.setOpening(u.ed.t, u.ed.i, u.ed.j, u.prev); pay(u.cost, -1); }
+    else if (u.type === 'upper') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && (o.lv || o.type === 'sisetrepp')) { deny('Remove the stairs and the upstairs items first.'); undo.push(u); return; } Base.setUpper(u.rid, false); pay(u.cost, -1); }
     Audio2.ui(); UI.toast('Undone');
     Crew.assignBeds();
   }
@@ -353,7 +397,8 @@ const Build = (() => {
   function commitPending() {
     if (!pending) return;
     if (pending.kind === 'walls') commitWalls(pending.edges);
-    else if (pending.kind === 'obj') commitObj(pending.type, pending.i, pending.j, pending.rot);
+    else if (pending.kind === 'obj') commitObj(pending.type, pending.i, pending.j, pending.rot, pending.lv || 0);
+    else if (pending.kind === 'upper') commitUpper(pending.rid);
     else if (pending.kind === 'edge') commitEdge(pending.e, pending.type);
     else if (pending.kind === 'demolish') doDemolish(pending.tg);
   }
@@ -362,9 +407,10 @@ const Build = (() => {
     if (!pending) { UI.buildConfirm(null); return; }
     let label = 'Build', ok = true, cost = '';
     if (pending.kind === 'walls') { const wi = wallInfo(pending.edges); cost = costStr(wi.cost); ok = wi.n > 0 && !afford(wi.cost); label = 'Build wall'; }
-    else if (pending.kind === 'obj') { cost = costStr(OBJ[pending.type].cost); ok = Base.canPlaceObj(pending.type, pending.i, pending.j, pending.rot).ok && !afford(OBJ[pending.type].cost); label = 'Place'; }
+    else if (pending.kind === 'obj') { cost = costStr(OBJ[pending.type].cost); ok = Base.canPlaceObj(pending.type, pending.i, pending.j, pending.rot, pending.lv || 0).ok && !afford(OBJ[pending.type].cost); label = 'Place'; }
+    else if (pending.kind === 'upper') { const c = upperCost(pending.rid); cost = costStr(c); ok = !afford(c) && !Base.roomHasUpper(pending.rid); label = '2nd floor'; }
     else if (pending.kind === 'edge') { const cur = Base.edgeType(pending.e.t, pending.e.i, pending.e.j); if (cur === pending.type) { label = 'Remove'; cost = '+' + (pending.type === 'door' ? 4 : 3) + ' scrap'; } else { cost = (pending.type === 'door' ? 8 : 6) + ' scrap'; ok = Base.canPlaceOpening(pending.e.t, pending.e.i, pending.e.j, pending.type).ok; } }
-    else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.edges.length + ' wall segments'; }
+    else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.kind === 'upper' ? 'Second floor' : pending.tg.edges.length + ' wall segments'; }
     UI.buildConfirm({ label, cost, ok, canRotate: pending.kind === 'obj' });
   }
 
@@ -378,7 +424,8 @@ const Build = (() => {
       window: 'Tap the outer wall where you want a window.',
       obj: S.item ? '' : 'Pick an item from the catalogue.',
       paint: 'Tap a room to change its colour. Cleaning a rusty room costs 10 scrap.',
-      demolish: 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
+      demolish: S.level ? 'Tap an upstairs item, or an empty upper floor to remove it.' : 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
+      upper: 'Tap a room to build a second floor on it (6 scrap per tile). Then add Indoor stairs and switch to Floor 2 to furnish it.',
     };
     txt = hints[S.tool] || '';
     if (S.tool === 'wall' && (drag || (pending && pending.kind === 'walls'))) {
@@ -391,7 +438,7 @@ const Build = (() => {
       const d = OBJ[S.item];
       const t = pending && pending.kind === 'obj' ? pending : hover ? { i: hover.oi, j: hover.oj, rot: hover.rot } : null;
       txt = d.name + ' · ' + costStr(d.cost) + (d.power > 0 ? ' · uses ' + d.power + ' ⚡' : d.power < 0 ? ' · gives ' + -d.power + ' ⚡' : '');
-      if (t) { const ok = Base.canPlaceObj(S.item, t.i, t.j, t.rot); const af = afford(d.cost); if (!ok.ok) { txt += ' · ' + ok.why; cls = 'bad'; } else if (af) { txt += ' · ' + af; cls = 'bad'; } else cls = 'good'; }
+      if (t) { const ok = Base.canPlaceObj(S.item, t.i, t.j, t.rot, S.level); const af = afford(d.cost); if (!ok.ok) { txt += ' · ' + ok.why; cls = 'bad'; } else if (af) { txt += ' · ' + af; cls = 'bad'; } else cls = 'good'; }
     }
     UI.buildInfo(txt, cls);
     if (pending && Input.isTouch) showPendingConfirm();
@@ -400,9 +447,11 @@ const Build = (() => {
   // ---------- joonistamine ----------
   function draw() {
     if (G.mode !== 'build') return;
-    M4.compose(tmpM, 0, Base.FLOOR_Y + 0.03, 0, 0);
+    const LY = S.level ? Base.WH : 0;
+    M4.compose(tmpM, 0, Base.FLOOR_Y + 0.03 + LY, 0, 0);
     GFX.draw(gridMesh, tmpM, [1, 1, 1, 0], null, { alpha: 0.13, shadow: false });
-    const box = (x, y, z, sx, sy, sz, tint, a) => { const m = M4.compose(M4.create(), x, y, z, 0, 0, 0, sx, sy, sz); GFX.draw(boxMesh, m, tint, null, { alpha: a, shadow: false }); };
+    if (S.level) for (const r of Base.rooms.values()) if (Base.roomHasUpper(r.id)) for (const [i, j] of r.cells) { const c = Base.cellCenter(i, j); const m = M4.compose(M4.create(), c.x, LY + 0.13, c.z, 0, 0, 0, Base.CS - 0.14, 0.03, Base.CS - 0.14); GFX.draw(boxMesh, m, BLUE, null, { alpha: 0.12, shadow: false }); }
+    const box = (x, y, z, sx, sy, sz, tint, a) => { const m = M4.compose(M4.create(), x, y + LY, z, 0, 0, 0, sx, sy, sz); GFX.draw(boxMesh, m, tint, null, { alpha: a, shadow: false }); };
     const rectBox = (r, tint) => {
       const x0 = Base.X0 + r.i0 * Base.CS, x1 = Base.X0 + (r.i1 + 1) * Base.CS, z0 = Base.Z0 + r.j0 * Base.CS, z1 = Base.Z0 + (r.j1 + 1) * Base.CS;
       box((x0 + x1) / 2, 0.16, (z0 + z1) / 2, x1 - x0, 0.1, z1 - z0, tint, 0.35);
@@ -427,12 +476,16 @@ const Build = (() => {
       const t = pending && pending.kind === 'obj' ? pending : hover ? { type: S.item, i: hover.oi, j: hover.oj, rot: hover.rot } : null;
       if (t) {
         const [w, h] = Base.footprint(S.item, t.rot);
-        const ok = Base.canPlaceObj(S.item, t.i, t.j, t.rot).ok && !afford(OBJ[S.item].cost);
+        const ok = Base.canPlaceObj(S.item, t.i, t.j, t.rot, S.level).ok && !afford(OBJ[S.item].cost);
         const cx = Base.X0 + (t.i + w / 2) * Base.CS, cz = Base.Z0 + (t.j + h / 2) * Base.CS;
-        const fy = Base.roomAt(t.i, t.j) ? Base.FLOOR_Y : 0;
-        M4.compose(tmpM2, cx, fy, cz, t.rot * Math.PI / 2);
+        const fy = (Base.roomAt(t.i, t.j) ? Base.FLOOR_Y : 0) + LY;
+        M4.compose(tmpM2, cx, fy, cz, t.rot * Math.PI / 2, 0, 0, 1, OBJ[S.item].sy || 1, 1);
         const mesh = MODELS.obj[S.item];
-        GFX.draw(mesh, tmpM2, ok ? [0.7, 1.3, 0.8, 0.2] : [1.4, 0.5, 0.45, 0.2], null, { alpha: 0.7, shadow: false });
+        if (mesh) GFX.draw(mesh, tmpM2, ok ? [0.7, 1.3, 0.8, 0.2] : [1.4, 0.5, 0.45, 0.2], null, { alpha: 0.7, shadow: false });
+        else if (S.item === 'sisetrepp') {   // trepi eelvaade: astmeline kiil
+          const yw = t.rot * Math.PI / 2, sx = Math.sin(yw), sz = Math.cos(yw);
+          for (let k = 0; k < 6; k++) { const off = Base.CS - (k + 0.5) * (2 * Base.CS / 6), hh = (k + 1) / 6 * Base.WH; const m = M4.compose(M4.create(), cx + sx * off, fy + hh / 2, cz + sz * off, yw, 0, 0, 1.6, hh, 2 * Base.CS / 6); GFX.draw(boxMesh, m, ok ? GREEN : RED, null, { alpha: 0.45, shadow: false }); }
+        }
         box(cx, 0.14, cz, w * Base.CS - 0.1, 0.06, h * Base.CS - 0.1, ok ? GREEN : RED, 0.4);
         // esikülje nool
         const fx = Math.sin(t.rot * Math.PI / 2), fz = Math.cos(t.rot * Math.PI / 2);
@@ -444,11 +497,12 @@ const Build = (() => {
       const e2 = pending && pending.kind === 'edge' ? pending.e : hover.edge;
       edgeBox(e2, Base.isWall(e2.t, e2.i, e2.j) ? (S.tool === 'door' ? YEL : BLUE) : RED);
     } else if (pending && pending.kind === 'edge') edgeBox(pending.e, YEL);
-    if ((S.tool === 'paint' || S.tool === 'demolish') && (hover || pending)) {
+    if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper') && (hover || pending)) {
       const tg = pending && pending.kind === 'demolish' ? pending.tg : S.tool === 'demolish' && hover && !drag ? demolishTarget(hover) : null;
       if (tg && tg.kind === 'obj') { const o = tg.o; box(o.cx, 0.7, o.cz, o.w * Base.CS, 1.4, o.h * Base.CS, RED, 0.35); }
+      else if (tg && tg.kind === 'upper') cellsBox(Base.rooms.get(tg.rid), RED);
       else if (tg && tg.kind === 'walls') { for (const [t, i, j] of tg.edges) edgeBox({ t, i, j }, RED); }
-      else if (S.tool === 'paint' && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
+      else if ((S.tool === 'paint' || S.tool === 'upper') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
     }
     // toad, mida ei saa liigutada: peahoone silt
   }
@@ -464,5 +518,5 @@ const Build = (() => {
     canvas.addEventListener('pointercancel', onUp);
     canvas.addEventListener('wheel', onWheel, { passive: true });
   }
-  return { S, cam, init, enter, exit, update, draw, setTool, selectItem, rotate, doUndo, commitPending, cancelPending, costStr, afford, rotateCam: (d) => { cam.yaw += d; }, get pending() { return pending; } };
+  return { S, cam, init, enter, exit, update, draw, setTool, selectItem, rotate, doUndo, commitPending, cancelPending, costStr, afford, rotateCam: (d) => { cam.yaw += d; }, setLevel, get pending() { return pending; } };
 })();

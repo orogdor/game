@@ -202,11 +202,12 @@ const Crew = (() => {
     if (c.wakeOff === undefined) { c.wakeOff = rand(-0.3, 1.1); c.bedOff = rand(-0.6, 0.8); }
     return h >= 21.5 + c.bedOff || h < 6 + c.wakeOff;
   }
-  function wakeUp(e) { if (e.pose === 'lie') { e.pose = 'stand'; const b = e.crew.bedObj; if (b) { const u = Base.useCells(b)[0]; if (u) { const c = Base.cellCenter(u[0], u[1]); e.pos.x = c.x; e.pos.z = c.z; } } e.pos.y = Ents.groundY(e.pos.x, e.pos.z); } if (e.pose === 'sit') e.pose = 'stand'; }
+  function wakeUp(e) { if (e.pose === 'lie') { e.pose = 'stand'; const b = e.crew.bedObj; if (b) { const u = Base.useCells(b)[0]; if (u) { const c = Base.cellCenter(u[0], u[1]); e.pos.x = c.x; e.pos.z = c.z; } } e.pos.y = Ents.groundY(e.pos.x, e.pos.z, e.pos.y); } if (e.pose === 'sit') e.pose = 'stand'; }
   function goObj(e, o) {
     const cells = Base.useCells(o);
     if (!cells.length) return false;
     e.goalCells = cells.map((c) => [c[0], c[1]]);
+    if (o.lv) { const c = Base.cellCenter(cells[0][0], cells[0][1]); Ents.goTo(e, c.x, c.z, null, 1); return true; }
     Ents.goTo(e, o.cx, o.cz, e.goalCells);
     return true;
   }
@@ -316,7 +317,7 @@ const Crew = (() => {
   // ---------- haavatuna maas (downed): veritseb, ootab abi; päästja lohistab haiglasse ----------
   function goDown(e) {
     const c = e.crew;
-    e.downed = true; e.bleed = 75; e.pose = 'lie'; e.lieY = Ents.groundY(e.pos.x, e.pos.z) + 0.04; e.aim = 0; e.hasGun = false; e.prop = null;
+    e.downed = true; e.bleed = 75; e.pose = 'lie'; e.lieY = Ents.groundY(e.pos.x, e.pos.z, e.pos.y) + 0.04; e.aim = 0; e.hasGun = false; e.prop = null;
     Ents.stopMove(e); if (c.task) c.task.done = true; c.task = null; leaveGroup(e);
     note('downed');
     say(e, pick(['I\'m hit! Help!', 'Medic! MEDIC!', 'I can\'t… get up…']), 0);
@@ -329,11 +330,11 @@ const Crew = (() => {
     setAct(e, e.dragBy ? 'Being dragged to safety' : 'Down and bleeding');
     if (e.dragBy && e.dragBy.alive && e.dragBy.crew && e.dragBy.crew.task && e.dragBy.crew.task.type === 'rescue') {
       const r = e.dragBy, fx = Math.sin(r.yaw), fz = Math.cos(r.yaw);
-      e.pos.x = r.pos.x - fx * 1.05; e.pos.z = r.pos.z - fz * 1.05; e.yaw = r.yaw + Math.PI; e.pos.y = Ents.groundY(e.pos.x, e.pos.z); e.lieY = e.pos.y + 0.04;
+      e.pos.x = r.pos.x - fx * 1.05; e.pos.z = r.pos.z - fz * 1.05; e.yaw = r.yaw + Math.PI; e.pos.y = Ents.groundY(e.pos.x, e.pos.z, e.pos.y); e.lieY = e.pos.y + 0.04;
     } else { e.dragBy = null; if (!e.treated) e.bleed -= dt; }
     if (e.bleed < 30 && e.bleed > 29.9) say(e, 'It\'s getting dark…', 0);
     if (e.bleed <= 0) { e.downed = false; Ents.damage(e, 9999, null); return; }
-    if (e.hp > e.maxHp * 0.4) { e.downed = false; e.dragBy = null; e.treated = false; e.pose = 'stand'; e.pos.y = Ents.groundY(e.pos.x, e.pos.z); say(e, 'Thanks… I owe you one.', 0); c.task = { type: 'leisure', step: 0, obj: nearestObj(e, 'ravila') || nearestObj(e, 'diivan') || nearestObj(e, 'voodi'), t: 30 }; if (!c.task.obj) c.task = null; }
+    if (e.hp > e.maxHp * 0.4) { e.downed = false; e.dragBy = null; e.treated = false; e.pose = 'stand'; e.pos.y = Ents.groundY(e.pos.x, e.pos.z, e.pos.y); say(e, 'Thanks… I owe you one.', 0); c.task = { type: 'leisure', step: 0, obj: nearestObj(e, 'ravila') || nearestObj(e, 'diivan') || nearestObj(e, 'voodi'), t: 30 }; if (!c.task.obj) c.task = null; }
   }
   // ---------- pilk mängija poole: ainult kui see on loogiline ----------
   // Märkab, kui mängija tuleb lähedale tema vaatevälja, kui mängija vaatab talle otsa või kui ta tervitab.
@@ -1129,7 +1130,7 @@ const Crew = (() => {
               e.pos.x = b.cx; e.pos.z = b.cz; e.yaw = Base.objYaw(b);
               e.lieY = b.y + (b.type === 'nari' ? (c.bed.slot ? 1.45 : 0.45) : 0.55);
               setAct(e, 'Sleeping');
-            } else { e.lieY = Ents.groundY(e.pos.x, e.pos.z) + 0.07; setAct(e, 'Sleeping on the floor'); }
+            } else { e.lieY = Ents.groundY(e.pos.x, e.pos.z, e.pos.y) + 0.07; setAct(e, 'Sleeping on the floor'); }
           }
         } else {
           e.moveAmt = 0;
@@ -1365,7 +1366,7 @@ const Crew = (() => {
         const dt2 = Math.hypot(tx - e.pos.x, tz - e.pos.z);
         k.rt -= dt;
         if (d > 70) { // jäi liiga kaugele maha: jõuab järele
-          e.pos.x = tx; e.pos.z = tz; e.pos.y = Ents.groundY(tx, tz); Ents.stopMove(e);
+          e.pos.x = tx; e.pos.z = tz; e.pos.y = Ents.groundY(tx, tz, e.pos.y); Ents.stopMove(e);
         }
         if (dt2 > 1.6 && d > 3.2) {
           if (k.rt <= 0 || !e.path || Ents.arrived(e)) { k.rt = d > 15 ? 1.2 : 0.6; Ents.goTo(e, tx, tz); }
@@ -1433,13 +1434,13 @@ const Crew = (() => {
         else if (k.step === 1) {
           if (Ents.stepMove(e, dt, sp * 1.2)) {
             k.step = 2;
-            if (o.type === 'torn') { e.pos.x = o.cx + rand(-0.8, 0.8); e.pos.z = o.cz + rand(-0.8, 0.8); e.pos.y = Ents.groundY(e.pos.x, e.pos.z); }
+            if (o.type === 'torn') { e.pos.x = o.cx + rand(-0.8, 0.8); e.pos.z = o.cz + rand(-0.8, 0.8); e.pos.y = Ents.groundY(e.pos.x, e.pos.z, e.pos.y); }
             if (o.type === 'vallikaik') { e.pos.x = o.cx; e.pos.z = o.cz; e.pos.y = Ents.groundY(o.cx, o.cz); }
             Ents.stopMove(e); e.onPost = o.type;
           }
         } else {
           e.moveAmt = 0; e.onPost = o.type;
-          if (o.type === 'torn' || o.type === 'vallikaik') e.pos.y = Ents.groundY(e.pos.x, e.pos.z);
+          if (o.type === 'torn' || o.type === 'vallikaik') e.pos.y = Ents.groundY(e.pos.x, e.pos.z, e.pos.y);
           const wd = wi.dir; Ents.face(e, Math.cos(wd) * 200, Math.sin(wd) * 200, dt, 1.5);
           setAct(e, o.type === 'torn' ? 'Guarding in the tower' : o.type === 'kmpesa' ? 'Manning the machine gun' : 'Guarding on the rampart');
         }

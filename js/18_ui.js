@@ -850,14 +850,16 @@ const UI = (() => {
     else showHUD(true);
   }
   function buildTools(S) {
-    const tools = [['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['obj', 'Items', 'box'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']];
-    $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
+    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['obj', 'Items', 'box'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
+      .filter(([k]) => !(S.level && (k === 'wall' || k === 'door' || k === 'window' || k === 'upper')));
+    $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k || (k === 'level' && S.level) ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
     $('bTools').querySelectorAll('.tool').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));
     let h = '';
     if (S.tool === 'obj') {
       h += `<div id="bCats">${OBJ_CATS.map(([k, n]) => `<button class="cat ${S.cat === k ? 'on' : ''}" data-c="${k}">${n}</button>`).join('')}</div><div id="bItems">`;
       for (const [k, d] of Object.entries(OBJ)) {
         if (d.fixed || d.cat !== S.cat) continue;
+        if (S.level && (d.where === 'out' || d.needsUpper)) continue;
         const af = Build.afford(d.cost);
         const cs = (have, need, unit) => (need ? `<span class="${have >= need ? 'ok' : 'no'}">${need} ${unit}</span> ` : '');
         h += `<button class="item ${S.item === k ? 'on' : ''} ${af ? 'na' : ''}" data-i="${k}"><b>${d.name}</b><span class="c">${cs(G.res.scrap, d.cost.s, 'vr')}${cs(G.res.cr, d.cost.c, '₵')}${cs(G.res.kris, d.cost.k, 'kr')}${d.power > 0 ? '· ' + d.power + '⚡' : d.power < 0 ? '· +' + -d.power + '⚡' : ''}${d.where === 'out' ? ' · outdoor' : ''}${SIG[k] && (SIG[k][0] + SIG[k][1]) >= 3 ? ' · <span style="color:#ffa04a">threat +' + (SIG[k][0] + SIG[k][1] + 1) + '</span>' : ''}</span><span class="d">${d.desc}</span></button>`;

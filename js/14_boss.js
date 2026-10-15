@@ -14,9 +14,9 @@ const Boss = (() => {
   function spawn(saved) {
     const n = World.sites.nest;
     const e = Ents.spawn('boss', 'wild', n.x, n.z, { radius: 8.5, state: 'sleep', maxHp: 1 });
-    e.nodes = NODE_POS.map((p, i) => ({ hp: 320, max: 320, alive: true, m: M4.create(), i }));
-    e.heartHp = 1600; e.heartMax = 1600;
-    e.stompCD = 4; e.barrageCD = 6; e.summonCD = 25; e.chargeCD = 12; e.act = null; e.actT = 0; e.lastSeen = 0; e.roarT = 0;
+    e.nodes = NODE_POS.map((p, i) => ({ hp: 520, max: 520, alive: true, m: M4.create(), i }));
+    e.heartHp = 2600; e.heartMax = 2600; e.guardT = 0; e.guarded = false;
+    e.stompCD = 4; e.barrageCD = 6; e.summonCD = 16; e.chargeCD = 12; e.act = null; e.actT = 0; e.lastSeen = 0; e.roarT = 0;
     e.yaw = rand(0, TAU); e.ms = [];
     if (saved) {
       e.nodes.forEach((nd, i) => { nd.hp = saved.nodes[i]; nd.alive = nd.hp > 0; });
@@ -49,9 +49,32 @@ const Boss = (() => {
     e.nodes.forEach((n, i) => { if (n.alive) { local(e, NODE_POS[i], tmp); s.push([tmp.x, tmp.y + 0.8 * BS, tmp.z, 1.35 * BS, 1, i]); } else s.push([0, -999, 0, 0.01, 0, i]); });
     if (exposed(e)) { local(e, HEART, tmp); s.push([tmp.x, tmp.y, tmp.z, 1.5 * BS, 1]); }
   }
+  // pesa valvurid: maetud hiilijad ringis ümber pesa + paar krabi; täiendatakse, kui mängija on kaugel
+  function guardTick(e, dt) {
+    e.guardT = (e.guardT || 0) - dt; if (e.guardT > 0) return;
+    e.guardT = 12;
+    const n = World.sites.nest;
+    const pd = Math.hypot(Player.pos.x - n.x, Player.pos.z - n.z);
+    const first = !e.guarded; e.guarded = true;
+    if (!first && pd < 110) return;
+    const near = (f) => Ents.countAlive((x) => f(x) && Math.hypot(x.pos.x - n.x, x.pos.z - n.z) < 55);
+    let ns = near((x) => x.kind === 'stalker'), nc = near((x) => x.kind === 'crab');
+    let k = first ? 99 : 3;
+    while (ns < 9 && k-- > 0) { const a = rand(0, TAU), d = rand(15, 45); const s = Spawner.stalker(n.x + Math.cos(a) * d, n.z + Math.sin(a) * d, 'buried'); s.daySpawned = false; s.nestGuard = true; ns++; }
+    k = first ? 99 : 1;
+    while (nc < 3 && k-- > 0) { const a = rand(0, TAU), d = rand(18, 40); const c = Spawner.crab(n.x + Math.cos(a) * d, n.z + Math.sin(a) * d); c.nestGuard = true; nc++; }
+  }
   function wake(e, src) {
     if (e.state !== 'sleep') return;
     e.state = 'fight';
+    // valvurid ärkavad koos hiiglasega
+    const tgt = src && src.alive !== false && src.pos ? src : nearestTarget(e, 130);
+    let woke = 0;
+    for (const s of Ents.list) {
+      if (woke >= 5 || !s.alive || s.kind !== 'stalker' || s.state !== 'buried') continue;
+      if (Math.hypot(s.pos.x - e.pos.x, s.pos.z - e.pos.z) > 55) continue;
+      s.state = 'hunt'; s.stateT = 25; if (tgt) s.target = tgt; FX.dust(s.pos.x, s.pos.y + 0.3, s.pos.z, 12, 2); woke++;
+    }
     Audio2.roar(e.pos.x, e.pos.z);
     UI.banner('The Stoneheart woke up', 'Shoot the crystal nodes on its back', 'danger');
     UI.msg('The ground shakes. The Stoneheart rises from its nest. The glowing crystal nodes on its back are its weak spots.', 'danger');
@@ -158,6 +181,7 @@ const Boss = (() => {
       if (r.r > r.max) rings.splice(i, 1);
     }
     if (!e.alive) { e.deathT += dt; return; }
+    guardTick(e, dt);
     if (e.state === 'sleep') {
       e.phase += dt * 0.3;
       const t = nearestTarget(e, 85);
@@ -216,8 +240,9 @@ const Boss = (() => {
       return;
     }
     if (e.summonCD <= 0) {
-      e.summonCD = rand(28, 40);
-      for (let i = 0; i < 2; i++) { const a = rand(0, TAU); const s = Spawner.stalker(t.pos.x + Math.cos(a) * rand(10, 16), t.pos.z + Math.sin(a) * rand(10, 16), 'hunt'); s.target = t; FX.dust(s.pos.x, s.pos.y + 0.3, s.pos.z, 12, 2); }
+      e.summonCD = rand(18, 28) * (e.enraged ? 0.75 : 1);
+      const ns = 3 + (Math.random() < 0.5 ? 1 : 0) + (e.enraged ? 1 : 0);
+      for (let i = 0; i < ns; i++) { const a = rand(0, TAU); const s = Spawner.stalker(t.pos.x + Math.cos(a) * rand(10, 16), t.pos.z + Math.sin(a) * rand(10, 16), 'hunt'); s.target = t; FX.dust(s.pos.x, s.pos.y + 0.3, s.pos.z, 12, 2); }
       UI.msg('The sand is boiling. The Stoneheart is calling stalkers for help!', 'danger');
     }
     // liikumine

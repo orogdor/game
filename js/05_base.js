@@ -2,6 +2,7 @@
 //  BAAS: Sims-stiilis ruumid, seinad, uksed, aknad, esemed, energia, teekonnad
 // ============================================================
 const OBJ = {
+  sisetrepp: { name: 'Indoor stairs', cat: 'elu', cost: { s: 30, c: 0 }, size: [1, 2], where: 'in', power: 0, h: 0.1, inner: true, needsUpper: true, desc: 'Stairs to the upper floor. Build the upper floor first (Build → 2nd floor). The high end needs a free tile behind it.' },
   voodi: { name: 'Bed', cat: 'elu', cost: { s: 25, c: 0 }, size: [1, 1], where: 'in', power: 0, h: 0.9, beds: 1, desc: 'One bed. Every hired person needs their own bed.' },
   nari: { name: 'Bunk bed', cat: 'elu', cost: { s: 40, c: 40 }, size: [1, 1], where: 'in', power: 0, h: 2.0, beds: 2, desc: 'Two beds on a single tile.' },
   laud: { name: 'Dining table', cat: 'elu', cost: { s: 15, c: 0 }, size: [1, 1], where: 'in', power: 0, h: 0.8, seats: 4, desc: 'Eating at a table lifts morale.' },
@@ -28,8 +29,8 @@ const OBJ = {
   relvakapp: { name: 'Gun locker', cat: 'kaitse', cost: { s: 40, c: 60 }, size: [1, 1], where: 'in', power: 0, h: 2.0, desc: 'Access to the stored weapons. The crew shoots 15% more accurately.' },
   myyr: { name: 'Concrete wall', cat: 'kaitse', cost: { s: 12, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.7, hp: 600, desc: 'Thick concrete block with a firing slit. Bugs have to chew through it. Can be placed side by side in a line.' },
   myyrturel: { name: 'Wall turret', cat: 'kaitse', cost: { s: 45, c: 180 }, size: [1, 1], where: 'out', power: 1, h: 3.4, hp: 750, desc: 'Concrete wall with an autocannon on top. Fires over the wall up to 46 m. Fits into a wall line.' },
-  vallikaik: { name: 'Rampart walk', cat: 'kaitse', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.5, deck: 1.5, hp: 400, desc: 'Platform behind the wall. You shoot over the wall from there. Reach it by stairs.' },
-  trepp: { name: 'Stairs', cat: 'kaitse', cost: { s: 8, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.1, ramp: 1.5, hp: 300, desc: 'Leads up to the rampart walk. Rotate so the high end faces the rampart.' },
+  vallikaik: { name: 'Rampart walk', cat: 'kaitse', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.0, deck: 2.0, sy: 2.0 / 1.5, hp: 400, desc: 'Platform behind the wall. You shoot over the wall from there. Reach it by stairs.' },
+  trepp: { name: 'Stairs', cat: 'kaitse', cost: { s: 8, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.1, ramp: 2.0, sy: 2.0 / 1.5, hp: 300, desc: 'Leads up to the rampart walk. Rotate so the high end faces the rampart.' },
   torn: { name: 'Watchtower', cat: 'kaitse', cost: { s: 60, c: 150 }, size: [2, 2], where: 'out', power: 1, h: 6.0, deck: 6.1, hp: 700, desc: 'A guard in the tower sees far and shoots more accurately. Floodlight at night. You can climb up.' },
   varav: { name: 'Gate', cat: 'kaitse', cost: { s: 40, c: 0 }, size: [2, 1], where: 'out', power: 1, h: 2.7, hp: 800, desc: 'Opens for your own people. Locked during a bug swarm.' },
   kmpesa: { name: 'MG nest', cat: 'kaitse', cost: { s: 30, c: 80 }, size: [2, 1], where: 'out', power: 0, h: 1.0, hp: 350, desc: 'Sandbagged nest. A crew member mans it during a swarm. Uses carbine ammo from storage.' },
@@ -77,6 +78,8 @@ function createBase(opt) {
   const DEF_STYLE = opt.style !== undefined ? opt.style : 1;
   const cellRoom = new Int16Array(N * N);
   const cellObj = new Int16Array(N * N);
+  const cellObjUp = new Int16Array(N * N);   // teise korruse esemed
+  const upper = new Set();                    // teise korrusega rakud 'i:j'
   const cellStyle = new Uint8Array(N * N).fill(255);
   const cellRust = new Uint8Array(N * N);
   const walls = new Set();
@@ -84,16 +87,17 @@ function createBase(opt) {
   const objs = new Map();
   const openings = new Map(); // 'v:i:j' -> 'door'|'window'
   let nextRoomId = 1, nextObjId = 1;
-  let meshes = { main: [null, null], low: [null, null], roof: [null, null], glass: null, strips: null };
+  let meshes = { main: [null, null], low: [null, null], roof: [null, null], up: [null, null], upLow: [null, null], glass: null, strips: null };
+  let viewLevel = 0;   // ehitusrežiimis vaadatav korrus
   const colliders = [];
   const doors = [];
   const frames = []; // ukse- ja aknaraamid (SDF mudelid)
   // instantsitud SDF-moodulid (põrandad, katus, katuseserv, nurgapostid); joonistatakse ainult selle baasi draw() kaudu
   let inst = [];
   const _im = M4.create();
-  function makeInst(list, mesh, rust, roofOnly) {
+  function makeInst(list, mesh, rust, roofOnly, upperLv) {
     if (!list.length || !mesh) return;
-    const st = new GFX.InstSet(mesh, list.length); st.manual = true; st.rust = rust; st.roofOnly = roofOnly; st.viewDist = 650;
+    const st = new GFX.InstSet(mesh, list.length); st.manual = true; st.rust = rust; st.roofOnly = roofOnly; st.upper = !!upperLv; st.viewDist = 650;
     for (const [x, y, z, yaw, c] of list) { M4.compose(_im, x, y, z, yaw); st.add(_im, c[0], c[1], c[2], 0); }
     GFX.addInstSet(st); inst.push(st);
   }
@@ -106,6 +110,10 @@ function createBase(opt) {
   const inArea = (i, j) => i >= 2 && j >= 2 && i <= N - 3 && j <= N - 3;
   const roomAt = (i, j) => (inGrid(i, j) ? cellRoom[j * N + i] : 0);
   const objAt = (i, j) => (inGrid(i, j) ? cellObj[j * N + i] : 0);
+  const objUpAt = (i, j) => (inGrid(i, j) ? cellObjUp[j * N + i] : 0);
+  const upAt = (i, j) => roomAt(i, j) > 0 && upper.has(i + ':' + j);
+  // trepiava teisel korrusel (siseterepi rakud)
+  const holeAt = (i, j) => { const id = objAt(i, j); return !!id && objs.get(id) && objs.get(id).type === 'sisetrepp'; };
   const cellCenter = (i, j) => ({ x: X0 + (i + 0.5) * CS, z: Z0 + (j + 0.5) * CS });
   const toCell = (x, z) => ({ i: Math.floor((x - X0) / CS), j: Math.floor((z - Z0) / CS) });
   const containsWorld = (x, z) => x >= X0 && z >= Z0 && x < X0 + N * CS && z < Z0 + N * CS;
@@ -239,8 +247,14 @@ function createBase(opt) {
   // välja jäänud siseesemed eemaldatakse; tagastab eemaldatud
   function pruneObjects() {
     const removed = [];
+    // teine korrus: toa rakud kas kõik üleval või ükski (seinte muutmise järel)
+    const byRoom = new Map();
+    for (const r of rooms.values()) { let n = 0; for (const [i, j] of r.cells) if (upper.has(i + ':' + j)) n++; byRoom.set(r.id, n * 2 >= r.cells.length && n > 0); }
+    for (const k of [...upper]) { const [i, j] = k.split(':').map(Number); if (!roomAt(i, j)) upper.delete(k); }
+    for (const r of rooms.values()) for (const [i, j] of r.cells) { if (byRoom.get(r.id)) upper.add(i + ':' + j); else upper.delete(i + ':' + j); }
     for (const o of [...objs.values()]) {
       const def = OBJ[o.type];
+      if (o.lv || def.needsUpper) { if (cellsOf(o.i, o.j, o.w, o.h).some(([a, b]) => !upAt(a, b))) { removed.push(o); removeObj(o.id); } continue; }
       const inRoom = !!roomAt(o.i, o.j);
       if ((def.where === 'in' && !inRoom) || (def.where === 'out' && inRoom)) { removed.push(o); removeObj(o.id); }
     }
@@ -352,10 +366,38 @@ function createBase(opt) {
 
   // ---------- esemed ----------
   function cellsOf(i, j, w, h) { const out = []; for (let jj = j; jj < j + h; jj++) for (let ii = i; ii < i + w; ii++) out.push([ii, jj]); return out; }
+  // siseterepp: madal ots esiküljel (+z kohalik), kõrge ots tagaküljel; esimene vaba rakk ees = sissepääs, kõrge otsa taga = väljapääs üleval
+  function stairDir(o) { const r = o.rot % 4; return r === 0 ? [0, 1] : r === 1 ? [1, 0] : r === 2 ? [0, -1] : [-1, 0]; }
+  function stairEntry(o) { const [di, dj] = stairDir(o); return di > 0 ? { i: o.i + o.w, j: o.j } : di < 0 ? { i: o.i - 1, j: o.j } : dj > 0 ? { i: o.i, j: o.j + o.h } : { i: o.i, j: o.j - 1 }; }
+  function stairExit(o) { const [di, dj] = stairDir(o); return di > 0 ? { i: o.i - 1, j: o.j } : di < 0 ? { i: o.i + o.w, j: o.j } : dj > 0 ? { i: o.i, j: o.j - 1 } : { i: o.i, j: o.j + o.h }; }
   function nearDoor(i, j) { for (const [t, a, b] of [['v', i, j], ['v', i + 1, j], ['h', i, j], ['h', i, j + 1]]) if (edgeType(t, a, b) === 'door') return true; return false; }
-  function canPlaceObj(type, i, j, rot) {
+  function canPlaceObj(type, i, j, rot, lv) {
     const def = OBJ[type];
     const [w, h] = footprint(type, rot);
+    if (lv) {   // teine korrus: ainult toaesemed, teise korruse põrandal, mitte trepiava kohal
+      if (def.where === 'out' || def.needsUpper || def.fixed) return { ok: false, why: 'This item can\'t go on the upper floor.' };
+      let rm = -1;
+      for (const [ii, jj] of cellsOf(i, j, w, h)) {
+        if (!inArea(ii, jj) || !upAt(ii, jj)) return { ok: false, why: 'This spot has no upper floor.' };
+        if (holeAt(ii, jj)) return { ok: false, why: 'The stairwell is here.' };
+        if (objUpAt(ii, jj)) return { ok: false, why: 'That spot is already taken.' };
+        const r = roomAt(ii, jj); if (rm === -1) rm = r; else if (rm !== r) return { ok: false, why: 'An item can\'t be in two rooms at once.' };
+        for (const so of objs.values()) if (so.type === 'sisetrepp') { const ex = stairExit(so); if (ex && ex.i === ii && ex.j === jj) return { ok: false, why: 'Keep the top of the stairs free.' }; }
+      }
+      for (const [ii, jj] of cellsOf(i, j, w, h)) {
+        if (ii + 1 < i + w && isWall('v', ii + 1, jj)) return { ok: false, why: 'A wall is in the way.' };
+        if (jj + 1 < j + h && isWall('h', ii, jj + 1)) return { ok: false, why: 'A wall is in the way.' };
+      }
+      return { ok: true };
+    }
+    if (def.needsUpper) {
+      for (const [ii, jj] of cellsOf(i, j, w, h)) if (!upAt(ii, jj)) return { ok: false, why: 'Build the upper floor on this room first (tool: 2nd floor).' };
+      const ex = stairExit({ i, j, w, h, rot, type });
+      if (!ex || !upAt(ex.i, ex.j) || roomAt(ex.i, ex.j) !== roomAt(i, j) || objUpAt(ex.i, ex.j)) return { ok: false, why: 'The high end of the stairs needs a free upper-floor tile behind it (in the same room).' };
+      const en = stairEntry({ i, j, w, h, rot, type });
+      if (!en || roomAt(en.i, en.j) !== roomAt(i, j) || objAt(en.i, en.j)) return { ok: false, why: 'Leave a free tile in front of the low end of the stairs.' };
+      for (const [ii, jj] of cellsOf(i, j, w, h)) if (objUpAt(ii, jj)) return { ok: false, why: 'Something stands on the upper floor there.' };
+    }
     let room = -1;
     for (const [ii, jj] of cellsOf(i, j, w, h)) {
       if (!inArea(ii, jj)) return { ok: false, why: 'Outside the build area.' };
@@ -365,6 +407,7 @@ function createBase(opt) {
       if (def.where === 'out' && r) return { ok: false, why: 'This item goes outside.' };
       if (room === -1) room = r; else if (room !== r) return { ok: false, why: 'An item can\'t be in two rooms at once.' };
       if (nearDoor(ii, jj)) return { ok: false, why: 'Nothing can be placed in front of a door.' };
+      for (const so of objs.values()) if (so.type === 'sisetrepp') { const en = stairEntry(so); if (en && en.i === ii && en.j === jj) return { ok: false, why: 'Keep the foot of the stairs free.' }; }
     }
     if (def.where !== 'in') { const c = cellCenter(i, j); if (Math.hypot(c.x - OX, c.z - OZ) > 54) return { ok: false, why: 'Too far from the base.' }; }
     for (const [ii, jj] of cellsOf(i, j, w, h)) {
@@ -425,15 +468,17 @@ function createBase(opt) {
     const o = Object.assign({ id: id || nextObjId++, type, i, j, rot, w, h, hp: def.hp || 100, maxHp: def.hp || 100, broken: false, on: true, anim: 0, cool: 0, target: null, data: {} }, extra || {});
     nextObjId = Math.max(nextObjId, o.id + 1);
     objs.set(o.id, o);
-    for (const [ii, jj] of cellsOf(i, j, w, h)) cellObj[jj * N + ii] = o.id;
+    const grid = o.lv ? cellObjUp : cellObj;
+    for (const [ii, jj] of cellsOf(i, j, w, h)) grid[jj * N + ii] = o.id;
     o.m = M4.create(); updateObjMatrix(o);
     dirty = true;
     return o;
   }
-  function updateObjMatrix(o) { const c = objCenter(o); const fy = (roomAt(o.i, o.j) ? FLOOR_Y : 0) + OY; M4.compose(o.m, c.x, fy, c.z, objYaw(o)); o.cx = c.x; o.cz = c.z; o.y = fy; }
+  function updateObjMatrix(o) { const c = objCenter(o); const fy = (roomAt(o.i, o.j) ? FLOOR_Y : 0) + OY + (o.lv ? WH : 0); const sy = OBJ[o.type].sy || 1; M4.compose(o.m, c.x, fy, c.z, objYaw(o), 0, 0, 1, sy, 1); o.cx = c.x; o.cz = c.z; o.y = fy; }
   function removeObj(id) {
     const o = objs.get(id); if (!o) return;
-    for (const [ii, jj] of cellsOf(o.i, o.j, o.w, o.h)) if (cellObj[jj * N + ii] === id) cellObj[jj * N + ii] = 0;
+    const grid = o.lv ? cellObjUp : cellObj;
+    for (const [ii, jj] of cellsOf(o.i, o.j, o.w, o.h)) if (grid[jj * N + ii] === id) grid[jj * N + ii] = 0;
     objs.delete(id); dirty = true;
   }
   function autoRot(type, i, j) {
@@ -455,7 +500,7 @@ function createBase(opt) {
     for (const [ii, jj] of cellsOf(o.i, o.j, o.w, o.h)) {
       for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const ni = ii + di, nj = jj + dj;
-        if (isIn(ni, nj) || !inGrid(ni, nj) || objAt(ni, nj)) continue;
+        if (isIn(ni, nj) || !inGrid(ni, nj) || (o.lv ? objUpAt(ni, nj) || holeAt(ni, nj) || !upAt(ni, nj) : objAt(ni, nj))) continue;
         if (edgeBlocked(ii, jj, di, dj)) continue;
         const [t, a, b] = edgeOf(ii, jj, di, dj);
         if (edgeType(t, a, b) === 'door') continue;
@@ -521,16 +566,16 @@ function createBase(opt) {
   // ---------- geomeetria ----------
   function rebuild() {
     dirty = false;
-    for (const k of ['main', 'low', 'roof']) for (let q = 0; q < 2; q++) if (meshes[k][q]) { meshes[k][q].dispose(); meshes[k][q] = null; }
+    for (const k of ['main', 'low', 'roof', 'up', 'upLow']) for (let q = 0; q < 2; q++) if (meshes[k][q]) { meshes[k][q].dispose(); meshes[k][q] = null; }
     if (meshes.glass) { meshes.glass.dispose(); meshes.glass = null; }
     if (meshes.strips) { meshes.strips.dispose(); meshes.strips = null; }
     for (const st of inst) GFX.removeInstSet(st);
     inst = []; frames.length = 0;
     const O = MODELS.obj, sdf = !!O.floorTile;
-    const IL = { floor: [[], []], roof: [[], []], edge: [[], []], post: [[], []] };
+    const IL = { floor: [[], []], roof: [[], []], edge: [[], []], post: [[], []], upFloor: [[], []], upPost: [[], []] };
     const SL = new MB(); SL.jit = 0;
     const WARM = [1.0, 0.82, 0.55], REDL = [1.0, 0.12, 0.06];
-    const B = { main: [new MB(), new MB()], low: [new MB(), new MB()], roof: [new MB(), new MB()] };
+    const B = { main: [new MB(), new MB()], low: [new MB(), new MB()], roof: [new MB(), new MB()], up: [new MB(), new MB()], upLow: [new MB(), new MB()] };
     for (const k in B) for (const b of B[k]) b.jit = 0.025;
     const G = new MB(); G.jit = 0;
     const rustQ = (rid) => { const r = rooms.get(rid); return r && r.rust > 0.5 ? 1 : 0; };
@@ -546,21 +591,29 @@ function createBase(opt) {
         if (sdf) IL.floor[q].push([c.x, OY, c.z, ((i * 7 + j * 3) % 4) * Math.PI / 2, col.map((v) => v / 0.78)]);
         else for (const b of [B.main[q], B.low[q]]) b.color(col, r.rust > 0.5 ? MAT.RUST : MAT.WORN).boxB(c.x, -0.1, c.z, CS, FLOOR_Y + 0.1, CS);
         const x0 = c.x - CS / 2, x1 = c.x + CS / 2, z0 = c.z - CS / 2, z1 = c.z + CS / 2;
-        B.roof[q].color(st.ceil).quad([x0, WH - 0.01, z0], [x1, WH - 0.01, z0], [x1, WH - 0.01, z1], [x0, WH - 0.01, z1]);
-        if (sdf) IL.roof[q].push([c.x, OY + WH, c.z, 0, EXT2.map((v) => v / 0.62)]);
-        else B.roof[q].color(EXT2, MAT.RUST).boxB(c.x, WH, c.z, CS + 0.02, 0.16, CS + 0.02);
-        // äärisrinnatis seal, kus naaberrakk pole tuba
+        const upC = upAt(i, j), hole = holeAt(i, j), RY = upC ? WH * 2 : WH;
+        if (!hole) B.roof[q].color(st.ceil).quad([x0, WH - 0.01, z0], [x1, WH - 0.01, z0], [x1, WH - 0.01, z1], [x0, WH - 0.01, z1]);
+        if (upC) {   // teise korruse põrand (trepiava kohal auk) ja ülemine lagi
+          if (!hole) {
+            if (sdf) IL.upFloor[q].push([c.x, OY + WH, c.z, ((i * 5 + j * 3) % 4) * Math.PI / 2, col.map((v) => v / 0.78)]);
+            else B.up[q].color(col, r.rust > 0.5 ? MAT.RUST : MAT.WORN).boxB(c.x, WH - 0.05, c.z, CS, FLOOR_Y + 0.05, CS);
+          }
+          B.roof[q].color(st.ceil).quad([x0, RY - 0.01, z0], [x1, RY - 0.01, z0], [x1, RY - 0.01, z1], [x0, RY - 0.01, z1]);
+        }
+        if (sdf) IL.roof[q].push([c.x, OY + RY, c.z, 0, EXT2.map((v) => v / 0.62)]);
+        else B.roof[q].color(EXT2, MAT.RUST).boxB(c.x, RY, c.z, CS + 0.02, 0.16, CS + 0.02);
+        // äärisrinnatis seal, kus naaberrakk pole tuba (teisel korrusel: kus naabril pole teist korrust)
         for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          if (roomAt(i + di, j + dj)) continue;
-          if (sdf) { IL.edge[q].push([c.x + di * (CS / 2 + 0.07), OY + WH, c.z + dj * (CS / 2 + 0.07), di ? Math.PI / 2 : 0, EXT.map((v) => v / 0.72)]); continue; }
-          B.roof[q].color(EXT, MAT.RUST).boxB(c.x + di * (CS / 2 + 0.07), WH + 0.16, c.z + dj * (CS / 2 + 0.07), di ? 0.14 : CS + 0.28, 0.22, dj ? 0.14 : CS + 0.28);
+          if (upC ? upAt(i + di, j + dj) : roomAt(i + di, j + dj)) continue;
+          if (sdf) { IL.edge[q].push([c.x + di * (CS / 2 + 0.07), OY + RY, c.z + dj * (CS / 2 + 0.07), di ? Math.PI / 2 : 0, EXT.map((v) => v / 0.72)]); continue; }
+          B.roof[q].color(EXT, MAT.RUST).boxB(c.x + di * (CS / 2 + 0.07), RY + 0.16, c.z + dj * (CS / 2 + 0.07), di ? 0.14 : CS + 0.28, 0.22, dj ? 0.14 : CS + 0.28);
         }
       }
       const rr = mulberry32(r.id * 31 + 7);
       if (r.id % 2 === 0 || rooms.size === 1) {
         const c0 = cellCenter(r.cells[0][0], r.cells[0][1]);
-        const ax = c0.x - 0.4, az = c0.z - 0.4, ah = 3.2 + rr() * 2.2;
-        if (sdf) frames.push({ mesh: 'roofMast', roof: true, m: M4.compose(M4.create(), ax, OY + WH + 0.16, az, rr() * TAU, 0, 0, 1, ah / 4, 1) });
+        const ax = c0.x - 0.4, az = c0.z - 0.4, ah = 3.2 + rr() * 2.2, RYm = upAt(r.cells[0][0], r.cells[0][1]) ? WH * 2 : WH;
+        if (sdf) frames.push({ mesh: 'roofMast', roof: true, m: M4.compose(M4.create(), ax, OY + RYm + 0.16, az, rr() * TAU, 0, 0, 1, ah / 4, 1) });
         else {
           B.roof[q].color(PAL.metalDark).cyl(ax, WH + 0.16, az, 0.07, 0.04, ah, 5);
           for (let k = 1; k < 4; k++) B.roof[q].color(PAL.metalDark).boxB(ax, WH + 0.16 + ah * k / 4, az, 0.5 - k * 0.1, 0.03, 0.03);
@@ -570,7 +623,7 @@ function createBase(opt) {
       const nv = Math.min(4, 1 + Math.floor(r.cells.length / 6));
       for (let k = 0; k < nv; k++) {
         const cc = r.cells[Math.floor(rr() * r.cells.length)], c = cellCenter(cc[0], cc[1]);
-        if (sdf) { const kind = ['roofAC', 'roofVent', 'roofTank'][Math.floor(rr() * 3)]; frames.push({ mesh: kind, roof: true, t: [0.62, 0.61, 0.6, 0], m: M4.compose(M4.create(), c.x + (rr() - 0.5) * 0.6, OY + WH + 0.16, c.z + (rr() - 0.5) * 0.6, Math.floor(rr() * 4) * Math.PI / 2) }); }
+        if (sdf) { const kind = ['roofAC', 'roofVent', 'roofTank'][Math.floor(rr() * 3)]; frames.push({ mesh: kind, roof: true, t: [0.62, 0.61, 0.6, 0], m: M4.compose(M4.create(), c.x + (rr() - 0.5) * 0.6, OY + (upAt(cc[0], cc[1]) ? WH * 2 : WH) + 0.16, c.z + (rr() - 0.5) * 0.6, Math.floor(rr() * 4) * Math.PI / 2) }); }
         else if (rr() < 0.5) B.roof[q].color([0.42, 0.42, 0.40], MAT.RUST).boxB(c.x, WH + 0.16, c.z, 0.9 + rr() * 0.5, 0.5, 0.7 + rr() * 0.5);
         else B.roof[q].color([0.36, 0.36, 0.35], MAT.RUST).cyl(c.x, WH + 0.16, c.z, 0.25, 0.22, 0.8 + rr() * 0.6, 7);
       }
@@ -759,6 +812,73 @@ function createBase(opt) {
         addWallCol(p0x, p0z, p3x, p3z, 0, WH);
       }
     }
+    // ---------- teise korruse seinad (alumise korruse seinte peal) ----------
+    const upPosts = new Set();
+    for (const key of walls) {
+      const [t, si, sj] = key.split(':'); const i = +si, j = +sj;
+      const [[ai, aj], [bi, bj]] = edgeCells(t, i, j);
+      const uA = upAt(ai, aj), uB = upAt(bi, bj);
+      if (!uA && !uB) continue;
+      const [ra, rb] = edgeRooms(t, i, j);
+      const q = Math.max(rustQ(ra), rustQ(rb));
+      let ax, az, bx, bz, nx, nz;
+      if (t === 'v') { ax = X0 + i * CS; bx = ax; az = Z0 + j * CS; bz = az + CS; nx = 1; nz = 0; }
+      else { az = Z0 + j * CS; bz = az; ax = X0 + i * CS; bx = ax + CS; nx = 0; nz = 1; }
+      upPosts.add(i + ':' + j); upPosts.add(t === 'v' ? i + ':' + (j + 1) : (i + 1) + ':' + j);
+      const sA = uB ? sideStyle(rb) : sideStyle(0), sB = uA ? sideStyle(ra) : sideStyle(0);
+      const lowerOp = openings.get(key);
+      const op = uA && uB ? (lowerOp === 'door' ? 'door' : null) : (lowerOp === 'window' || ((i + j) % 2 === 0 && lowerOp !== 'door') ? 'window' : null);
+      const L = CS, ux = (bx - ax) / L, uz = (bz - az) / L;
+      const P = (s_) => [ax + ux * s_, az + uz * s_];
+      const useg = (s0, s1, y0, y1) => {
+        const [x0, z0] = P(s0), [x1, z1] = P(s1);
+        for (const low of [false, true]) {
+          const bands = [[y0, Math.min(y1, 0.3), true], [Math.max(y0, 0.3), Math.min(y1, WH - 0.25), false], [Math.max(y0, WH - 0.25), y1, true]];
+          for (const [b0, b1, dark] of bands) {
+            const top = low ? Math.min(b1, LOW_H) : b1; if (top <= b0) continue;
+            const bld = low ? B.upLow[q] : B.up[q];
+            wallFace(bld, x0, z0, x1, z1, nx, nz, WH + b0, WH + top, dark ? sA.col2 : sA.col, sA.mat);
+            wallFace(bld, x0, z0, x1, z1, -nx, -nz, WH + b0, WH + top, dark ? sB.col2 : sB.col, sB.mat);
+            if (top === (low ? Math.min(y1, LOW_H) : y1)) { const ox = nx * WT / 2, oz = nz * WT / 2; bld.color(POST).quad([x0 - ox, WH + top, z0 - oz], [x1 - ox, WH + top, z1 - oz], [x1 + ox, WH + top, z1 + oz], [x0 + ox, WH + top, z0 + oz]); }
+          }
+        }
+      };
+      if (op === 'door') {
+        const dw = 1.4, sOff = (L - dw) / 2;
+        useg(0, sOff, 0, WH); useg(L - sOff, L, 0, WH); useg(sOff, L - sOff, 2.3, WH);
+        const [p0x, p0z] = P(0), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff), [p3x, p3z] = P(L);
+        addWallCol(p0x, p0z, p1x, p1z, WH, WH * 2); addWallCol(p2x, p2z, p3x, p3z, WH, WH * 2); addWallCol(p1x, p1z, p2x, p2z, WH + 2.3, WH * 2);
+      } else if (op === 'window') {
+        const ww = 1.5, sOff = (L - ww) / 2;
+        useg(0, L, 0, 1.0); useg(0, L, 2.0, WH); useg(0, sOff, 1.0, 2.0); useg(L - sOff, L, 1.0, 2.0);
+        const [mx, mz] = P(L / 2);
+        G.color([0.42, 0.62, 0.70]).boxB(mx, WH + 1.0, mz, t === 'v' ? 0.04 : ww, 1.0, t === 'v' ? ww : 0.04);
+        B.up[q].color([0.15, 0.155, 0.17]).boxB(mx, WH + 0.93, mz, t === 'v' ? WT + 0.2 : ww + 0.16, 0.09, t === 'v' ? ww + 0.16 : WT + 0.2);
+        B.up[q].color([0.15, 0.155, 0.17]).boxB(mx, WH + 1.98, mz, t === 'v' ? WT + 0.14 : ww + 0.16, 0.08, t === 'v' ? ww + 0.16 : WT + 0.14);
+        const [p0x, p0z] = P(0), [p3x, p3z] = P(L), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff);
+        addWallCol(p0x, p0z, p3x, p3z, WH, WH + 1.0); addWallCol(p0x, p0z, p3x, p3z, WH + 2.0, WH * 2);
+        addWallCol(p0x, p0z, p1x, p1z, WH + 1.0, WH + 2.0); addWallCol(p2x, p2z, p3x, p3z, WH + 1.0, WH + 2.0);
+        addWallCol(p1x, p1z, p2x, p2z, WH + 1.0, WH + 2.0, { noRay: true, glass: true });
+      } else {
+        useg(0, L, 0, WH);
+        const [p0x, p0z] = P(0), [p3x, p3z] = P(L);
+        addWallCol(p0x, p0z, p3x, p3z, WH, WH * 2);
+        // seinavalgusti teisel korrusel
+        for (const [side, ok, rid] of [[1, uB, rb], [-1, uA, ra]]) {
+          if (!ok || (i + j) % 2 !== 1) continue;
+          const [mx, mz] = P(L / 2), o = WT / 2;
+          SL.color([1.0, 0.86, 0.66], MAT.GLOW).boxB(mx + nx * side * (o + 0.1), WH + 2.07, mz + nz * side * (o + 0.1), t === 'v' ? 0.1 : 0.24, 0.14, t === 'v' ? 0.24 : 0.1);
+          sconces.push({ x: mx + nx * side * (o + 0.5), y: OY + WH + 1.85, z: mz + nz * side * (o + 0.5), ext: false, rid });
+        }
+      }
+    }
+    for (const k of upPosts) {
+      const [i, j] = k.split(':').map(Number);
+      const x = X0 + i * CS, z = Z0 + j * CS;
+      if (sdf) IL.upPost[0].push([x, OY + WH, z, ((i + j) % 4) * Math.PI / 2, [1, 1, 1]]);
+      else B.up[0].color(POST, MAT.WORN).cyl(x, WH, z, 0.15, 0.15, WH + 0.05, 8, true, Math.PI / 8);
+      B.upLow[0].color(POST, MAT.WORN).boxB(x, WH, z, 0.3, LOW_H + 0.02, 0.3);
+    }
     for (const k of posts) {
       const [i, j] = k.split(':').map(Number);
       const x = X0 + i * CS, z = Z0 + j * CS;
@@ -775,7 +895,33 @@ function createBase(opt) {
       const d = OBJ[o.type];
       const x0 = X0 + o.i * CS, z0 = Z0 + o.j * CS;
       const sh = o.type === 'barrikaad' ? 0.1 : 0.22;
-      const c = { t: 'b', x0: x0 + sh, z0: z0 + sh, x1: x0 + o.w * CS - sh, z1: z0 + o.h * CS - sh, y0: OY, y1: OY + d.h, kind: 'obj', obj: o };
+      const ly = o.lv ? WH : 0;
+      const c = { t: 'b', x0: x0 + sh, z0: z0 + sh, x1: x0 + o.w * CS - sh, z1: z0 + o.h * CS - sh, y0: OY + ly, y1: OY + ly + d.h + (o.lv ? FLOOR_Y : 0), kind: 'obj', obj: o };
+      if (o.type === 'sisetrepp') {   // astmed + käsipuud; teisel korrusel piire ümber trepiava (kõrge ots lahti)
+        const q = rustQ(roomAt(o.i, o.j)), cc = objCenter(o), yw = objYaw(o), n = 12, run = (2 * CS) / n;
+        for (const b of [B.main[q], B.low[q]]) {
+        b.push().tf(cc.x, 0, cc.z, yw);
+        for (let k = 0; k < n; k++) b.color(k % 2 ? [0.3, 0.3, 0.31] : [0.26, 0.26, 0.27], MAT.WORN).boxB(0, FLOOR_Y, CS - (k + 0.5) * run, 1.6, (k + 1) / n * WH, run + 0.01);
+        for (const sx of [-0.86, 0.86]) {
+          b.color([0.16, 0.16, 0.17], MAT.RUST).boxB(sx, FLOOR_Y, 0, 0.08, 0.2, 2 * CS);
+          for (let k = 0; k <= 4; k++) b.color([0.2, 0.2, 0.21]).boxB(sx, FLOOR_Y + k / 4 * WH + 0.05, CS - k / 4 * 2 * CS, 0.05, 0.95, 0.05);
+        }
+        b.pop();
+        }
+        // teise korruse piire: pikad küljed + madala otsa kohal
+        const bu = B.up[q], [di, dj] = stairDir(o);
+        const hx0 = X0 + o.i * CS, hz0 = Z0 + o.j * CS, hx1 = hx0 + o.w * CS, hz1 = hz0 + o.h * CS;
+        const rails = [];
+        if (di === 0) { rails.push([hx0, hz0, hx0, hz1], [hx1, hz0, hx1, hz1]); rails.push(dj > 0 ? [hx0, hz1, hx1, hz1] : [hx0, hz0, hx1, hz0]); }
+        else { rails.push([hx0, hz0, hx1, hz0], [hx0, hz1, hx1, hz1]); rails.push(di > 0 ? [hx1, hz0, hx1, hz1] : [hx0, hz0, hx0, hz1]); }
+        for (const [rx0, rz0, rx1, rz1] of rails) {
+          const mx = (rx0 + rx1) / 2, mz = (rz0 + rz1) / 2, lx = Math.abs(rx1 - rx0), lz = Math.abs(rz1 - rz0);
+          bu.color([0.2, 0.2, 0.21], MAT.RUST).boxB(mx, WH + FLOOR_Y + 0.95, mz, Math.max(lx, 0.06), 0.06, Math.max(lz, 0.06));
+          for (let k = 0; k <= 4; k++) bu.color([0.22, 0.22, 0.23]).boxB(rx0 + (rx1 - rx0) * k / 4, WH + FLOOR_Y, rz0 + (rz1 - rz0) * k / 4, 0.05, 0.95, 0.05);
+          colliders.push({ t: 's', ax: rx0, az: rz0, bx: rx1, bz: rz1, r: 0.08, y0: OY + WH, y1: OY + WH + 1.1, kind: 'wall', noRay: true });
+        }
+        continue;
+      }
       if (o.type === 'paike' || o.type === 'prozektor' || o.type === 'radar') { const cc = objCenter(o); Object.assign(c, { x0: cc.x - 0.45, x1: cc.x + 0.45, z0: cc.z - 0.45, z1: cc.z + 0.45 }); }
       if (o.type === 'okas' || o.type === 'trepp') continue;
       if (o.type === 'myyr' || o.type === 'myyrturel' || o.type === 'varav' || o.type === 'vallikaik') { c.x0 = x0 + 0.02; c.z0 = z0 + 0.02; c.x1 = x0 + o.w * CS - 0.02; c.z1 = z0 + o.h * CS - 0.02; }
@@ -783,19 +929,20 @@ function createBase(opt) {
       colliders.push(c);
     }
     for (const c of colliders) World.addCol(c);
-    for (const k of ['main', 'low', 'roof']) for (let q = 0; q < 2; q++) meshes[k][q] = B[k][q].p.length ? B[k][q].build() : null;
+    for (const k of ['main', 'low', 'roof', 'up', 'upLow']) for (let q = 0; q < 2; q++) meshes[k][q] = B[k][q].p.length ? B[k][q].build() : null;
     meshes.glass = G.p.length ? G.build() : null;
     meshes.strips = SL.p.length ? SL.build() : null;
     if (sdf) for (let q = 0; q < 2; q++) {
       const rust = q === 1 ? 1.25 : 0.32;
       makeInst(IL.floor[q], O.floorTile, rust, false); makeInst(IL.roof[q], O.roofTile, rust, true);
       makeInst(IL.edge[q], O.roofEdge, rust, true); makeInst(IL.post[q], O.wallPost, rust, true);
+      makeInst(IL.upFloor[q], O.floorTile, rust, false, true); makeInst(IL.upPost[q], O.wallPost, rust, true, true);
     }
     for (const o of objs.values()) updateObjMatrix(o);
   }
 
   // ---------- teekonnaotsing ----------
-  const PASS = { varav: 1, trepp: 1, okas: 1 };
+  const PASS = { varav: 1, trepp: 1, okas: 1, sisetrepp: 1 };
   function walkable(i, j) { if (!inGrid(i, j)) return false; const id = objAt(i, j); if (!id) return true; const o = objs.get(id); return !!(o && PASS[o.type]); }
   function canStep(i, j, di, dj) {
     if (!inGrid(i + di, j + dj)) return false;
@@ -932,11 +1079,15 @@ function createBase(opt) {
     const low = buildMode;
     const cam = GFX.cam.pos;
     if (Math.hypot(cam.x - OX, cam.z - OZ) > 700) return;
-    for (const st of inst) st.want = !(low && st.roofOnly);
+    // ehitusrežiim: 1. korrus = madalad seinad, teine korrus peidus; 2. korrus = alumised seinad täies kõrguses + ülemise korruse madalad seinad
+    const lv1 = low && viewLevel === 1;
+    for (const st of inst) st.want = st.upper ? (st.roofOnly ? !low : !low || lv1) : !(low && st.roofOnly);
     for (let q = 0; q < 2; q++) {
       const rust = q === 1 ? 1.25 : 0.32;
-      const mm = low ? meshes.low[q] : meshes.main[q];
+      const mm = low && !lv1 ? meshes.low[q] : meshes.main[q];
       if (mm) GFX.draw(mm, baseM, null, null, { rust });
+      const um = low ? (lv1 ? meshes.upLow[q] : null) : meshes.up[q];
+      if (um) GFX.draw(um, baseM, null, null, { rust });
       if (!low && meshes.roof[q]) GFX.draw(meshes.roof[q], baseM, null, null, { rust });
     }
     const lit = power.lightsOn;
@@ -976,8 +1127,14 @@ function createBase(opt) {
         const c = cellCenter(i, j);
         if (!r._lm[k]) r._lm[k] = M4.create();
         M4.compose(r._lm[k], c.x, OY + WH - 0.06, c.z, 0);
-        if (!low) GFX.draw(MODELS.obj.ceilLamp, r._lm[k], lit && !r.dark ? ON_T : OFF_T, null, { shadow: false });
+        if (!low && !holeAt(i, j)) GFX.draw(MODELS.obj.ceilLamp, r._lm[k], lit && !r.dark ? ON_T : OFF_T, null, { shadow: false });
+        if (upAt(i, j) && (!low || lv1)) {
+          if (!r._lu) r._lu = []; if (!r._lu[k]) r._lu[k] = M4.create();
+          M4.compose(r._lu[k], c.x, OY + WH * 2 - 0.06, c.z, 0);
+          if (!low) GFX.draw(MODELS.obj.ceilLamp, r._lu[k], lit && !r.dark ? ON_T : OFF_T, null, { shadow: false });
+        }
       });
+      if (lit && !r.dark && upAt(r.ci, r.cj)) { const c = cellCenter(r.ci, r.cj); GFX.addLight(c.x, OY + WH * 2 - 0.5, c.z, Math.max(r.i1 - r.i0 + 1, r.j1 - r.j0 + 1) * CS * 0.6 + 2.3, 1.0, 0.82, 0.62, 1.3); }
       if (lit && !r.dark) {
         const c = cellCenter(r.ci, r.cj);
         const span = Math.max(r.i1 - r.i0 + 1, r.j1 - r.j0 + 1) * CS;
@@ -988,8 +1145,11 @@ function createBase(opt) {
     }
     for (const o of objs.values()) {
       const d = OBJ[o.type];
+      if (o.type === 'sisetrepp') continue;
+      if (o.lv && low && !lv1) continue;
       let mesh = MODELS.obj[o.type];
       if (o.type === 'vanagen') mesh = MODELS.obj.generaator;
+      if (!mesh) continue;
       const powered = d.power > 0 ? o.on : d.power < 0 ? !o.broken : true;
       const tint = o.broken ? OFF_T : o.hp < o.maxHp * 0.4 ? DMG_T : powered ? ON_T : [0.55, 0.5, 0.48, 0];
       const rust = o.type === 'vanagen' || o.type === 'terminal' || o.type === 'hoidla' ? 1.3 : 0.3;
@@ -1038,15 +1198,22 @@ function createBase(opt) {
     return r;
   }
   function reset() {
-    cellRoom.fill(0); cellObj.fill(0); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
+    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
     nextRoomId = 1; nextObjId = 1; dirty = true;
   }
   function isInside(x, z) { const c = toCell(x, z); return roomAt(c.i, c.j) > 0; }
-  function floorAt(x, z) {
-    if (isInside(x, z)) return OY + FLOOR_Y;
+  // põranda kõrgus; y = olija praegune kõrgus (teise korruse jaoks)
+  function floorAt(x, z, y) {
     const c = toCell(x, z); if (!inGrid(c.i, c.j)) return -1e9;
-    const id = cellObj[c.j * N + c.i]; if (!id) return -1e9;
-    const o = objs.get(id); if (!o) return -1e9;
+    const id = cellObj[c.j * N + c.i], o = id ? objs.get(id) : null;
+    if (o && o.type === 'sisetrepp') {   // siseterepp: põrandast teise korruse põrandani
+      const lx = (x - o.cx), lz = (z - o.cz), yw = objYaw(o);
+      const back = -(lx * Math.sin(yw) + lz * Math.cos(yw));
+      return OY + FLOOR_Y + clamp(0.5 + back / (2 * CS), 0, 1) * WH;
+    }
+    if (y !== undefined && y > OY + WH * 0.55 && upAt(c.i, c.j)) return OY + WH + FLOOR_Y;
+    if (roomAt(c.i, c.j) > 0) return OY + FLOOR_Y;
+    if (!o) return -1e9;
     const d = OBJ[o.type];
     if (d.deck) return OY + d.deck;
     if (d.ramp) { // kõrgem ots objekti tagaküljel (pöörde suunas -z)
@@ -1055,6 +1222,49 @@ function createBase(opt) {
       return OY + clamp(0.5 + back / CS, 0, 1) * d.ramp;
     }
     return -1e9;
+  }
+  function levelAt(x, z, y) { const c = toCell(x, z); return y > OY + WH * 0.55 && upAt(c.i, c.j) ? 1 : 0; }
+  // teise korruse lisamine / eemaldamine tervele toale
+  function setUpper(rid, on) {
+    const r = rooms.get(rid); if (!r) return false;
+    for (const [i, j] of r.cells) { if (on) upper.add(i + ':' + j); else upper.delete(i + ':' + j); }
+    if (!on) pruneObjects();
+    dirty = true; return true;
+  }
+  function roomHasUpper(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && upper.has(r.cells[0][0] + ':' + r.cells[0][1])); }
+  // teekond korruste vahel: lähim siseterepp
+  // teise korruse teekond (BFS üle ülemise korruse rakkude; seinast läbi ainult alumise ukse kohalt)
+  function pathUp(ax, az, bx, bz) {
+    const s0 = toCell(ax, az), g = toCell(bx, bz);
+    if (!inGrid(s0.i, s0.j) || !inGrid(g.i, g.j)) return null;
+    const ok = (i, j) => inGrid(i, j) && upAt(i, j) && !holeAt(i, j) && (!objUpAt(i, j) || (i === g.i && j === g.j));
+    const prev = new Map(), k0 = s0.j * N + s0.i, kg = g.j * N + g.i;
+    prev.set(k0, -1); const q = [k0];
+    while (q.length) {
+      const k = q.shift(); if (k === kg) break;
+      const i = k % N, j = (k - i) / N;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj, nk = nj * N + ni;
+        if (prev.has(nk) || !ok(ni, nj)) continue;
+        const t = di ? 'v' : 'h', ei = di > 0 ? i + 1 : di < 0 ? i : i, ej = dj > 0 ? j + 1 : dj < 0 ? j : j;
+        if (isWall(t, ei, ej) && openings.get(ekey(t, ei, ej)) !== 'door') continue;
+        prev.set(nk, k); q.push(nk);
+      }
+    }
+    if (!prev.has(kg)) return null;
+    const pts = []; for (let k = kg; k !== -1 && k !== k0; k = prev.get(k)) { const i = k % N; pts.push(cellCenter(i, (k - i) / N)); }
+    pts.reverse(); if (pts.length) pts[pts.length - 1] = { x: bx, z: bz }; else pts.push({ x: bx, z: bz });
+    return pts;
+  }
+  function stairRoute(x, z, goingUp) {
+    let best = null, bd = 1e9;
+    for (const o of objs.values()) if (o.type === 'sisetrepp') { const d = Math.hypot(o.cx - x, o.cz - z); if (d < bd) { bd = d; best = o; } }
+    if (!best) return null;
+    const [di, dj] = stairDir(best), L = CS - 0.35;
+    const lo = { x: best.cx + di * L, z: best.cz + dj * L }, hi = { x: best.cx - di * L, z: best.cz - dj * L };
+    const en = stairEntry(best), ex = stairExit(best);
+    const ce = cellCenter(en.i, en.j), cx = cellCenter(ex.i, ex.j);
+    return goingUp ? { entry: ce, via: [lo, hi], exit: cx } : { entry: cx, via: [hi, lo], exit: ce };
   }
   function bounds() {
     let r = 0;
@@ -1065,7 +1275,7 @@ function createBase(opt) {
   function serialize() {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
-    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data })) };
+    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, upper: [...upper], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
@@ -1078,17 +1288,19 @@ function createBase(opt) {
     }
     openings.clear();
     for (const [k, v] of d.openings) if (walls.has(k)) openings.set(k, v);
-    for (const o of d.objs) addObj(o.type, o.i, o.j, o.rot, { hp: o.hp, broken: o.broken, data: o.data || {} }, o.id);
+    for (const k of d.upper || []) upper.add(k);
+    for (const o of d.objs) addObj(o.type, o.i, o.j, o.rot, { hp: o.hp, broken: o.broken, data: o.data || {}, lv: o.lv || 0 }, o.id);
     computeRooms();
     dirty = true;
   }
   return {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
-    inGrid, inArea, roomAt, objAt, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
+    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
     serialize, deserialize, markDirty: () => { dirty = true; }, rebuildNow: () => rebuild(), computeRooms,
+    get viewLevel() { return viewLevel; }, set viewLevel(v) { viewLevel = v ? 1 : 0; },
   };
 }
 
@@ -1097,7 +1309,7 @@ const Base = createBase({ ox: 0, oy: 0, oz: 0, player: true, accent: [1.0, 0.55,
 const Bases = {
   list: [Base],
   at(x, z) { for (const b of this.list) if (b.containsWorld(x, z)) return b; return null; },
-  floorAt(x, z) { const b = this.at(x, z); return b ? b.floorAt(x, z) : -1e9; },
+  floorAt(x, z, y) { const b = this.at(x, z); return b ? b.floorAt(x, z, y) : -1e9; },
   isInsideAny(x, z) { const b = this.at(x, z); return !!(b && b.isInside(x, z)); },
   pathWorld(ax, az, bx, bz, goalCells) {
     if (goalCells) return Base.pathWorld(ax, az, bx, bz, goalCells);

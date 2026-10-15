@@ -74,7 +74,7 @@ const Player = {
       }
     }
     this.pos.x = clamp(this.pos.x, -World.HALF + 12, World.HALF - 12); this.pos.z = clamp(this.pos.z, -World.HALF + 12, World.HALF - 12);
-    const gy = Ents.groundY(this.pos.x, this.pos.z);
+    const gy = Ents.groundY(this.pos.x, this.pos.z, this.pos.y);
     if (this.onGround && inp.jump) { this.vel.y = 5.4; this.onGround = false; }
     this.vel.y -= 11 * dt;
     this.pos.y += this.vel.y * dt;
