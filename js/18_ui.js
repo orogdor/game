@@ -128,6 +128,7 @@ const UI = (() => {
     return `<span class="chip cr" title="Krediidid">${ICON.coin}<span class="num">${fmtInt(G.res.cr)}</span></span>
       <span class="chip sc" title="Scrap">${ICON.scrap}<span class="num">${G.res.scrap}</span></span>
       <span class="chip kr" title="Toorteemandid hoidlas (+ lihvitud)">${ICON.crystal}<span class="num">${G.res.kris}${G.res.lihv ? '<small style="opacity:.75"> +' + G.res.lihv + '</small>' : ''}</span></span>
+      ${(G.res.ore || 0) > 0 || G.flags.drill ? `<span class="chip or" title="Iron ore" style="color:#d98a62">${ICON.scrap}<span class="num">${G.res.ore || 0}</span></span>` : ''}
       <span class="chip fd" title="Toit (toores liha)">${ICON.food}<span class="num">${G.res.food}${G.res.meat ? '<small style="opacity:.75"> +' + G.res.meat + '</small>' : ''}</span></span>` + pw + threatChip();
   }
   function threatChip() {
@@ -547,6 +548,7 @@ const UI = (() => {
       h += `<div class="kv"><div><div class="k">Diamond price today</div><div class="v" style="color:var(--crystal)">${p} ₵/pc</div></div><div><div class="k">Money</div><div class="v" style="color:var(--brass)">${fmtInt(G.res.cr)} ₵</div></div><div><div class="k">Next debt payment</div><div class="v">${fmtInt(G.debt.amount)} ₵</div></div></div>`;
       h += `<div class="row"><div class="grow"><div class="t">Raw diamonds · ${G.res.kris}</div><div class="s">${p} ₵ each. The price changes every morning.</div></div>${btn('sell:10', 'Sell 10', { disabled: G.res.kris < 1 })}${btn('sell:all', 'Sell all · ' + fmtInt(G.res.kris * p) + ' ₵', { primary: true, disabled: G.res.kris < 1 })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">Polished diamonds · ${G.res.lihv}</div><div class="s">${pl} ₵ each. Build a diamond polisher to polish them.</div></div>${btn('selll', 'Sell all · ' + fmtInt(G.res.lihv * pl) + ' ₵', { primary: true, disabled: G.res.lihv < 1 })}</div>`;
+      if ((G.res.ore || 0) > 0 || G.flags.drill) h += `<div class="row"><div class="grow"><div class="t">Iron ore · ${G.res.ore || 0}</div><div class="s">9 ₵ each. Smelting it at the Ore works gives steel scrap instead.</div></div>${btn('sello', 'Sell all · ' + fmtInt((G.res.ore || 0) * 9) + ' ₵', { disabled: !(G.res.ore > 0) })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">Raw meat · ${G.res.meat}</div><div class="s">4 ₵ each. The crew needs meat for food.</div></div>${btn('sellm', 'Sell all', { disabled: G.res.meat < 1 })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">20 scrap</div><div class="s">The cargo shuttle delivers right away. In storage: ${G.res.scrap}.</div></div>${btn('buy:scrap', 'Buy · 45 ₵', { disabled: G.res.cr < 45 })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">5 meals</div><div class="s">Canned food from the home world. Food: ${G.res.food}.</div></div>${btn('buy:food', 'Buy · 40 ₵', { disabled: G.res.cr < 40 })}</div>`;
@@ -602,6 +604,7 @@ const UI = (() => {
     bindActs(body, {
       sell: (a) => { const n = a === 'all' ? G.res.kris : 10; const v = Econ.sellKris(n); if (v) { toast('+' + fmtInt(v) + ' ₵'); G.flags.sold = true; Objectives.check(); } renderPanel(true); },
       selll: () => { const v = Econ.sellLihv(G.res.lihv); if (v) { toast('+' + fmtInt(v) + ' ₵'); G.flags.sold = true; Objectives.check(); } renderPanel(true); },
+      sello: () => { const v = Econ.sellOre(G.res.ore); if (v) toast('+' + v + ' ₵'); renderPanel(true); },
       sellm: () => { const v = Econ.sellMeat(G.res.meat); if (v) toast('+' + v + ' ₵'); renderPanel(true); },
       buy: (k) => { if (Econ.buy(k)) toast(k === 'scrap' ? '+20 scrap' : k === 'food' ? '+5 meals' : SHOP[k].name + ' is in storage'); renderPanel(true); },
       craft: (k) => { const c = CRAFT[k]; if (!c) return; if (G.res.scrap < c.s || G.res.kris < (c.k || 0)) { toast('Not enough material'); Audio2.deny(); return; } G.res.scrap -= c.s; G.res.kris -= c.k || 0; Inv.stashAdd(c.id, c.n); Audio2.repair(); toast(c.name + ' ready · in storage'); renderPanel(true); },
@@ -697,7 +700,9 @@ const UI = (() => {
     ctx.drawImage(mapCanvas, 0, 0, S, S);
     ctx.fillStyle = 'rgba(17,13,11,.18)'; ctx.fillRect(0, 0, S, S);
     const P = (x, z) => [(x + World.HALF) * k, (z + World.HALF) * k];
-    for (const w of World.wrecks) { const [x, y] = P(w.x, w.z); ctx.fillStyle = w.scrap > 0 ? '#9a8f80' : '#5a5148'; ctx.fillRect(x - 3, y - 3, 6, 6); }
+    for (const w of World.wrecks) { if (w.gone || w.scrap <= 0) continue; const [x, y] = P(w.x, w.z); ctx.fillStyle = w.scrap > 0 ? '#9a8f80' : '#5a5148'; ctx.fillRect(x - 3, y - 3, 6, 6); }
+    // rauamaak: nähtud kivid; maagipuuriga tuleb kaasa uuringukaart (kõik kivid)
+    for (const o of World.ores) { if (o.gone || o.amount <= 0 || !(o.known || G.flags.drill)) continue; const [x, y] = P(o.x, o.z); ctx.fillStyle = '#c8643c'; ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x + 4, y + 3); ctx.lineTo(x - 4, y + 3); ctx.closePath(); ctx.fill(); }
     ctx.fillStyle = 'rgba(238,223,198,.9)';
     for (const b of Bases.list) { ctx.fillStyle = b === Base ? 'rgba(238,223,198,.9)' : 'rgba(255,120,95,.85)'; for (const r of b.rooms.values()) for (const [ci, cj] of r.cells) { const [x, y] = P(b.X0 + ci * b.CS, b.Z0 + cj * b.CS); ctx.fillRect(x, y, b.CS * k + 0.5, b.CS * k + 0.5); } }
     for (const m of markers()) {
@@ -831,7 +836,7 @@ const UI = (() => {
       <h4>Objective</h4><p>Keep the station alive, pay the bank its instalments and find the Stoneheart. Its heartstones wipe out the whole debt. Two rivals are hunting the same thing.</p>
       <h4>Phone controls</h4><ul><li>Left thumb: move. Push all the way to run.</li><li>Right side: look around. Slide your finger on the fire button to aim at the same time.</li><li>The action button appears when there's something to do. Some actions must be held.</li><li>The hammer opens building, the minimap opens the big map.</li></ul>
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>
-      <h4>Building</h4><p>Drag out a room on the floor like in The Sims. A door appears by itself; you can add more doors and windows. Put items in rooms: beds, table, stove, workbench, scanner. Cannons, solar panels, radar and floodlights go outside. Every device needs power.</p>
+      <h4>Building</h4><p>Drag out a room on the floor like in The Sims. A door appears by itself; you can add more doors and windows. Put items in rooms: beds, table, stove, workbench, scanner. Cannons, solar panels, radar and floodlights go outside. Every device needs power. Build the <b>Ore works</b> and buy an ore drill there to mine the reddish iron ore rocks in the desert; smelt the ore into steel scrap or sell it.</p>
       <h4>Money and food</h4><p>Comets bring raw diamonds. Collect them before the rivals and take them to the base; storage fills when you step inside. Sell them at the terminal. Desert goats give meat, which the stove turns into food. Every hire eats and wants wages every morning.</p>
       <h4>Threats</h4><p>Sand stalkers come out at night. Spineshields won't attack if you keep your distance, but diamonds grow on their backs. Rivals raid your storage and compete for the comets. Their camp core can be blown up.</p>
       <h4>Stoneheart</h4><p>Build the deep scanner to find the nest. The giant's armour stops bullets: aim for the glowing crystal nodes on its back, then the exposed heart. Jump over the shockwave.</p></div>`;

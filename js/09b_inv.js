@@ -7,6 +7,7 @@ const ITEMS = (() => {
     kris: { name: 'Raw diamond', cat: 'res', stack: 10, col: '#92d9ff', desc: 'A raw diamond from a comet. Sell it at the comms terminal or polish it to raise its value.', icon: s('<path d="M16 3l7 9-7 17-7-17z"/><path d="M9 12h14M13 12l3 17M19 12l-3 17"/>') },
     scrap: { name: 'Scrap', cat: 'res', stack: 20, col: '#c9b9a2', desc: 'Building material. Used for building, repairs and making ammo.', icon: s('<path d="M16 4l10 6v12l-10 6-10-6V10z"/><circle cx="16" cy="16" r="4"/><path d="M6 10l10 6 10-6"/>') },
     meat: { name: 'Raw meat', cat: 'res', stack: 5, col: '#e7b98a', desc: 'Desert goat meat. The cook turns it into food.', icon: s('<path d="M8 20c-3-5 1-13 9-13 6 0 9 4 8 8-1 5-7 8-12 8-2 0-4-1-5-3z"/><circle cx="12" cy="21" r="3"/><path d="M10 23l-4 4"/>') },
+    ore: { name: 'Iron ore', cat: 'res', stack: 15, col: '#c06a44', desc: 'Iron ore from the desert rocks. Smelt it into steel at the Ore works or sell it at the comms terminal.', icon: s('<path d="M6 22l5-12 8-3 7 8-3 10-11 1z"/><path d="M11 10l3 7 5-10M14 17l-3 9M14 17l9-2"/>') },
     stones: { name: 'Heartstones', cat: 'quest', stack: 5, col: '#ff8fd0', desc: 'Stones from the Stoneheart\'s nest. Take them to the base — they wipe out the debt.', icon: s('<path d="M16 27s-10-6-10-13a6 6 0 0 1 10-4 6 6 0 0 1 10 4c0 7-10 13-10 13z"/><path d="M12 14l4 4 4-4"/>') },
     ammo_r: { name: 'Carbine ammo', cat: 'ammo', stack: 90, col: '#ddb45c', desc: '5.56 mm rounds for the carbine. Reloading takes them from your backpack.', icon: s('<path d="M8 26V12l2-5 2 5v14zM15 26V12l2-5 2 5v14zM22 26V12l2-5 2 5v14z"/><path d="M8 22h4M15 22h4M22 22h4"/>') },
     ammo_c: { name: 'Railgun charge', cat: 'ammo', stack: 15, col: '#92d9ff', desc: 'Crystal-battery charge for the railgun.', icon: s('<rect x="9" y="6" width="14" height="20" rx="2"/><path d="M16 10v6l-3 0 6 6v-6h-3"/>') },
@@ -226,7 +227,7 @@ const Inv = (() => {
   function gearSpd(eq) { let m = 1; if (!eq) return 1; for (const k of ['vest', 'boots']) if (eq[k] && ITEMS[eq[k]]) m += ITEMS[eq[k]].spd || 0; return m; }
   function reloadMul() { const g = ensure().eq.gloves; return g && ITEMS[g] ? ITEMS[g].rel || 1 : 1; }
   // ---------- hoidla ----------
-  const RES_KEYS = { kris: 'kris', scrap: 'scrap', meat: 'meat' };
+  const RES_KEYS = { kris: 'kris', scrap: 'scrap', meat: 'meat', ore: 'ore' };
   function stashCount(id) { ensure(); if (RES_KEYS[id]) return G.res[RES_KEYS[id]] || 0; return G.stash[id] || 0; }
   function toStash(id, n) {
     ensure(); const k = take(id, n); if (!k) return 0;
@@ -243,13 +244,13 @@ const Inv = (() => {
   // baasi sisenedes: ressursid hoidlasse
   function depositResources() {
     const parts = [];
-    for (const id of ['kris', 'scrap', 'meat', 'stones']) { const n = count(id); if (!n) continue; toStash(id, n); parts.push(id === 'stones' ? 'The heartstones are home!' : '+' + n + ' ' + ITEMS[id].name.toLowerCase()); }
+    for (const id of ['kris', 'scrap', 'meat', 'ore', 'stones']) { const n = count(id); if (!n) continue; toStash(id, n); parts.push(id === 'stones' ? 'The heartstones are home!' : '+' + n + ' ' + ITEMS[id].name.toLowerCase()); }
     return parts;
   }
   // kõik seljakotist kotti (surm): ainult ressursid
   function dropResourcesBag(x, z) {
     const items = [];
-    for (const id of ['kris', 'scrap', 'meat', 'stones']) { const n = count(id); if (n) { take(id, n); items.push([id, n]); } }
+    for (const id of ['kris', 'scrap', 'meat', 'ore', 'stones']) { const n = count(id); if (n) { take(id, n); items.push([id, n]); } }
     if (items.length) Ents.pickups.push({ kind: items.some((q) => q[0] === 'stones') ? 'stones' : 'bag', x, y: Ents.groundY(x, z), z, data: { items } });
   }
   // korja kott: lisab mahtuva, ülejääk jääb kotti

@@ -82,5 +82,7 @@ function applyPropModels() {
   }
   for (const k of ['camp_core', 'camp_cargo', 'camp_pad', 'camp_lander', 'camp_turbine', 'camp_lights', 'comm_tower', 'scifi_crate', 'barrel', 'q_crate', 'q_crate_long', 'q_container', 'q_pod', 'base_pad', 'base_truck', 'bag', 'meat']) if (P[k]) MODELS[k] = g(k);
   if (P.flagpole) MODELS.obj.flagpole = g('flagpole');
+  if (P.ore_rock && P.ore_rock2) { MODELS.oreRocks = [g('ore_rock'), g('ore_rock2')]; MODELS.oreRocksLo = [g('ore_rock', 1), g('ore_rock2', 1)]; }
+  if (P.ore_works) MODELS.obj.maagitehas = g('ore_works');
 }
 

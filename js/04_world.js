@@ -7,6 +7,7 @@ const World = (() => {
   const mapRGB = new Uint8Array(N1 * N1 * 3);
   const sites = { base: { x: 0, z: 0 }, rivals: [], nest: { x: 0, z: 0 }, ribs: [], campLevel: [0, 0], nestLevel: 0 };
   const wrecks = [];
+  const ores = [];   // rauamaagi kivid (kaevandamiseks on vaja maagipuuri)
   const groves = [];
   let seed = 1;
   let terrainMesh = null;
@@ -35,6 +36,24 @@ const World = (() => {
         arr.push(c); c._cells.push(k);
       }
     return c;
+  }
+  function clearOre(o) {
+    o.gone = true;
+    if (o.col) { removeCol(o.col); o.col = null; }
+    if (GFX.cam && Math.hypot(GFX.cam.pos.x - o.x, GFX.cam.pos.z - o.z) < 150 && typeof FX !== 'undefined') {
+      for (let k = 0; k < 4; k++) FX.dust && FX.dust(o.x + (Math.random() - 0.5) * o.rad, o.y + 0.4, o.z + (Math.random() - 0.5) * o.rad, 6, 1.8);
+      if (typeof UI !== 'undefined' && G.mode === 'play' && Math.hypot(Player.pos.x - o.x, Player.pos.z - o.z) < 40) UI.toast('The ore vein is exhausted');
+    }
+  }
+  // tühjaks korjatud vrakk kaob: kokkupõrge maha, tolmupilv (kui lähedal)
+  function clearWreck(w) {
+    w.gone = true;
+    if (w.col) { removeCol(w.col); w.col = null; }
+    else for (const arr of cells.values()) for (let k = arr.length - 1; k >= 0; k--) { const c = arr[k]; if (c.kind === 'wreck' && Math.hypot(c.x - w.x, c.z - w.z) < 0.5) arr.splice(k, 1); }
+    if (GFX.cam && Math.hypot(GFX.cam.pos.x - w.x, GFX.cam.pos.z - w.z) < 150 && typeof FX !== 'undefined') {
+      for (let k = 0; k < 5; k++) FX.dust && FX.dust(w.x + (Math.random() - 0.5) * w.rad, w.y + 0.5, w.z + (Math.random() - 0.5) * w.rad, 6, 2.2);
+      if (typeof UI !== 'undefined' && G.mode === 'play' && Math.hypot(Player.pos.x - w.x, Player.pos.z - w.z) < 40) UI.toast(w.name + ' is stripped bare and gone');
+    }
   }
   function removeCol(c) {
     if (!c._cells) return;
@@ -256,7 +275,7 @@ const World = (() => {
   function scatter(rng) {
     for (const s of instSets) GFX.removeInstSet(s);
     instSets.length = 0;
-    wrecks.length = 0; groves.length = 0;
+    wrecks.length = 0; groves.length = 0; ores.length = 0;
     for (const arr of cells.values()) arr.length = 0;
     cells.clear();
     const CH = 200, NC = Math.ceil(SIZE / CH);
@@ -383,7 +402,24 @@ const World = (() => {
       const mm = M4.compose(M4.create(), x, y, z, yaw, (rng() - 0.5) * 0.25, (rng() - 0.5) * 0.25);
       const rad = [2.9, 2.7, 3.0, 3.0, 6.5][type];
       wrecks.push({ id: i, x, z, y, yaw, type, m: mm, rad, scrap: type === 4 ? 120 : 18 + Math.floor(rng() * 28), name: wreckNames[type], known: i < 4 });
-      addCol({ t: 'c', x, z, r: rad * 0.8, y0: y - 3, y1: y + 4, kind: 'wreck' });
+      wrecks[wrecks.length - 1].col = addCol({ t: 'c', x, z, r: rad * 0.8, y0: y - 3, y1: y + 4, kind: 'wreck' }) || null;
+    }
+    // rauamaagi kivid: eraldi juhuarvudega (ülejäänud maailm ei muutu)
+    let os = (seed * 7919 + 1013) >>> 0;
+    const orng = () => { os = (Math.imul(os ^ (os >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0; os ^= os >>> 12; return (os >>> 0) / 4294967296; };
+    for (let i = 0; i < 30; i++) {
+      let x, z, ok = false;
+      for (let t = 0; t < 60 && !ok; t++) {
+        const a = orng() * TAU, r = i < 3 ? 70 + orng() * 50 : 110 + orng() * (HALF - 220);
+        x = Math.cos(a) * r; z = Math.sin(a) * r;
+        ok = okSpot(x, z, 60) && slopeAt(x, z) < 0.25 && !wrecks.some((w) => Math.hypot(w.x - x, w.z - z) < 22) && !ores.some((w) => Math.hypot(w.x - x, w.z - z) < 40);
+      }
+      if (!ok) continue;
+      const yaw = orng() * TAU, type = orng() < 0.55 ? 0 : 1, y = heightAt(x, z) - 0.15, sc = 0.9 + orng() * 0.5;
+      const o = { id: i, x, z, y, yaw, type, sc, rad: 1.5 * sc, amount: 40 + Math.floor(orng() * 35), name: 'Iron ore rock', known: false,
+        m: M4.compose(M4.create(), x, y, z, yaw, 0, 0, sc, sc, sc) };
+      o.col = addCol({ t: 'c', x, z, r: 1.15 * sc, y0: y - 2, y1: y + 2.2 * sc, kind: 'rock' });
+      ores.push(o);
     }
     for (const s of instSets) s.computeBounds();
     // baasi kõrval: vana maandumisplats ja roostes veok
@@ -533,14 +569,22 @@ const World = (() => {
   function draw() {
     drawTerrain();
     const cx = GFX.cam.pos.x, cz = GFX.cam.pos.z, WL = MODELS.wrecksLo;
-    for (const w of wrecks) GFX.draw(WL && Math.hypot(w.x - cx, w.z - cz) > 70 + w.rad * 6 ? WL[w.type] : MODELS.wrecks[w.type], w.m, null, null, { rust: 1.2 });
+    for (const w of wrecks) {
+      if (w.scrap <= 0) { if (!w.gone) clearWreck(w); continue; }
+      GFX.draw(WL && Math.hypot(w.x - cx, w.z - cz) > 70 + w.rad * 6 ? WL[w.type] : MODELS.wrecks[w.type], w.m, null, null, { rust: 1.2 });
+    }
+    if (MODELS.oreRocks) for (const o of ores) {
+      if (o.amount <= 0) { if (!o.gone) clearOre(o); continue; }
+      const far = Math.hypot(o.x - cx, o.z - cz) > 60 && MODELS.oreRocksLo;
+      GFX.draw((far ? MODELS.oreRocksLo : MODELS.oreRocks)[o.type], o.m, null, null, { rust: 1.0 });
+    }
     for (const r of sites.ribs) GFX.draw(MODELS.ribcage, r.m, null, null, { rust: 0 });
     for (const d of sites.decor || []) GFX.draw(d.mesh, d.m, null, null, { rust: 1.1 });
   }
 
   return {
-    HALF, SIZE, RES, STEP, N1, H, mapRGB, sites, wrecks, groves, instSets,
-    generate, heightAt, normalAt, slopeAt, addCol, removeCol, query, collideCircle, deformCrater,
+    HALF, SIZE, RES, STEP, N1, H, mapRGB, sites, wrecks, ores, groves, instSets,
+    generate, heightAt, normalAt, slopeAt, addCol, removeCol, clearWreck, clearOre, query, collideCircle, deformCrater,
     raycastCols, raycastTerrain, lineOfSight, draw, okSpot,
     get terrainMesh() { return null; }, setTerrainShadow(v) { terrainShadow = v; },
   };

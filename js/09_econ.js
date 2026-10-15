@@ -10,7 +10,7 @@ const DIFFS = {
 const G = {
   mode: 'title', seed: 1, diff: 'tavaline', dk: DIFFS.tavaline,
   time: { day: 1, t: 0.03, total: 0 },
-  res: { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6 },
+  res: { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0 },
   carry: { kris: 0, scrap: 0, meat: 0, stones: 0 },
   debt: { left: 30000, nextDay: 4, amount: 200, idx: 0, grace: false, warned: false },
   up: { rifle: 1, rail: false, armor: 0 },
@@ -228,6 +228,10 @@ const Econ = (() => {
     G.res.lihv -= n; G.res.cr += v; Audio2.cash();
     return v;
   }
+  function sellOre(n) {
+    n = Math.min(n, G.res.ore || 0); if (n <= 0) return 0;
+    const v = n * 9; G.res.ore -= n; G.res.cr += v; Audio2.cash(); return v;
+  }
   function sellMeat(n) {
     n = Math.min(n, G.res.meat); if (n <= 0) return 0;
     const v = n * 4; G.res.meat -= n; G.res.cr += v; Audio2.cash(); return v;
@@ -273,7 +277,7 @@ const Econ = (() => {
     G.candidates = out;
   }
 
-  return { hour, isNight, clockStr, sunElev, updateEnv, update, newDay, dayLine, sleep, sellKris, sellLihv, sellMeat, buy, payDebtEarly, genCandidates, debtAmount };
+  return { hour, isNight, clockStr, sunElev, updateEnv, update, newDay, dayLine, sleep, sellKris, sellLihv, sellMeat, sellOre, buy, payDebtEarly, genCandidates, debtAmount };
 })();
 
 // ---------- ilm: tolmutormid ----------

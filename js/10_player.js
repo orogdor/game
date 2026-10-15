@@ -310,6 +310,7 @@ const Player = {
     }
     // vrakid
     for (const w of World.wrecks) {
+      if (w.gone) continue;
       const d = Math.hypot(w.x - px, w.z - pz);
       if (d > w.rad + 2.6) continue;
       w.known = true;
@@ -317,6 +318,17 @@ const Player = {
         ? { key: 'w' + w.id, label: 'Collect scrap', sub: w.name + ' · left ' + w.scrap, hold: 1.4, act: () => salvage(w), tick: () => FX.repair(w.x + rand(-1, 1), w.y + 1.2, w.z + rand(-1, 1)) }
         : { key: 'w' + w.id + 'e', label: w.name, sub: 'Picked clean', disabled: true };
       consider(it, w.x, w.z, w.rad + 2.6);
+    }
+    // rauamaagi kivid (vajavad maagipuuri)
+    for (const o of World.ores) {
+      if (o.gone || o.amount <= 0) continue;
+      const d = Math.hypot(o.x - px, o.z - pz);
+      if (d > o.rad + 2.4) continue;
+      o.known = true;
+      const it = G.flags.drill
+        ? { key: 'ore' + o.id, label: 'Drill iron ore', sub: 'left ' + o.amount + ' · backpack fits ' + Inv.room('ore'), hold: 1.6, act: () => mineOre(o), tick: () => { FX.sparks(o.x + rand(-0.6, 0.6), o.y + 0.8, o.z + rand(-0.6, 0.6), [1, 0.6, 0.3], 2, 2); } }
+        : { key: 'ore' + o.id + 'n', label: 'Iron ore rock', sub: 'Needs an ore drill · build the Ore works and buy one there', disabled: true };
+      consider(it, o.x, o.z, o.rad + 2.4);
     }
     // kristallid
     const cl = Comets.nearestCluster(px, pz, 3.4);
@@ -461,6 +473,18 @@ function objInteraction(o) {
     case 'jukebox':
       if (!o.on) return { label: 'Jukebox', sub: 'No power', disabled: true };
       return { label: G.flags.music ? 'Stop music' : 'Play music', act: () => { G.flags.music = !G.flags.music; Audio2.setMusic(G.flags.music); } };
+    case 'maagitehas': {
+      if (!G.flags.drill) {
+        const can = G.res.cr >= 400;
+        return { label: 'Buy an ore drill', sub: '400 ₵ · you and your miners can then mine iron ore rocks' + (can ? '' : ' · not enough money'), disabled: !can, hold: 1.0,
+          act: () => { if (G.res.cr < 400) return; G.res.cr -= 400; G.flags.drill = true; Audio2.cash(); UI.banner('Ore drill bought', 'Iron ore rocks in the desert can now be mined. Miners will also go drilling.'); Objectives.check(); } };
+      }
+      if (!o.on) return { label: 'Ore works', sub: 'No power — can\'t smelt', disabled: true };
+      if (!(G.res.ore > 0)) return { label: 'Ore works', sub: 'No iron ore in storage · mine the reddish rocks in the desert', disabled: true };
+      return { label: 'Smelt iron ore', sub: G.res.ore + ' ore in storage · 1 ore = 3 steel scrap', hold: 2.4,
+        act: () => { const n = Math.min(10, G.res.ore); G.res.ore -= n; G.res.scrap += n * 3; UI.toast('+' + n * 3 + ' steel scrap from ' + n + ' ore'); Audio2.repair(); },
+        tick: () => FX.sparks(o.cx + rand(-0.3, 0.3), 0.9, o.cz + rand(-0.3, 0.3), [1, 0.55, 0.2], 2, 2.5) };
+    }
     case 'toolaud':
       return { label: 'Workshop', sub: 'Weapon upgrades', act: () => UI.openTerminal('tookoda') };
     case 'lihvija':
@@ -499,6 +523,14 @@ function salvage(w) {
   w.scrap -= n;
   Audio2.pickup(); UI.toast('+' + n + ' scrap into the backpack');
   G.flags.salvaged = true; Objectives.check();
+}
+function mineOre(o) {
+  const room = Inv.room('ore');
+  if (room <= 0) { UI.toast('Backpack is full. Take your things to the base.'); Audio2.deny(); return; }
+  const n = Inv.add('ore', Math.min(5, o.amount, room));
+  o.amount -= n;
+  Audio2.pickup(); UI.toast('+' + n + ' iron ore into the backpack');
+  FX.dust(o.x, o.y + 0.6, o.z, 4, 1.2);
 }
 function butcher(e) {
   const room = Inv.room('meat');

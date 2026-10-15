@@ -16,7 +16,7 @@ const Save = (() => {
       flags: Object.assign({}, G.flags, { music: false }), stats: G.stats, market: G.market, candidates: G.candidates,
       player: { x: Player.pos.x, z: Player.pos.z, yaw: Player.yaw, hp: Player.hp },
       base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(),
-      wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
+      wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), ores: World.ores.map((o) => [o.amount, o.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
       pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data })),
       look: Look.clean(G.look), pname: G.pname, inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
     };
@@ -246,7 +246,7 @@ const Game = (() => {
 
   function resetState() {
     G.time = { day: 1, t: 0.03, total: 0 };
-    G.res = { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6 };
+    G.res = { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0 };
     G.carry = { kris: 0, scrap: 0, meat: 0, stones: 0 };
     G.dk = DIFFS[G.diff] || DIFFS.tavaline;
     G.debt = { left: Math.round(30000 * G.dk.debt), nextDay: 4, amount: 0, idx: 0, grace: false, warned: false };
@@ -297,7 +297,7 @@ const Game = (() => {
     resetState();
     G.diff = d.diff || 'tavaline'; G.dk = DIFFS[G.diff];
     setupWorld(d.seed);
-    Object.assign(G.time, d.time); Object.assign(G.res, d.res); Object.assign(G.carry, d.carry); Object.assign(G.debt, d.debt);
+    Object.assign(G.time, d.time); Object.assign(G.res, d.res); if (G.res.ore == null) G.res.ore = 0; Object.assign(G.carry, d.carry); Object.assign(G.debt, d.debt);
     Object.assign(G.up, d.up); Object.assign(G.scan, d.scan); G.flags = d.flags || {}; Object.assign(G.stats, d.stats); Object.assign(G.market, d.market);
     G.candidates = d.candidates || []; G.log = d.log || [];
     if (d.look) G.look = d.look; if (d.pname) G.pname = d.pname;
@@ -306,6 +306,7 @@ const Game = (() => {
     UI.waypoint = d.waypoint || null;
     Base.deserialize(d.base);
     Base.rebuildNow();
+    (d.ores || []).forEach((w, i) => { const o = World.ores[i]; if (o) { o.amount = w[0]; o.known = !!w[1]; } });
     (d.wrecks || []).forEach((w, i) => { if (World.wrecks[i]) { World.wrecks[i].scrap = Array.isArray(w) ? w[0] : w; World.wrecks[i].known = Array.isArray(w) ? !!w[1] : false; } });
     Spawner.init();
     Rivals.deserialize(d.rivals);

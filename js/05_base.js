@@ -35,6 +35,7 @@ const OBJ = {
   kmpesa: { name: 'MG nest', cat: 'kaitse', cost: { s: 30, c: 80 }, size: [2, 1], where: 'out', power: 0, h: 1.0, hp: 350, desc: 'Sandbagged nest. A crew member mans it during a swarm. Uses carbine ammo from storage.' },
   siil: { name: 'Tank trap', cat: 'kaitse', cost: { s: 5, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.2, hp: 500, desc: 'Steel hedgehog. Big bugs can\'t get through.' },
   okas: { name: 'Barbed wire', cat: 'kaitse', cost: { s: 6, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.9, hp: 120, desc: 'Slows and hurts bugs that climb through it.' },
+  maagitehas: { name: 'Ore works', cat: 'too', cost: { s: 60, c: 150 }, size: [2, 1], where: 'any', power: 2, h: 2.4, desc: 'Crusher and smelter. Sells the ore drill (needed to mine iron ore rocks in the desert) and smelts iron ore into steel scrap.' },
   kaardilaud: { name: 'Map table', cat: 'too', cost: { s: 20, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 1.1, desc: 'The heart of the command post. With a radar it shows the swarm\'s direction and size an hour ahead.' },
   terminal: { name: 'Comms terminal', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.6 },
   hoidla: { name: 'Storage', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.4 },
@@ -44,11 +45,11 @@ const OBJ = {
 const SIG = {
   generaator: [10, 1], vanagen: [12, 1], lihvija: [6, 1], jukebox: [5, 1], teler: [2, 1], pliit: [2, 1], kasvu: [2, 3], toolaud: [2, 0],
   skanner: [5, 3], radar: [3, 1], kahur: [3, 1], myyrturel: [3, 1], varav: [2, 1], vesi: [1, 0], dush: [1, 0], trenn: [1, 0],
-  ravila: [1, 1], kaardilaud: [1, 1], prozektor: [1, 9], torn: [1, 6], paike: [0, 0],
+  ravila: [1, 1], kaardilaud: [1, 1], prozektor: [1, 9], torn: [1, 6], paike: [0, 0], maagitehas: [7, 2],
 };
 const THREAT_TIERS = [[0, 'Quiet', '#97d276'], [35, 'Noticeable', '#e8d06a'], [70, 'Resonant', '#ffa04a'], [120, 'Lighthouse', '#ff5b47']];
 const OBJ_CATS = [['elu', 'Living'], ['too', 'Work'], ['energia', 'Power'], ['kaitse', 'Defence']];
-const POWER_PRIO = { kasvu: 6, vesi: 6, dush: 3, teler: 1, kahur: 9, myyrturel: 9, radar: 8, skanner: 7, ravila: 6, pliit: 5, lihvija: 4, toolaud: 4, prozektor: 3, jukebox: 2 };
+const POWER_PRIO = { kasvu: 6, vesi: 6, dush: 3, teler: 1, kahur: 9, myyrturel: 9, radar: 8, skanner: 7, ravila: 6, pliit: 5, lihvija: 4, toolaud: 4, maagitehas: 4, prozektor: 3, jukebox: 2 };
 const ROOM_STYLES = [
   { name: 'Rusty', wall: [0.40, 0.30, 0.25], wall2: [0.26, 0.19, 0.16], floor: [0.27, 0.23, 0.21], floor2: [0.23, 0.20, 0.18], ceil: [0.28, 0.25, 0.23] },
   { name: 'Steel panel', wall: [0.46, 0.47, 0.46], wall2: [0.28, 0.29, 0.30], floor: [0.31, 0.31, 0.31], floor2: [0.27, 0.27, 0.27], ceil: [0.40, 0.40, 0.39] },
@@ -125,7 +126,8 @@ function createBase(opt) {
   // ---------- müüride ühendused: nurgad, ristmikud, otsad, tornid ----------
   const JOIN = { myyr: 1, myyrturel: 1, varav: 1, torn: 1, vallikaik: 1 };
   const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  function joinAt(i, j, self) { const id = objAt(i, j); if (!id || id === self.id) return null; const q = objs.get(id); return q && JOIN[q.type] ? q : null; }
+  // vallikäik (platvorm) seisab müüri taga: see ei tee müürist nurka ega ristmikku
+  function joinAt(i, j, self) { const id = objAt(i, j); if (!id || id === self.id) return null; const q = objs.get(id); return q && JOIN[q.type] && q.type !== 'vallikaik' ? q : null; }
   const _jm = M4.create();
   function drawJoined(o, mesh, tint, rust) {
     if (!o.jm) o.jm = [M4.create(), M4.create(), M4.create(), M4.create(), M4.create()];

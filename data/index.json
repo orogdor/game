@@ -1,5 +1,5 @@
 {
- "version": "v45",
+ "version": "v46",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -69,7 +69,7 @@
   {
    "var": "PROP_DATA",
    "json": "data/props.json",
-   "size": 3708478,
+   "size": 4029764,
    "bin": "data/props.bin"
   },
   {
