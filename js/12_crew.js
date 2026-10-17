@@ -734,24 +734,15 @@ const Crew = (() => {
   let rtCache = null, rtT = -1;
   function roomTypes() {
     if (rtCache && G.time.total - rtT < 2) return rtCache;
-    const by = new Map();
-    for (const o of Base.objs.values()) { const rid = Base.roomAt(o.i, o.j); if (!rid) continue; if (!by.has(rid)) by.set(rid, {}); const m = by.get(rid); m[o.type] = (m[o.type] || 0) + 1; }
+    // toa ülesanne määratakse ehitusmenüüst; boonus kehtib ainult siis, kui toas on ainult õiged asjad
     const out = new Map();
-    for (const [rid, m] of by) {
-      const beds = (m.voodi || 0) + (m.nari || 0) * 2;
-      if (m.kaardilaud && Base.objsOfType('radar').length) out.set(rid, 'Command post');
-      else if (m.laud && (m.pliit || m.vesi)) out.set(rid, 'Canteen');
-      else if (beds >= 3) out.set(rid, 'Barracks');
-      else if (m.dush && m.wc) out.set(rid, 'Washroom');
-      else if (m.ravila) out.set(rid, 'Infirmary');
-      else if (m.relvakapp && m.toolaud) out.set(rid, 'Armoury');
-    }
-    // teata uutest
-    if (rtCache) for (const [rid, n] of out) if (rtCache.get(rid) !== n) UI.msg('Room type set: ' + n + '. ' + ROOM_BONUS[n], 'good');
+    for (const rid of Base.roomJob.keys()) { const st = Base.roomJobStatus(rid); if (st && st.ok) out.set(rid, st.def.name); }
+    if (rtCache) for (const [rid, n] of out) if (rtCache.get(rid) !== n) { const st = Base.roomJobStatus(rid); UI.msg('Room job active: ' + n + '. ' + st.def.bonus, 'good'); }
     rtCache = out; rtT = G.time.total;
     return out;
   }
-  const ROOM_BONUS = { Komandopunkt: 'The swarm\'s direction and size are known in advance.', Söökla: 'Eating lifts morale twice as much.', Kasarm: 'Sleep recovers 30% faster.', Pesuruum: 'Washing is faster and there are fewer quarrels.', Haigla: 'Wounds heal faster indoors.', Arsenal: 'The crew shoots another 10% more accurately.' };
+  const hasRoomJob = (name) => [...roomTypes().values()].includes(name);
+  const roomJobOf = (o) => { const n = roomTypes().get(Base.roomAt(o.i, o.j)); return n || null; };
   function roomTypeAt(x, z) { const c = Base.toCell(x, z); return roomTypes().get(Base.roomAt(c.i, c.j)) || null; }
   function crewAI(e, dt) {
     const c = e.crew; if (!c) return;
@@ -782,6 +773,7 @@ const Crew = (() => {
     else if (e.pose === 'lie') e.headYaw = lerp(e.headYaw || 0, 0, Math.min(1, dt * 3));
     else if (!e.aim || e.aim < 0.1) { e._look = (e._look || 0) - dt; if (e._look <= 0) { e._look = rand(1.5, 5); e._lookTo = Math.random() < 0.4 ? 0 : rand(-0.8, 0.8); } e.headYaw = lerp(e.headYaw || 0, e._lookTo || 0, Math.min(1, dt * 2.5)); }
     else e.headYaw = lerp(e.headYaw || 0, 0, Math.min(1, dt * 6));
+    if (!sleeping && roomTypeAt(e.pos.x, e.pos.z) === 'Rec room') c.morale = Math.min(100, c.morale + dt * 0.05);   // puhketuba
     c.energy = clamp(c.energy + (sleeping ? dt * 0.9 * (roomTypeAt(e.pos.x, e.pos.z) === 'Barracks' ? 1.3 : 1) : -dt * 0.2), 0, 100);
     if (c.hunger <= 0) c.morale = Math.max(0, c.morale - dt * 0.03);
     if (G.flags.music && Base.isInside(e.pos.x, e.pos.z) && Base.objsOfType('jukebox').some((o) => o.on)) c.morale = Math.min(100, c.morale + dt * 0.02);
@@ -1466,7 +1458,8 @@ const Crew = (() => {
           e.gesture = k.what === 'dush' ? 'look' : 'fold';
           setAct(e, k.what === 'wc' ? 'In the toilet' : 'Showering');
           if (k.what === 'dush' && Math.random() < dt * 3) FX.smoke(o.cx, 1.9, o.cz);
-          if (k.w > k.t) { if (k.what === 'wc') c.bladder = 100; else { c.hygiene = 100; c.washedToday = G.time.day; c.morale = Math.min(100, c.morale + 3); } k.done = true; }
+          if (k.what === 'dush' && roomJobOf(o) === 'Washroom') k.w += dt;   // pesuruum: kaks korda kiirem
+          if (k.w > k.t) { if (k.what === 'wc') c.bladder = 100; else { c.hygiene = 100; c.washedToday = G.time.day; c.morale = Math.min(100, c.morale + (roomJobOf(o) === 'Washroom' ? 6 : 3)); } k.done = true; }
         }
         return;
       }
@@ -1618,5 +1611,5 @@ const Crew = (() => {
     Audio2.ui && Audio2.ui();
   }
   function followers() { return members().filter((m) => m.crew.follow); }
-  return { note, hear, torchLights, roomTypes, setFollow, followNear, followers, MAX, members, count, freeBeds, canHire, hire, fire, payWages, afterSleep, onDeath, engineerBonus, scientistAtScanner, update, turretTargets, assignBeds, serialize, deserialize, crewAI };
+  return { note, hear, torchLights, roomTypes, hasRoomJob, roomJobOf, setFollow, followNear, followers, MAX, members, count, freeBeds, canHire, hire, fire, payWages, afterSleep, onDeath, engineerBonus, scientistAtScanner, update, turretTargets, assignBeds, serialize, deserialize, crewAI };
 })();

@@ -489,7 +489,7 @@ function objInteraction(o) {
       if (!o.on) return { label: 'Ore works', sub: 'No power — can\'t smelt', disabled: true };
       if (!(G.res.ore > 0)) return { label: 'Ore works', sub: 'No iron ore in storage · mine the reddish rocks in the desert', disabled: true };
       return { label: 'Smelt iron ore', sub: G.res.ore + ' ore in storage · 1 ore = 3 steel scrap', hold: 2.4,
-        act: () => { const n = Math.min(10, G.res.ore); G.res.ore -= n; G.res.scrap += n * 3; UI.toast('+' + n * 3 + ' steel scrap from ' + n + ' ore'); Audio2.repair(); },
+        act: () => { const n = Math.min(10, G.res.ore); G.res.ore -= n; const got = Math.round(n * 3 * (Crew.roomJobOf(o) === 'Workshop' ? 1.2 : 1)); G.res.scrap += got; UI.toast('+' + got + ' steel scrap from ' + n + ' ore'); Audio2.repair(); },
         tick: () => FX.sparks(o.cx + rand(-0.3, 0.3), 0.9, o.cz + rand(-0.3, 0.3), [1, 0.55, 0.2], 2, 2.5) };
     }
     case 'toolaud':
@@ -497,7 +497,7 @@ function objInteraction(o) {
     case 'lihvija':
       if (!o.on) return { label: 'Diamond polisher', sub: 'No power', disabled: true };
       if (G.res.kris <= 0) return { label: 'Diamond polisher', sub: 'No raw diamonds', disabled: true };
-      return { label: 'Polish diamonds', sub: 'up to 5 at a time', hold: 2.2, act: () => { const n = Math.min(5, G.res.kris); G.res.kris -= n; G.res.lihv += n; UI.toast('+' + n + ' polished diamonds'); Audio2.crystal(); }, tick: () => FX.beam(o.cx, 1.8, o.cz, o.cx + rand(-0.5, 0.5), 1.0, o.cz) };
+      return { label: 'Polish diamonds', sub: 'up to 5 at a time' + (Crew.roomJobOf(o) === 'Workshop' ? ' · workshop +20%' : ''), hold: 2.2, act: () => { const n = Math.min(5, G.res.kris); G.res.kris -= n; const got = Crew.roomJobOf(o) === 'Workshop' ? Math.round(n * 1.2) : n; G.res.lihv += got; UI.toast('+' + got + ' polished diamonds'); Audio2.crystal(); }, tick: () => FX.beam(o.cx, 1.8, o.cz, o.cx + rand(-0.5, 0.5), 1.0, o.cz) };
     case 'hoidla':
       return { label: 'Storage', sub: G.res.kris + ' raw diamonds · ' + G.res.lihv + ' polished · ' + G.res.scrap + ' scrap · ' + G.res.meat + ' meat · ' + G.res.food + ' food', disabled: true };
     case 'skanner':

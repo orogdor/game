@@ -418,7 +418,7 @@ const Vehicles = (() => {
     G.flags.buggy = true;
     return nv;
   }
-  function repairCost(v) { return Math.ceil((v.maxHp - v.hp) / 12); }
+  function repairCost(v) { const half = Base.objsOfType('tostuk').some((o) => Crew.roomJobOf(o) === 'Garage'); return Math.ceil((v.maxHp - v.hp) / 12 * (half ? 0.5 : 1)); }
   function repair(v) { const c = repairCost(v); if (c <= 0 || G.res.scrap < c) return false; G.res.scrap -= c; v.hp = v.maxHp; Audio2.repair(); return true; }
   function sell(v) { if (v.seats.some(Boolean)) return false; const d = DEF[v.type], val = Math.round(d.cost.c * 0.4 * (v.hp / v.maxHp)); G.res.cr += val; list.splice(list.indexOf(v), 1); Audio2.cash(); UI.toast(d.name + ' sold for ' + val + ' ₵'); return true; }
   function owned() { return list.filter((v) => v.team === 'crew'); }

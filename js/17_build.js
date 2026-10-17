@@ -222,6 +222,9 @@ const Build = (() => {
       else commitEdge(hover.edge, S.tool);
     } else if (S.tool === 'paint' && hover && moved < 25) {
       paintAt(hover);
+    } else if (S.tool === 'job' && hover && moved < 25) {
+      const rid = Base.roomAt(hover.i, hover.j);
+      if (!rid) deny('Tap a room to give it a job.'); else { Audio2.ui(); UI.openRoomJob(rid); }
     } else if (S.tool === 'floor' && hover && moved < 25) {
       if (!S.level) deny('Switch to Floor 2 to remove or restore floor.');
       else if (Base.voidAt(hover.i, hover.j)) { Base.setVoid(hover.i, hover.j, false); Audio2.build(); UI.toast('Floor restored'); }
@@ -526,6 +529,7 @@ const Build = (() => {
       obj: S.item ? '' : 'Pick an item from the catalogue.',
       paint: 'Tap a room to change its colour. Cleaning a rusty room costs 10 scrap.',
       demolish: S.level ? 'Tap an upstairs item, or an empty upper floor to remove it.' : 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
+      job: 'Tap a room to give it a job (barracks, canteen, workshop …). With only the right items inside, the room gives a bonus.',
       floor: 'Floor 2: tap a floor tile above a ground-floor room to remove it (makes a two-storey space with a railing) – tap again to put it back.',
       tall: 'Tap a room to make it two storeys tall (3 scrap per new upstairs wall segment) – no floor in between. Good for a garage: then place the Car lift against an outer wall. Tap a tall room again to make it normal.',
       upper: 'Tap a room to raise its walls to the second floor (3 scrap per wall segment). Or switch to Floor 2 and draw walls yourself – rooms can reach 3 tiles past the ground floor (posts appear under longer overhangs). Then add Indoor stairs and switch to Floor 2 to furnish it.',
@@ -536,6 +540,10 @@ const Build = (() => {
       const wi = wallInfo(edges), af = afford(wi.cost);
       txt = 'Wall ' + edges.length * Base.CS + ' m · ' + (wi.n ? costStr(wi.cost) : 'already there') + (wi.bad ? ' · ' + wi.bad : '') + (af ? ' · ' + af : '');
       cls = wi.n && !af ? 'good' : 'bad';
+    }
+    if (S.tool === 'job' && hover) {
+      const rid = Base.roomAt(hover.i, hover.j);
+      if (rid) { const st = Base.roomJobStatus(rid); txt = st ? st.def.name + ' · ' + (st.ok ? 'active: ' + st.def.bonus : st.why) : 'No job yet – tap to choose'; cls = st && st.ok ? 'good' : st ? 'bad' : ''; }
     }
     // 2. korrus / kõrge tuba: näita kohe, mida see tuba maksab ja kas saab
     if ((S.tool === 'upper' || S.tool === 'tall') && hover) {
@@ -619,12 +627,12 @@ const Build = (() => {
       edgeBox(e2, wallHere(e2.t, e2.i, e2.j) ? (S.tool === 'door' ? YEL : BLUE) : RED);
     } else if (pending && pending.kind === 'edge') edgeBox(pending.e, YEL);
     if (S.tool === 'floor' && hover && S.level) { const c = Base.cellCenter(hover.i, hover.j), ok = Base.voidAt(hover.i, hover.j) || Base.canVoid(hover.i, hover.j).ok; box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, ok ? YEL : RED, 0.45); }
-    if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper' || S.tool === 'tall') && (hover || pending)) {
+    if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper' || S.tool === 'tall' || S.tool === 'job') && (hover || pending)) {
       const tg = pending && pending.kind === 'demolish' ? pending.tg : S.tool === 'demolish' && hover && !drag ? demolishTarget(hover) : null;
       if (tg && tg.kind === 'obj') { const o = tg.o; box(o.cx, 0.7, o.cz, o.w * Base.CS, 1.4, o.h * Base.CS, RED, 0.35); }
       else if (tg && tg.kind === 'floor') { const c = Base.cellCenter(tg.i, tg.j); box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, RED, 0.45); }
       else if (tg && (tg.kind === 'walls' || tg.kind === 'upwalls')) { for (const [t, i, j] of tg.edges) edgeBox({ t, i, j }, RED); }
-      else if ((S.tool === 'paint' || S.tool === 'upper' || S.tool === 'tall') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
+      else if ((S.tool === 'paint' || S.tool === 'upper' || S.tool === 'tall' || S.tool === 'job') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
     }
     // toad, mida ei saa liigutada: peahoone silt
   }

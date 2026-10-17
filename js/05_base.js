@@ -43,6 +43,19 @@ const OBJ = {
   hoidla: { name: 'Storage', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.4 },
   vanagen: { name: 'Old generator', fixed: true, size: [2, 1], where: 'in', power: -4, h: 2.1 },
 };
+// tubade ülesanded: kui toas on AINULT lubatud esemed ja nõutud asjad olemas, annab tuba boonuse
+const ROOM_PURPOSES = {
+  barracks: { name: 'Barracks', allow: ['voodi', 'nari', 'taim', 'diivan'], need: (m) => (m.voodi || 0) + (m.nari || 0) * 2 >= 2, needTxt: 'at least 2 beds', bonus: 'Sleep recovers 30% faster.' },
+  canteen: { name: 'Canteen', allow: ['laud', 'pliit', 'vesi', 'taim', 'jukebox', 'teler', 'kasvu'], need: (m) => m.laud && (m.pliit || m.vesi), needTxt: 'a table + a stove or water dispenser', bonus: 'Eating lifts morale twice as much.' },
+  washroom: { name: 'Washroom', allow: ['dush', 'wc', 'vesi', 'taim'], need: (m) => m.dush && m.wc, needTxt: 'a shower + a toilet', bonus: 'Showers take half the time and lift morale twice as much.' },
+  infirmary: { name: 'Infirmary', allow: ['ravila', 'voodi', 'vesi', 'taim'], need: (m) => m.ravila, needTxt: 'a medical bay', bonus: 'Wounds heal 60% faster indoors.' },
+  armoury: { name: 'Armoury', allow: ['relvakapp', 'toolaud', 'taim'], need: (m) => m.relvakapp && m.toolaud, needTxt: 'a gun locker + a workbench', bonus: 'The crew shoots 10% more accurately.' },
+  workshop: { name: 'Workshop', allow: ['toolaud', 'lihvija', 'maagitehas', 'taim'], need: (m) => m.lihvija || m.maagitehas, needTxt: 'a diamond polisher or the ore works', bonus: 'Polishing and smelting give 20% more.' },
+  lab: { name: 'Science lab', allow: ['skanner', 'kaardilaud', 'taim'], need: (m) => m.skanner, needTxt: 'the deep scanner', bonus: 'The deep scanner searches 35% faster.' },
+  command: { name: 'Command post', allow: ['kaardilaud', 'relvakapp', 'taim'], need: (m) => m.kaardilaud, needTxt: 'a map table', bonus: 'Swarm warnings with direction and size – even without a radar.' },
+  rec: { name: 'Rec room', allow: ['diivan', 'teler', 'jukebox', 'trenn', 'taim', 'laud'], need: (m) => ((m.diivan ? 1 : 0) + (m.teler ? 1 : 0) + (m.jukebox ? 1 : 0) + (m.trenn ? 1 : 0)) >= 2, needTxt: '2 of: sofa, TV, jukebox, training bench', bonus: 'Everyone in the room slowly gains morale.' },
+  garage: { name: 'Garage', allow: ['tostuk', 'toolaud', 'relvakapp', 'taim'], need: (m) => m.tostuk, needTxt: 'a car lift', bonus: 'Vehicle repairs cost half.' },
+};
 // baasi müra ja valgus: [müra, valgus] töötavana. Iga ese lisab ka 1 punkti lihtsalt olemasoluga.
 const SIG = {
   generaator: [10, 1], vanagen: [12, 1], lihvija: [6, 1], jukebox: [5, 1], teler: [2, 1], pliit: [2, 1], kasvu: [2, 3], toolaud: [2, 0],
@@ -99,6 +112,7 @@ function createBase(opt) {
   let meshes = { main: [null, null], low: [null, null], roof: [null, null], up: [null, null], upLow: [null, null], glass: null, strips: null };
   let viewLevel = 0;   // ehitusrežiimis vaadatav korrus
   const colliders = [];
+  const roomJob = new Map();   // toa id -> ROOM_PURPOSES võti
   const doors = [];
   const gdoors = [];   // garaažiuksed (rullukse)
   let gPanel = null;
@@ -1436,6 +1450,7 @@ function createBase(opt) {
     return r;
   }
   function reset() {
+    roomJob.clear();
     cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); voids.clear(); upWalls.clear(); upOpen.clear(); upRoomCell.fill(0); upRooms.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
     nextRoomId = 1; nextObjId = 1; dirty = true;
   }
@@ -1488,6 +1503,16 @@ function createBase(opt) {
     for (const id of ids) { const r = upRooms.get(id); if (r) for (const [i, j] of r.cells) voids.delete(i + ':' + j); }
     upChanged();
   }
+  // toa ülesanne ja selle olek
+  function setRoomJob(rid, key) { if (!rooms.has(rid)) return false; if (key && ROOM_PURPOSES[key]) roomJob.set(rid, key); else roomJob.delete(rid); return true; }
+  function roomJobStatus(rid) {
+    const key = roomJob.get(rid); if (!key || !rooms.has(rid)) return null;
+    const def = ROOM_PURPOSES[key], m = {}, bad = new Set();
+    for (const o of objs.values()) { if (o.lv || roomAt(o.i, o.j) !== rid) continue; m[o.type] = (m[o.type] || 0) + 1; if (!def.allow.includes(o.type) && !OBJ[o.type].fixed) bad.add(OBJ[o.type].name); }
+    if (bad.size) return { key, def, ok: false, why: 'Remove: ' + [...bad].join(', ') };
+    if (!def.need(m)) return { key, def, ok: false, why: 'Needs ' + def.needTxt };
+    return { key, def, ok: true, why: '' };
+  }
   function roomHasUpper(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && r.cells.some(([i, j]) => hiAt(i, j))); }
   // teekond korruste vahel: lähim siseterepp
   // teise korruse teekond (BFS üle ülemise korruse rakkude; seinast läbi ainult alumise ukse kohalt)
@@ -1532,7 +1557,8 @@ function createBase(opt) {
   function serialize() {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
-    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
+    const jobs = []; for (const [rid, k] of roomJob) { const r = rooms.get(rid); if (r) jobs.push([r.cells[0][0], r.cells[0][1], k]); }
+    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
@@ -1565,13 +1591,14 @@ function createBase(opt) {
       for (const [k, v] of d.upOpen || []) { if (v === 'door' || v === 'window') upOpen.set(k, v); else if (v === 'wall') upOpen.delete(k); }
       for (const k of d.tall || []) voids.add(k);
     }
+    for (const [i, j, k] of d.jobs || []) { const rid = roomAt(i, j); if (rid) roomJob.set(rid, k); }
     for (const o of d.objs) addObj(o.type, o.i, o.j, o.rot, { hp: o.hp, broken: o.broken, data: o.data || {}, lv: o.lv || 0 }, o.id);
     computeRooms();
     dirty = true;
   }
   return {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
-    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
+    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,

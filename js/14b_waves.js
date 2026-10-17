@@ -7,6 +7,7 @@ const Waves = (() => {
 
   function waveNight(day) { return day >= 2 && day % 2 === 0; }
   function hasCommand() {
+    if (typeof Crew !== 'undefined' && Crew.hasRoomJob('Command post')) return true;   // toa ülesanne: komandopunkt
     if (!Base.objsOfType('radar').some((o) => o.on)) return false;
     return Base.objsOfType('kaardilaud').some((o) => o.on && Base.roomAt(o.i, o.j) > 0);
   }

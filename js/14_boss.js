@@ -299,7 +299,7 @@ const Boss = (() => {
     if (G.scan.found) return;
     const sc = Base.objsOfType('skanner').filter((o) => o.on);
     if (sc.length) {
-      const rate = (32 / DAY_LEN) * (Crew.scientistAtScanner() ? 2.3 : 1) * (sc.length > 1 ? 1.4 : 1);
+      const rate = (32 / DAY_LEN) * (Crew.scientistAtScanner() ? 2.3 : 1) * (sc.length > 1 ? 1.4 : 1) * (sc.some((o) => Crew.roomJobOf(o) === 'Science lab') ? 1.35 : 1);
       G.scan.p = Math.min(100, G.scan.p + rate * dt);
       if (G.scan.p >= 100) {
         G.scan.found = true; G.flags.nestKnown = true;

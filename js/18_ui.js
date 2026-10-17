@@ -527,6 +527,7 @@ const UI = (() => {
     else if (panelKind === 'coop') Net.renderPanel(body);
     else if (panelKind === 'saves') renderSaves(body);
     else if (panelKind === 'garage') renderGarage(body);
+    else if (panelKind === 'roomjob') renderRoomJob(body);
     if (soft) body.scrollTop = scroll;
   }
   function btn(id, label, opts = {}) { return `<button class="pbtn ${opts.primary ? 'primary' : ''}" data-act="${id}" ${opts.disabled ? 'disabled' : ''}>${label}</button>`; }
@@ -868,6 +869,29 @@ const UI = (() => {
       vsell: (id) => { const v = byId(id); if (v) Vehicles.sell(v); renderPanel(true); },
     });
   }
+  // ---------- toa ülesanne ----------
+  let jobRoom = 0;
+  function openRoomJob(rid) { jobRoom = rid; openPanel('roomjob'); }
+  function renderRoomJob(body) {
+    const r = Base.rooms.get(jobRoom);
+    $('pTitle').textContent = 'Room job'; $('pTabs').innerHTML = '';
+    if (!r) { body.innerHTML = '<div class="empty">This room no longer exists.</div>'; return; }
+    const items = {}; for (const o of Base.objs.values()) if (!o.lv && Base.roomAt(o.i, o.j) === jobRoom) items[OBJ[o.type].name] = (items[OBJ[o.type].name] || 0) + 1;
+    const st = Base.roomJobStatus(jobRoom);
+    let h = `<div class="kv"><div><div class="k">Room</div><div class="v">${r.cells.length} tiles</div></div><div><div class="k">Job</div><div class="v">${st ? esc(st.def.name) : '—'}</div></div><div><div class="k">Bonus</div><div class="v" style="color:${st && st.ok ? '#97d276' : '#ff8a6a'}">${st ? (st.ok ? 'active' : 'off') : '—'}</div></div></div>`;
+    h += `<p class="note">Items now: ${Object.entries(items).map(([n, c]) => esc(n) + (c > 1 ? ' ×' + c : '')).join(', ') || 'none'}${st && !st.ok ? ' · <b>' + esc(st.why) + '</b>' : ''}</p>`;
+    h += '<div class="cards">';
+    for (const [k, d] of Object.entries(ROOM_PURPOSES)) {
+      const on = st && st.key === k;
+      const allowed = d.allow.map((t) => OBJ[t] ? OBJ[t].name : t).join(', ');
+      h += `<div class="card"><h4>${esc(d.name)}</h4><div class="act">${esc(d.bonus)}</div><div class="trait"><b>Needs:</b> ${esc(d.needTxt)}<br><b>Only:</b> ${esc(allowed)}</div>
+        <div class="row">${btn('rjob:' + k, on ? 'Chosen' : 'Choose', { primary: on })}</div></div>`;
+    }
+    h += '</div>';
+    if (st) h += `<div class="row" style="margin-top:10px">${btn('rjob:none', 'Remove the job')}</div>`;
+    body.innerHTML = h;
+    bindActs(body, { rjob: (k) => { Base.setRoomJob(jobRoom, k === 'none' ? null : k); const s2 = Base.roomJobStatus(jobRoom); if (s2) toast(s2.ok ? s2.def.name + ' – bonus active!' : s2.def.name + ' – ' + s2.why); renderPanel(true); } });
+  }
   // salakood meeskonna menüüs
   function tryCode(v) {
     const code = String(v || '').trim().toLowerCase();
@@ -891,7 +915,7 @@ const UI = (() => {
       <h4>Objective</h4><p>Keep the station alive, pay the bank its instalments and find the Stoneheart. Its heartstones wipe out the whole debt. Two rivals are hunting the same thing.</p>
       <h4>Phone controls</h4><ul><li>Left thumb: move. Push all the way to run.</li><li>Right side: look around. Slide your finger on the fire button to aim at the same time.</li><li>The action button appears when there's something to do. Some actions must be held.</li><li>The hammer opens building, the minimap opens the big map.</li></ul>
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>
-      <h4>Building</h4><p>Drag out a room on the floor like in The Sims. A door appears by itself; you can add more doors and windows. Put items in rooms: beds, table, stove, workbench, scanner. Cannons, solar panels, radar and floodlights go outside. Every device needs power. Build the <b>Ore works</b> and buy an ore drill there to mine the reddish iron ore rocks in the desert; smelt the ore into steel scrap or sell it.</p>
+      <h4>Building</h4><p>Drag out a room on the floor like in The Sims. A door appears by itself; you can add more doors and windows. Put items in rooms: beds, table, stove, workbench, scanner. Cannons, solar panels, radar and floodlights go outside. Every device needs power. Give rooms a <b>Room job</b> (barracks, canteen, workshop, lab …): when only the right items are inside, the room gives a bonus. Build the <b>Ore works</b> and buy an ore drill there to mine the reddish iron ore rocks in the desert; smelt the ore into steel scrap or sell it.</p>
       <h4>Money and food</h4><p>Comets bring raw diamonds. Collect them before the rivals and take them to the base; storage fills when you step inside. Sell them at the terminal. Desert goats give meat, which the stove turns into food. Every hire eats and wants wages every morning.</p>
       <h4>Threats</h4><p>Sand stalkers come out at night. Spineshields won't attack if you keep your distance, but diamonds grow on their backs. Rivals raid your storage and compete for the comets. Their camp core can be blown up.</p>
       <h4>Stoneheart</h4><p>Build the deep scanner to find the nest. The giant's armour stops bullets: aim for the glowing crystal nodes on its back, then the exposed heart. Jump over the shockwave.</p></div>`;
@@ -905,7 +929,7 @@ const UI = (() => {
     else showHUD(true);
   }
   function buildTools(S) {
-    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['floor', 'Floor', 'box'], ['obj', 'Items', 'box'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
+    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['floor', 'Floor', 'box'], ['obj', 'Items', 'box'], ['job', 'Room job', 'room'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
       .filter(([k]) => k !== 'floor' || S.level);
     $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k || (k === 'level' && S.level) ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
     $('bTools').querySelectorAll('.tool').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));
@@ -979,7 +1003,7 @@ const UI = (() => {
   return {
     bubble, init, msg, toast, banner, damage, hitMarker, armorHit, whiz, shake, getShake, joy, lockHint, showHUD, update, updateObjective,
     openTerminal, openCrew, openMap, openMenu, openHelp, openInv, invDirty, closePanel, isPanelOpen, openPanel, btn, bindActs, esc, tabs,
-    openGarage, showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,
+    openRoomJob, openGarage, showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,
     get panelKind() { return panelKind; }, get panelTab() { return panelTab; },
     get waypoint() { return waypoint; }, set waypoint(v) { waypoint = v; },
   };
