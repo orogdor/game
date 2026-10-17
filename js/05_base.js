@@ -2,12 +2,12 @@
 //  BAAS: Sims-stiilis ruumid, seinad, uksed, aknad, esemed, energia, teekonnad
 // ============================================================
 const OBJ = {
-  tostuk: { name: 'Car lift + garage door', cat: 'too', cost: { s: 120, c: 200 }, size: [2, 3], where: 'in', power: 1, h: 0.2, needsTall: true, garage: true, desc: 'For a two-storey (tall) room. Place it with its front against an outer wall – that wall becomes a roll-up garage door. Buy and repair vehicles here.' },
-  sisetrepp: { name: 'Indoor stairs', cat: 'elu', cost: { s: 30, c: 0 }, size: [1, 2], where: 'in', power: 0, h: 0.1, inner: true, needsUpper: true, desc: 'Stairs to the upper floor. Build the upper floor first (Build → 2nd floor). The high end needs a free tile behind it.' },
+  tostuk: { name: 'Car lift + garage door', cat: 'garaaz', cost: { s: 120, c: 200 }, size: [2, 3], where: 'in', power: 1, h: 0.2, needsTall: true, garage: true, desc: 'For a two-storey (tall) room. Place it with its front against an outer wall – that wall becomes a roll-up garage door. Buy and repair vehicles here.' },
+  sisetrepp: { name: 'Indoor stairs', cat: 'garaaz', cost: { s: 30, c: 0 }, size: [1, 2], where: 'in', power: 0, h: 0.1, inner: true, needsUpper: true, desc: 'Stairs to the upper floor. Build the upper floor first (Build → 2nd floor). The high end needs a free tile behind it.' },
   voodi: { name: 'Bed', cat: 'elu', cost: { s: 25, c: 0 }, size: [1, 1], where: 'in', power: 0, h: 0.9, beds: 1, desc: 'One bed. Every hired person needs their own bed.' },
   nari: { name: 'Bunk bed', cat: 'elu', cost: { s: 40, c: 40 }, size: [1, 1], where: 'in', power: 0, h: 2.0, beds: 2, desc: 'Two beds on a single tile.' },
   laud: { name: 'Dining table', cat: 'elu', cost: { s: 15, c: 0 }, size: [1, 1], where: 'in', power: 0, h: 0.8, seats: 4, desc: 'Eating at a table lifts morale.' },
-  pliit: { name: 'Stove', cat: 'elu', cost: { s: 30, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 1.0, desc: 'Turns raw meat into food: a cook gets two meals from one piece of meat.' },
+  pliit: { name: 'Stove', cat: 'olme', cost: { s: 30, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 1.0, desc: 'Turns raw meat into food: a cook gets two meals from one piece of meat.' },
   diivan: { name: 'Sofa', cat: 'elu', cost: { s: 20, c: 20 }, size: [1, 1], where: 'in', power: 0, h: 0.9, desc: 'A place to rest in free time. Lifts morale.' },
   jukebox: { name: 'Jukebox', cat: 'elu', cost: { s: 20, c: 120 }, size: [1, 1], where: 'in', power: 1, h: 1.5, desc: 'Old music lifts everyone\'s morale.' },
   taim: { name: 'Potted desert flower', cat: 'elu', cost: { s: 5, c: 15 }, size: [1, 1], where: 'any', power: 0, h: 1.3, desc: 'A bit of life among the rust. Small morale bonus.' },
@@ -19,24 +19,24 @@ const OBJ = {
   paike: { name: 'Solar panel', cat: 'energia', cost: { s: 35, c: 60 }, size: [1, 1], where: 'out', power: -2, solar: true, h: 1.8, desc: 'Gives 2 units of power during the day.' },
   radar: { name: 'Radar mast', cat: 'kaitse', cost: { s: 50, c: 80 }, size: [1, 1], where: 'out', power: 1, h: 4.5, desc: 'Shows the exact comet impact site and attackers on the map.' },
   kahur: { name: 'Autocannon', cat: 'kaitse', cost: { s: 60, c: 150 }, size: [1, 1], where: 'out', power: 1, h: 1.6, hp: 220, desc: 'Shoots enemies within 34 m.' },
-  barrikaad: { name: 'Barricade', cat: 'kaitse', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.1, desc: 'Cover from bullets.' },
+  barrikaad: { name: 'Barricade', cat: 'vall', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.1, desc: 'Cover from bullets.' },
   prozektor: { name: 'Floodlight', cat: 'kaitse', cost: { s: 15, c: 30 }, size: [1, 1], where: 'out', power: 1, h: 4.2, desc: 'Lights up the surroundings at night. Stalkers avoid light.' },
-  vesi: { name: 'Water dispenser', cat: 'elu', cost: { s: 15, c: 40 }, size: [1, 1], where: 'in', power: 1, h: 1.6, desc: 'Purified water. The crew comes here to quench their thirst.' },
-  dush: { name: 'Shower', cat: 'elu', cost: { s: 30, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 2.3, desc: 'Washing keeps morale up. Without it people stink and quarrel.' },
-  wc: { name: 'Dry toilet', cat: 'elu', cost: { s: 20, c: 20 }, size: [1, 1], where: 'in', power: 0, h: 2.2, desc: 'Without a toilet people go in the desert. Needed for good morale.' },
+  vesi: { name: 'Water dispenser', cat: 'olme', cost: { s: 15, c: 40 }, size: [1, 1], where: 'in', power: 1, h: 1.6, desc: 'Purified water. The crew comes here to quench their thirst.' },
+  dush: { name: 'Shower', cat: 'olme', cost: { s: 30, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 2.3, desc: 'Washing keeps morale up. Without it people stink and quarrel.' },
+  wc: { name: 'Dry toilet', cat: 'olme', cost: { s: 20, c: 20 }, size: [1, 1], where: 'in', power: 0, h: 2.2, desc: 'Without a toilet people go in the desert. Needed for good morale.' },
   teler: { name: 'Old TV', cat: 'elu', cost: { s: 15, c: 70 }, size: [1, 1], where: 'in', power: 1, h: 1.6, desc: 'Home world TV channels crackle through the static. Evening entertainment.' },
   trenn: { name: 'Training bench', cat: 'elu', cost: { s: 25, c: 30 }, size: [1, 1], where: 'in', power: 0, h: 1.4, desc: 'Training in free time. Guards and hunters love it.' },
-  kasvu: { name: 'Hydroponics', cat: 'too', cost: { s: 50, c: 140 }, size: [2, 1], where: 'in', power: 2, h: 1.9, desc: 'Grows algae and beans: one meal every 2 hours.' },
-  relvakapp: { name: 'Gun locker', cat: 'kaitse', cost: { s: 40, c: 60 }, size: [1, 1], where: 'in', power: 0, h: 2.0, desc: 'Access to the stored weapons. The crew shoots 15% more accurately.' },
-  myyr: { name: 'Concrete wall', cat: 'kaitse', cost: { s: 12, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.7, hp: 600, desc: 'Thick concrete block with a firing slit. Bugs have to chew through it. Can be placed side by side in a line.' },
+  kasvu: { name: 'Hydroponics', cat: 'olme', cost: { s: 50, c: 140 }, size: [2, 1], where: 'in', power: 2, h: 1.9, desc: 'Grows algae and beans: one meal every 2 hours.' },
+  relvakapp: { name: 'Gun locker', cat: 'too', cost: { s: 40, c: 60 }, size: [1, 1], where: 'in', power: 0, h: 2.0, desc: 'Access to the stored weapons. The crew shoots 15% more accurately.' },
+  myyr: { name: 'Concrete wall', cat: 'vall', cost: { s: 12, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.7, hp: 600, desc: 'Thick concrete block with a firing slit. Bugs have to chew through it. Can be placed side by side in a line.' },
   myyrturel: { name: 'Wall turret', cat: 'kaitse', cost: { s: 45, c: 180 }, size: [1, 1], where: 'out', power: 1, h: 3.4, hp: 750, desc: 'Concrete wall with an autocannon on top. Fires over the wall up to 46 m. Fits into a wall line.' },
-  vallikaik: { name: 'Rampart walk', cat: 'kaitse', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.0, deck: 2.0, sy: 2.0 / 1.5, hp: 400, desc: 'Platform behind the wall. You shoot over the wall from there. Reach it by stairs.' },
-  trepp: { name: 'Stairs', cat: 'kaitse', cost: { s: 8, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.1, ramp: 2.0, sy: 2.0 / 1.5, hp: 300, desc: 'Leads up to the rampart walk. Rotate so the high end faces the rampart.' },
+  vallikaik: { name: 'Rampart walk', cat: 'vall', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.0, deck: 2.0, sy: 2.0 / 1.5, hp: 400, desc: 'Platform behind the wall. You shoot over the wall from there. Reach it by stairs.' },
+  trepp: { name: 'Stairs', cat: 'vall', cost: { s: 8, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.1, ramp: 2.0, sy: 2.0 / 1.5, hp: 300, desc: 'Leads up to the rampart walk. Rotate so the high end faces the rampart.' },
   torn: { name: 'Watchtower', cat: 'kaitse', cost: { s: 60, c: 150 }, size: [2, 2], where: 'out', power: 1, h: 6.0, deck: 6.1, hp: 700, desc: 'A guard in the tower sees far and shoots more accurately. Floodlight at night. You can climb up.' },
-  varav: { name: 'Gate', cat: 'kaitse', cost: { s: 40, c: 0 }, size: [2, 1], where: 'out', power: 1, h: 2.7, hp: 800, desc: 'Opens for your own people. Locked during a bug swarm.' },
+  varav: { name: 'Gate', cat: 'vall', cost: { s: 40, c: 0 }, size: [2, 1], where: 'out', power: 1, h: 2.7, hp: 800, desc: 'Opens for your own people. Locked during a bug swarm.' },
   kmpesa: { name: 'MG nest', cat: 'kaitse', cost: { s: 30, c: 80 }, size: [2, 1], where: 'out', power: 0, h: 1.0, hp: 350, desc: 'Sandbagged nest. A crew member mans it during a swarm. Uses carbine ammo from storage.' },
-  siil: { name: 'Tank trap', cat: 'kaitse', cost: { s: 5, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.2, hp: 500, desc: 'Steel hedgehog. Big bugs can\'t get through.' },
-  okas: { name: 'Barbed wire', cat: 'kaitse', cost: { s: 6, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.9, hp: 120, desc: 'Slows and hurts bugs that climb through it.' },
+  siil: { name: 'Tank trap', cat: 'vall', cost: { s: 5, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.2, hp: 500, desc: 'Steel hedgehog. Big bugs can\'t get through.' },
+  okas: { name: 'Barbed wire', cat: 'vall', cost: { s: 6, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.9, hp: 120, desc: 'Slows and hurts bugs that climb through it.' },
   maagitehas: { name: 'Ore works', cat: 'too', cost: { s: 60, c: 150 }, size: [2, 1], where: 'any', power: 2, h: 2.4, desc: 'Crusher and smelter. Sells the ore drill (needed to mine iron ore rocks in the desert) and smelts iron ore into steel scrap.' },
   kaardilaud: { name: 'Map table', cat: 'too', cost: { s: 20, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 1.1, desc: 'The heart of the command post. With a radar it shows the swarm\'s direction and size an hour ahead.' },
   terminal: { name: 'Comms terminal', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.6 },
@@ -50,7 +50,7 @@ const SIG = {
   ravila: [1, 1], kaardilaud: [1, 1], prozektor: [1, 9], torn: [1, 6], paike: [0, 0], maagitehas: [7, 2],
 };
 const THREAT_TIERS = [[0, 'Quiet', '#97d276'], [35, 'Noticeable', '#e8d06a'], [70, 'Resonant', '#ffa04a'], [120, 'Lighthouse', '#ff5b47']];
-const OBJ_CATS = [['elu', 'Living'], ['too', 'Work'], ['energia', 'Power'], ['kaitse', 'Defence']];
+const OBJ_CATS = [['elu', 'Living'], ['olme', 'Kitchen & bath'], ['too', 'Work'], ['garaaz', 'Garage & stairs'], ['energia', 'Power'], ['kaitse', 'Defence'], ['vall', 'Walls & gates']];
 const POWER_PRIO = { kasvu: 6, vesi: 6, dush: 3, teler: 1, kahur: 9, myyrturel: 9, radar: 8, skanner: 7, ravila: 6, pliit: 5, lihvija: 4, toolaud: 4, maagitehas: 4, prozektor: 3, jukebox: 2 };
 const ROOM_STYLES = [
   { name: 'Rusty', wall: [0.40, 0.30, 0.25], wall2: [0.26, 0.19, 0.16], floor: [0.27, 0.23, 0.21], floor2: [0.23, 0.20, 0.18], ceil: [0.28, 0.25, 0.23] },
@@ -494,7 +494,25 @@ function createBase(opt) {
   function stairEntry(o) { const [di, dj] = stairDir(o); return di > 0 ? { i: o.i + o.w, j: o.j } : di < 0 ? { i: o.i - 1, j: o.j } : dj > 0 ? { i: o.i, j: o.j + o.h } : { i: o.i, j: o.j - 1 }; }
   function stairExit(o) { const [di, dj] = stairDir(o); return di > 0 ? { i: o.i - 1, j: o.j } : di < 0 ? { i: o.i + o.w, j: o.j } : dj > 0 ? { i: o.i, j: o.j - 1 } : { i: o.i, j: o.j + o.h }; }
   function nearDoor(i, j) { for (const [t, a, b] of [['v', i, j], ['v', i + 1, j], ['h', i, j], ['h', i, j + 1]]) if (edgeType(t, a, b) === 'door') return true; return false; }
-  function canPlaceObj(type, i, j, rot, lv) {
+  // müüri/valli peale ehitatav kahur, värav vms vahetab selle välja
+  const REPLACERS = { kahur: 1, myyrturel: 1, varav: 1, kmpesa: 1 }, REPLACEABLE = { myyr: 1, vallikaik: 1, barrikaad: 1, okas: 1, siil: 1 };
+  function replaceSet(type, i, j, rot) {
+    const out = new Set(); if (!REPLACERS[type]) return out;
+    const [w, h] = footprint(type, rot);
+    for (const [ii, jj] of cellsOf(i, j, w, h)) { const id = objAt(ii, jj); const o = id && objs.get(id); if (o && REPLACEABLE[o.type]) out.add(id); }
+    return out;
+  }
+  function canPlaceReplacing(type, i, j, rot) {
+    const rep = replaceSet(type, i, j, rot);
+    const r = canPlaceObj(type, i, j, rot, 0, rep);
+    return Object.assign({}, r, { replace: [...rep].map((id) => objs.get(id)) });
+  }
+  function placeReplacing(type, i, j, rot) {
+    const chk = canPlaceReplacing(type, i, j, rot); if (!chk.ok) return null;
+    for (const o of chk.replace) removeObj(o.id);
+    return { o: addObj(type, i, j, rot), removed: chk.replace };
+  }
+  function canPlaceObj(type, i, j, rot, lv, ignore) {
     const def = OBJ[type];
     const [w, h] = footprint(type, rot);
     if (lv) {   // teine korrus: ainult toaesemed, teise korruse põrandal, mitte trepiava kohal
@@ -535,7 +553,7 @@ function createBase(opt) {
     let room = -1;
     for (const [ii, jj] of cellsOf(i, j, w, h)) {
       if (!inArea(ii, jj)) return { ok: false, why: 'Outside the build area.' };
-      if (objAt(ii, jj)) return { ok: false, why: 'That spot is already taken.' };
+      if (objAt(ii, jj) && !(ignore && ignore.has(objAt(ii, jj)))) return { ok: false, why: 'That spot is already taken.' };
       const r = roomAt(ii, jj);
       if (def.where === 'in' && !r) return { ok: false, why: 'This item goes inside a room.' };
       if (def.where === 'out' && r) return { ok: false, why: 'This item goes outside.' };
@@ -1553,7 +1571,7 @@ function createBase(opt) {
   }
   return {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
-    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
+    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,

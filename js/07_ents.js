@@ -42,6 +42,8 @@ const Ents = (() => {
   // ---------- liikumine ----------
   function goTo(e, x, z, goalCells, lv) {
     lv = lv || 0;
+    // pikk tee + lähedal vaba oma sõiduk -> sõidab (meeskond ja konkurendid)
+    if (typeof Vehicles !== 'undefined' && Vehicles.tryRide(e, x, z, goalCells, lv)) return true;
     // korrused: kui siht on teisel korrusel (või tuleb alla), mine läbi lähima sisetrepi
     const BB = Bases.at(e.pos.x, e.pos.z) || Bases.at(x, z);
     const cur = BB && BB.levelAt ? BB.levelAt(e.pos.x, e.pos.z, e.pos.y) : 0;

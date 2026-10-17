@@ -2,13 +2,17 @@
 //  SÕIDUKID: bagi (kaks istekohta + tagumine kuulipilduja, kast asjade vedamiseks)
 // ============================================================
 const Vehicles = (() => {
+  // istmed kohalikus ruumis (+z ette, +x vasakule): 0 = juht, 1 = kuulipildur (bagi) / kõrvalistuja (veok)
   const DEF = {
-    buggy: { name: 'Buggy', hp: 450, maxSpeed: 19, rev: 6, accel: 8.5, brake: 20, wheelBase: 2.5, cargoCap: 200, cost: { c: 900, s: 120 } },
+    buggy: { name: 'Buggy', desc: 'Fast, two seats, rear machine gun, small cargo box.', hp: 450, maxSpeed: 19, rev: 6, accel: 8.5, brake: 20, wheelBase: 2.5, cargoCap: 200, cost: { c: 900, s: 120 },
+      gun: { x: 0, y: 1.92, z: -0.75 }, seats: [{ x: 0.42, y: 0.62, z: 0.15, sit: true }, { x: 0, y: 0.72, z: -1.15, sit: false }],
+      wheels: [[0.86, 0.45, 1.18], [-0.86, 0.45, 1.18], [0.86, 0.45, -1.12], [-0.86, 0.45, -1.12]], wheelS: 1, mesh: 'body', len: 0.9 },
+    hauler: { name: 'Hauler truck', desc: 'Slow and tough: big cargo bed for hauling diamonds, ore and scrap. Two seats, no gun.', hp: 800, maxSpeed: 14, rev: 5, accel: 6, brake: 16, wheelBase: 3.3, cargoCap: 600, cost: { c: 1400, s: 220 },
+      gun: null, seats: [{ x: 0.45, y: 1.0, z: 1.25, sit: true }, { x: -0.45, y: 1.0, z: 1.25, sit: true }],
+      wheels: [[1.0, 0.55, 1.55], [-1.0, 0.55, 1.55], [1.0, 0.55, -1.45], [-1.0, 0.55, -1.45]], wheelS: 1.22, mesh: 'hauler', len: 1.3 },
   };
-  // istmed kohalikus ruumis (+z ette, +x vasakule): 0 = juht, 1 = kuulipildur taga (seisab)
-  const SEATS = [{ x: 0.42, y: 0.62, z: 0.15, sit: true }, { x: 0, y: 0.72, z: -1.15, sit: false }];
-  const GUN = { x: 0, y: 1.92, z: -0.75 };
-  const WHEELS = [[0.86, 0.45, 1.18], [-0.86, 0.45, 1.18], [0.86, 0.45, -1.12], [-0.86, 0.45, -1.12]];
+  const DEFAULT_TYPE = 'buggy';
+  const seatsOf = (v) => DEF[v.type].seats;
   const list = [];
   let nextId = 1;
   let M = null;
@@ -55,6 +59,25 @@ const Vehicles = (() => {
     b.color(DARK).cyl(0, -0.15, -1.68, 0.4, 0.4, 0, 14, true);
     b.push().tf(0, 0.86, -1.66, 0, Math.PI / 2, 0).color(DARK, MAT.WORN).cyl(0, -0.12, 0, 0.36, 0.36, 0.24, 14, true).pop();   // varuratas
     M.body = b.build();
+    // veok: kabiin ees, kastiga platvorm taga
+    b = new MB(); b.jit = 0;
+    const TRUCK = [0.36, 0.42, 0.3], TRUCK2 = [0.26, 0.3, 0.22];
+    b.color(DARK, MAT.WORN).boxB(0, 0.5, 0, 1.7, 0.22, 4.4);
+    b.color(TRUCK, MAT.RUST).boxB(0, 0.72, 1.3, 1.9, 1.1, 1.5);                    // kabiin
+    b.color(TRUCK2, MAT.RUST).boxB(0, 1.82, 1.25, 1.86, 0.1, 1.4);
+    b.color([0.28, 0.42, 0.5], MAT.WORN).box(0, 1.5, 2.06, 1.6, 0.5, 0.04);        // esiklaas
+    for (const x of [0.96, -0.96]) b.color([0.28, 0.42, 0.5], MAT.WORN).box(x, 1.5, 1.3, 0.04, 0.45, 0.9);
+    b.color(TRUCK, MAT.RUST).boxB(0, 0.4, 2.05, 1.9, 0.6, 0.12);                   // nina
+    for (const x of [-0.65, 0.65]) b.color([1, 0.95, 0.75], MAT.GLOW).box(x, 0.85, 2.12, 0.3, 0.16, 0.04);
+    b.color(DARK).boxB(0, 0.25, 2.18, 1.95, 0.3, 0.18);
+    b.color(TRUCK2, MAT.RUST).boxB(0, 0.72, -1.05, 2.0, 0.12, 2.9);                // kast
+    for (const x of [0.98, -0.98]) b.color(TRUCK, MAT.RUST).boxB(x, 0.84, -1.05, 0.06, 0.55, 2.9);
+    b.color(TRUCK, MAT.RUST).boxB(0, 0.84, -2.48, 2.0, 0.55, 0.06);
+    for (let k = 0; k < 4; k++) b.color(DARK).boxB(0, 0.84, -0.1 - k * 0.8, 2.02, 0.05, 0.06);
+    b.color([0.36, 0.3, 0.2], MAT.WORN).boxB(0.45, 0.84, -1.6, 0.7, 0.5, 0.7); b.color([0.3, 0.32, 0.26], MAT.WORN).boxB(-0.5, 0.84, -0.7, 0.6, 0.4, 0.9);
+    b.color([1, 0.12, 0.06], MAT.GLOW).box(0.8, 0.95, -2.52, 0.18, 0.1, 0.04); b.color([1, 0.12, 0.06], MAT.GLOW).box(-0.8, 0.95, -2.52, 0.18, 0.1, 0.04);
+    b.color(STEEL, MAT.WORN).cyl(0.85, 1.8, 0.55, 0.06, 0.06, 0.9, 8, true);        // väljalasketoru
+    M.hauler = b.build();
     // ratas (telg piki x-telge)
     b = new MB(); b.jit = 0;
     b.push().tf(0, 0, 0, 0, 0, Math.PI / 2);
@@ -95,9 +118,10 @@ const Vehicles = (() => {
 
   // ---------- olek ----------
   function spawn(type, x, z, yaw, extra) {
+    if (!DEF[type]) type = DEFAULT_TYPE;
     const d = DEF[type];
-    const v = Object.assign({ id: nextId++, type, x, y: World.heightAt(x, z), z, yaw, speed: 0, steer: 0, hp: d.hp, maxHp: d.hp, cargo: { ammo_r: 240 }, seats: [null, null],
-      wheelRot: 0, pitch: 0, roll: 0, gunYaw: yaw, gunPitch: 0, gunCool: 0, m: M4.create(), wm: WHEELS.map(() => M4.create()), gm: M4.create(), throttle: 0, steerIn: 0, brake: 0, dead: false, hurtT: 0 }, extra || {});
+    const v = Object.assign({ id: nextId++, type, team: 'crew', x, y: World.heightAt(x, z), z, yaw, speed: 0, steer: 0, hp: d.hp, maxHp: d.hp, cargo: d.gun ? { ammo_r: 240 } : {}, seats: [null, null],
+      wheelRot: 0, pitch: 0, roll: 0, gunYaw: yaw, gunPitch: 0, gunCool: 0, m: M4.create(), wm: d.wheels.map(() => M4.create()), gm: M4.create(), throttle: 0, steerIn: 0, brake: 0, dead: false, hurtT: 0, ai: null }, extra || {});
     nextId = Math.max(nextId, v.id + 1);
     v.y = groundAt(v.x, v.z, v.y);
     list.push(v);
@@ -105,7 +129,8 @@ const Vehicles = (() => {
   }
   function groundAt(x, z, y) { return Math.max(World.heightAt(x, z), Bases.floorAt(x, z, y === undefined ? 0 : y + 0.5)); }
   function near(x, z, r) { for (const v of list) if (!v.dead && Math.hypot(v.x - x, v.z - z) < r) return v; return null; }
-  function seatWorld(v, k, out) { M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll); const s = SEATS[k]; return M4.point(v.m, s.x, s.y, s.z, out || {}); }
+  function seatWorld(v, k, out) { M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll); const s = seatsOf(v)[k]; return M4.point(v.m, s.x, s.y, s.z, out || {}); }
+  const nameOf = (v) => DEF[v.type].name;
   function cargoCount(v) { let n = 0; for (const k in v.cargo) n += v.cargo[k]; return n; }
   function cargoText(v) { const p = []; for (const k in v.cargo) if (v.cargo[k] > 0) p.push(v.cargo[k] + ' ' + (ITEMS[k] ? ITEMS[k].name : k)); return p.join(', ') || 'empty'; }
 
@@ -129,7 +154,7 @@ const Vehicles = (() => {
     const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
     const ox = v.x, oz = v.z, oh = World.heightAt(ox, oz);
     let nx = v.x + fx * v.speed * dt, nz = v.z + fz * v.speed * dt;
-    const pF = { x: nx + fx * 0.9, z: nz + fz * 0.9 }, pB = { x: nx - fx * 0.9, z: nz - fz * 0.9 };
+    const L = d.len || 0.9, pF = { x: nx + fx * L, z: nz + fz * L }, pB = { x: nx - fx * L, z: nz - fz * L };
     const y0 = v.y + 0.35, y1 = v.y + 1.7;
     const hitF = World.collideCircle(pF, 1.0, y0, y1, true), hitB = World.collideCircle(pB, 1.0, y0, y1, true);
     nx = (pF.x + pB.x) / 2; nz = (pF.z + pB.z) / 2;
@@ -157,10 +182,10 @@ const Vehicles = (() => {
       if (!e.alive || e.kind === 'player' || e.inVehicle || e.kind === 'boss' || e.kind === 'core' || e.kind === 'rturret' || e.kind === 'jelly') continue;
       const ex = e.pos.x - v.x, ez = e.pos.z - v.z, dd = Math.hypot(ex, ez), m = 1.7 + (e.radius || 0.4);
       if (dd > m || dd < 1e-3 || Math.abs(e.pos.y - v.y) > 2) continue;
-      const friendly = e.team === 'crew' || e.team === 'player';
+      const friendly = v.team === 'crew' ? (e.team === 'crew' || e.team === 'player') : e.team === v.team;
       if (!friendly && Math.abs(v.speed) > 5 && !(e.hitBy && e.hitBy > G.time.total)) {
         e.hitBy = G.time.total + 0.6;
-        Ents.damage(e, Math.abs(v.speed) * 6, v.seats[0] === Player ? Player : null);
+        Ents.damage(e, Math.abs(v.speed) * 6, v.seats[0] === Player ? Player : v.seats[0] || null);
         v.speed *= e.kind === 'crab' || e.kind === 'kiskja' ? 0.5 : 0.85;
         FX.dust(e.pos.x, e.pos.y + 0.4, e.pos.z, 10, 2); UI.shake(0.2);
       }
@@ -173,22 +198,23 @@ const Vehicles = (() => {
   function aiGunner(v, e, dt) {
     v.gunCool -= dt;
     M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll);
-    const gp = M4.point(v.m, GUN.x, GUN.y, GUN.z, tmp);
+    const G0 = DEF[v.type].gun; if (!G0) { e.yaw = v.yaw; e.pose = 'sit'; return; }
+    const gp = M4.point(v.m, G0.x, G0.y, G0.z, tmp);
     e.scanT = (e.scanT || 0) - dt;
-    if (e.scanT <= 0) { e.scanT = 0.35; e.vThreat = findThreat(gp.x, gp.y, gp.z, 70, 'crew', null); }
+    if (e.scanT <= 0) { e.scanT = 0.35; e.vThreat = findThreat(gp.x, gp.y, gp.z, 70, e.team, e.team === 'crew' ? null : Crew.turretTargets()); }
     const t = e.vThreat;
     if (t && targetAlive(t)) {
       const tp = targetPoint(t), want = Math.atan2(tp.x - gp.x, tp.z - gp.z);
       v.gunYaw += angDiff(v.gunYaw, want) * Math.min(1, dt * 7);
       v.gunPitch = Math.atan2(tp.y - gp.y, Math.hypot(tp.x - gp.x, tp.z - gp.z));
       if (v.gunCool <= 0 && Math.abs(angDiff(v.gunYaw, want)) < 0.12) {
-        const ammo = (v.cargo.ammo_r || 0) > 0 ? 'cargo' : (G.stash.ammo_r || 0) > 0 && Base.isInside(v.x, v.z) ? 'stash' : null;
+        const ammo = (v.cargo.ammo_r || 0) > 0 ? 'cargo' : v.team === 'crew' && (G.stash.ammo_r || 0) > 0 && Base.isInside(v.x, v.z) ? 'stash' : null;
         if (ammo) {
           if (ammo === 'cargo') v.cargo.ammo_r--; else G.stash.ammo_r--;
           v.gunCool = 0.11;
-          const fake = { pos: { x: gp.x, y: gp.y - 1.33, z: gp.z }, yaw: v.gunYaw, team: 'crew', kind: 'turret' };
+          const fake = { pos: { x: gp.x, y: gp.y - 1.33, z: gp.z }, yaw: v.gunYaw, team: e.team, kind: 'turret' };
           fireAt(fake, t, 16, 0.55, 'lmg');
-        } else if (!v.noAmmoMsg) { v.noAmmoMsg = true; UI.toast('The buggy machine gun is out of rifle ammo – load some into the cargo box.'); }
+        } else if (!v.noAmmoMsg && v.team === 'crew') { v.noAmmoMsg = true; UI.toast('The buggy machine gun is out of rifle ammo – load some into the cargo box.'); }
       }
     } else { v.gunYaw += angDiff(v.gunYaw, v.yaw) * Math.min(1, dt * 1.5); v.gunPitch *= 0.95; }
     e.yaw = v.gunYaw; e.aim = 1; e.hasGun = true; e.pose = 'stand';
@@ -199,20 +225,22 @@ const Vehicles = (() => {
       const v = list[i];
       if (v.hurtT > 0) v.hurtT -= dt;
       if (v.dead) continue;
-      if (v.seats[0] !== Player) { v.throttle = 0; v.steerIn = 0; v.brake = v.speed !== 0 && Math.abs(v.speed) < 0.4 ? 1 : 0; }
-      if (Math.abs(v.speed) > 0.01 || v.seats[0] === Player || Math.abs(v.y - groundAt(v.x, v.z, v.y)) > 0.02) step(v, dt);
+      const drv = v.seats[0];
+      if (drv && drv !== Player && v.ai) aiDrive(v, dt);
+      else if (drv !== Player) { v.throttle = 0; v.steerIn = 0; v.brake = v.speed !== 0 && Math.abs(v.speed) < 0.4 ? 1 : 0; }
+      if (Math.abs(v.speed) > 0.01 || drv || Math.abs(v.y - groundAt(v.x, v.z, v.y)) > 0.02) step(v, dt);
       // istujad kaasa
       for (let k = 0; k < 2; k++) {
         const e = v.seats[k]; if (!e || e === Player) continue;
         if (!e.alive || e.downed) { leave(v, e); continue; }
-        seatWorld(v, k, tmp2); e.pos.x = tmp2.x; e.pos.y = tmp2.y - (SEATS[k].sit ? 0.55 : 0); e.pos.z = tmp2.z; e.path = null; e.moveAmt = 0;
+        seatWorld(v, k, tmp2); e.pos.x = tmp2.x; e.pos.y = tmp2.y - (seatsOf(v)[k].sit ? 0.55 : 0); e.pos.z = tmp2.z; e.moveAmt = 0;
         if (k === 1) aiGunner(v, e, dt); else { e.yaw = v.yaw; e.pose = 'sit'; }
       }
       // baasis: kast tühjendatakse lattu
-      if (cargoCount(v) > 0 && Base.isInside(v.x, v.z)) {
+      if (v.team === 'crew' && cargoCount(v) > 0 && Base.isInside(v.x, v.z)) {
         const parts = [];
         for (const k in v.cargo) { const n = v.cargo[k]; if (n > 0 && k !== 'ammo_r') { Inv.stashAdd(k, n); parts.push(n + ' ' + (ITEMS[k] ? ITEMS[k].name : k)); v.cargo[k] = 0; } }
-        if (parts.length) { UI.toast('Buggy unloaded to storage: ' + parts.join(' · ')); Audio2.pickup(); if (G.flags.stonesHome) Game.stonesHome(); }
+        if (parts.length) { UI.toast(nameOf(v) + ' unloaded to storage: ' + parts.join(' · ')); Audio2.pickup(); if (G.flags.stonesHome) Game.stonesHome(); }
       }
       if (v.hp <= 0) destroy(v);
     }
@@ -224,20 +252,22 @@ const Vehicles = (() => {
     const items = []; for (const k in v.cargo) if (v.cargo[k] > 0) items.push([k, v.cargo[k]]);
     if (items.length) Ents.pickups.push({ kind: 'bag', x: v.x + 2, y: World.heightAt(v.x + 2, v.z), z: v.z, data: { items }, id: Math.random() });
     v.cargo = {};
-    UI.msg('The buggy was destroyed! Tow what is left back to the garage lift to rebuild it.', 'danger');
+    if (v.team === 'crew') UI.msg('The ' + nameOf(v).toLowerCase() + ' was destroyed! Strip the wreck for scrap and buy a new one in the garage.', 'danger');
+    v.ai = null;
   }
 
   // ---------- mängija ----------
   function enter(v, seat) {
     if (v.dead || v.seats[seat]) return false;
-    v.seats[seat] = Player; Player.vehicle = v; Player.seat = seat;
+    if (v.team !== 'crew') { if (v.seats.some(Boolean)) return false; v.team = 'crew'; v.ai = null; UI.toast('You took the ' + nameOf(v).toLowerCase() + '!'); }
+    v.seats[seat] = Player; Player.vehicle = v; Player.seat = seat; v.ai = null;
     Player.vel.x = Player.vel.y = Player.vel.z = 0;
-    if (seat === 1) { Player._wBefore = Player.weapon; Player.weapon = 'bugmg'; if (!Player.mag.bugmg) reloadGun(v); }
+    if (seat === 1 && DEF[v.type].gun) { Player._wBefore = Player.weapon; Player.weapon = 'bugmg'; if (!Player.mag.bugmg) reloadGun(v); }
     Audio2.door(v.x, v.z);
     // jälgija hüppab kuulipilduja taha
     if (seat === 0 && !v.seats[1] && typeof Crew !== 'undefined') {
       const f = Crew.followers().filter((e) => e.alive && !e.downed && Math.hypot(e.pos.x - v.x, e.pos.z - v.z) < 16).sort((a, b) => Math.hypot(a.pos.x - v.x, a.pos.z - v.z) - Math.hypot(b.pos.x - v.x, b.pos.z - v.z))[0];
-      if (f) { v.seats[1] = f; f.inVehicle = v; UI.toast(f.crew.name.split(' ')[0] + ' mans the machine gun'); }
+      if (f) { v.seats[1] = f; f.inVehicle = v; UI.toast(f.crew.name.split(' ')[0] + (DEF[v.type].gun ? ' mans the machine gun' : ' rides along')); }
     }
     return true;
   }
@@ -256,7 +286,9 @@ const Vehicles = (() => {
       // kui juht lahkub, lahkub ka meeskonnaliige
       for (let s = 0; s < 2; s++) if (v.seats[s] && v.seats[s] !== Player) leave(v, v.seats[s]);
     } else {
-      e.inVehicle = null; e.pos.x = q.x; e.pos.z = q.z; e.pos.y = Ents.groundY(q.x, q.z, v.y + 0.5); e.pose = 'stand'; e.path = null;
+      e.inVehicle = null; e.pos.x = q.x; e.pos.z = q.z; e.pos.y = Ents.groundY(q.x, q.z, v.y + 0.5); e.pose = 'stand';
+      // jätka teekonda jalgsi sinna, kuhu sõit viis
+      if (e.ride) { const r = e.ride; e.ride = null; if (r.goal) { e._noRide = true; Ents.goTo(e, r.goal.x, r.goal.z, r.goalCells, r.lv); e._noRide = false; } } else e.path = null;
     }
   }
   function reloadGun(v) {
@@ -283,11 +315,12 @@ const Vehicles = (() => {
     }
     // asukoht istmel
     seatWorld(v, seat, tmp);
-    P.pos.x = tmp.x; P.pos.z = tmp.z; P.pos.y = tmp.y - (SEATS[seat].sit ? 0.55 : 0);
-    if (seat === 1) { const gp = M4.point(v.m, GUN.x, GUN.y, GUN.z, tmp2); P.pos.y = gp.y - P.eyeH + 0.32; }
+    const GN = DEF[v.type].gun;
+    P.pos.x = tmp.x; P.pos.z = tmp.z; P.pos.y = tmp.y - (seatsOf(v)[seat].sit ? 0.55 : 0);
+    if (seat === 1 && GN) { const gp = M4.point(v.m, GN.x, GN.y, GN.z, tmp2); P.pos.y = gp.y - P.eyeH + 0.32; }
     P.vel.x = Math.sin(v.yaw) * v.speed; P.vel.z = Math.cos(v.yaw) * v.speed; P.vel.y = 0; P.onGround = true;
     P.speedNow = 0; P.moveAmt = 0;
-    if (seat === 1) {
+    if (seat === 1 && GN) {
       v.gunYaw = P.yaw; v.gunPitch = P.pitch;
       if ((inp.fire || inp.reload) && (P.mag.bugmg || 0) <= 0 && P.reloadT <= 0) reloadGun(v);
       if (P.reloadT > 0) { P.reloadT -= dt; }
@@ -296,7 +329,7 @@ const Vehicles = (() => {
       P.recoil = Math.max(0, P.recoil - dt * 6); P.kick = Math.max(0, P.kick - dt * 8);
     }
     // tegevus: lühike vajutus = vaheta istet, pikk = välju
-    P.inter = { key: 'veh' + seat, label: 'Hold E: get out', sub: seat === 0 ? 'Tap E: man the machine gun · Space: brake · cargo: ' + cargoText(v) : 'Tap E: take the wheel · ammo ' + (P.mag.bugmg || 0) + ' + ' + (v.cargo.ammo_r || 0), hold: 0.6 };
+    P.inter = { key: 'veh' + seat, label: 'Hold E: get out', sub: seat === 0 ? 'Tap E: ' + (GN ? 'man the machine gun' : 'move to the passenger seat') + ' · Space: brake · cargo: ' + cargoText(v) : 'Tap E: take the wheel' + (GN ? ' · ammo ' + (P.mag.bugmg || 0) + ' + ' + (v.cargo.ammo_r || 0) : ''), hold: 0.6 };
     if (inp.actHeld) { P.interT += dt; if (P.interT >= 0.6) { P.interT = 0; P._actUsed = true; leave(v, P); return; } }
     else {
       if (P.interT > 0 && P.interT < 0.35 && !P._actUsed) {   // lühike vajutus
@@ -308,7 +341,7 @@ const Vehicles = (() => {
           v.seats[other] = Player;
           if (P.seat === 1 && P._wBefore) { P.weapon = P._wBefore; P._wBefore = null; }
           P.seat = other;
-          if (other === 1) { P._wBefore = P.weapon; P.weapon = 'bugmg'; if (!P.mag.bugmg) reloadGun(v); }
+          if (other === 1 && GN) { P._wBefore = P.weapon; P.weapon = 'bugmg'; if (!P.mag.bugmg) reloadGun(v); }
         }
       }
       P.interT = 0; P._actUsed = false;
@@ -320,7 +353,7 @@ const Vehicles = (() => {
   // mängija kaamera sõidukis
   function camera(C) {
     const v = Player.vehicle;
-    if (Player.seat === 1) return false;   // kuulipilduja: esimese isiku vaade
+    if (Player.seat === 1 && DEF[v.type].gun) return false;   // kuulipilduja: esimese isiku vaade
     const ty = v.y + 1.7;
     const dist = 7.2, cp = Math.cos(Player.pitch), sp = Math.sin(Player.pitch);
     let cx = v.x - Math.sin(Player.yaw) * cp * dist, cz = v.z - Math.cos(Player.yaw) * cp * dist, cy = ty - sp * dist + 0.8;
@@ -335,12 +368,15 @@ const Vehicles = (() => {
       if (Math.hypot(v.x - Player.pos.x, v.z - Player.pos.z) > 5) continue;
       M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll);
       const dp = M4.point(v.m, 1.1, 0, 0.1, {}), rp = M4.point(v.m, 0, 0, -2.0, {});
-      if (v.dead) { consider({ key: 'vd' + v.id, label: 'Strip the buggy wreck', sub: 'Get scrap back · a new buggy can be bought at the car lift', hold: 2.0, act: () => { const n = Math.min(40, Inv.room('scrap')); if (n > 0) Inv.add('scrap', n); list.splice(list.indexOf(v), 1); UI.toast('+' + n + ' scrap from the wreck'); Audio2.repair(); }, tick: () => FX.repair(v.x + rand(-1, 1), v.y + 0.8, v.z + rand(-1, 1)) }, v.x, v.z, 3.5); continue; }
-      if (!v.seats[0]) consider({ key: 've' + v.id, label: 'Drive the buggy', sub: 'hp ' + Math.round(v.hp) + '/' + v.maxHp + ' · cargo: ' + cargoText(v), act: () => enter(v, 0) }, dp.x, dp.z, 3.2);
-      if (!v.seats[1]) consider({ key: 'vg' + v.id, label: 'Man the machine gun', sub: 'ammo in cargo ' + (v.cargo.ammo_r || 0), act: () => enter(v, 1) }, rp.x + Math.sin(v.yaw) * 0.6, rp.z + Math.cos(v.yaw) * 0.6, 2.6);
+      const nm = nameOf(v).toLowerCase(), GN = DEF[v.type].gun;
+      if (v.team !== 'crew' && v.seats.some(Boolean)) continue;
+      if (v.dead) { consider({ key: 'vd' + v.id, label: 'Strip the ' + nm + ' wreck', sub: 'Get scrap back · a new buggy can be bought at the car lift', hold: 2.0, act: () => { const n = Math.min(40, Inv.room('scrap')); if (n > 0) Inv.add('scrap', n); list.splice(list.indexOf(v), 1); UI.toast('+' + n + ' scrap from the wreck'); Audio2.repair(); }, tick: () => FX.repair(v.x + rand(-1, 1), v.y + 0.8, v.z + rand(-1, 1)) }, v.x, v.z, 3.5); continue; }
+      if (!v.seats[0]) consider({ key: 've' + v.id, label: (v.team === 'crew' ? 'Drive the ' : 'Steal the ') + nm, sub: 'hp ' + Math.round(v.hp) + '/' + v.maxHp + ' · cargo: ' + cargoText(v), act: () => enter(v, 0) }, dp.x, dp.z, 3.4);
+      if (!v.seats[1] && GN && v.team === 'crew') consider({ key: 'vg' + v.id, label: 'Man the machine gun', sub: 'ammo in cargo ' + (v.cargo.ammo_r || 0), act: () => enter(v, 1) }, rp.x + Math.sin(v.yaw) * 0.6, rp.z + Math.cos(v.yaw) * 0.6, 2.6);
+      if (v.team !== 'crew') continue;
       const packN = Inv.idx().reduce((n, i) => n + (Inv.ensure().slots[i] ? 1 : 0), 0);
-      if (packN) consider({ key: 'vl' + v.id, label: 'Load backpack into the buggy', sub: 'cargo ' + cargoCount(v) + '/' + DEF[v.type].cargoCap + ' · unloads to storage at the base', hold: 0.8, act: () => loadPack(v) }, rp.x, rp.z, 2.4);
-      else if (cargoCount(v)) consider({ key: 'vu' + v.id, label: 'Take from the buggy', sub: cargoText(v), act: () => unloadToPack(v) }, rp.x, rp.z, 2.4);
+      if (packN) consider({ key: 'vl' + v.id, label: 'Load backpack into the ' + nm, sub: 'cargo ' + cargoCount(v) + '/' + DEF[v.type].cargoCap + ' · unloads to storage at the base', hold: 0.8, act: () => loadPack(v) }, rp.x, rp.z, 2.4);
+      else if (cargoCount(v)) consider({ key: 'vu' + v.id, label: 'Take from the ' + nm, sub: cargoText(v), act: () => unloadToPack(v) }, rp.x, rp.z, 2.4);
     }
   }
   function loadPack(v) {
@@ -351,34 +387,96 @@ const Vehicles = (() => {
       const n = Math.min(room, s.n), got = Inv.take(s.id, n);
       if (got) { v.cargo[s.id] = (v.cargo[s.id] || 0) + got; moved += got; }
     }
-    if (moved) { Audio2.pickup(); UI.toast('Loaded into the buggy: ' + cargoText(v)); } else UI.toast('The buggy cargo box is full');
+    if (moved) { Audio2.pickup(); UI.toast('Loaded into the ' + nameOf(v).toLowerCase() + ': ' + cargoText(v)); } else UI.toast('The cargo box is full');
   }
   function unloadToPack(v) {
     let moved = 0;
     for (const k in v.cargo) { const n = v.cargo[k]; if (n <= 0) continue; const r = Inv.room(k); const m = Math.min(n, r); if (m > 0) { Inv.add(k, m); v.cargo[k] -= m; moved += m; } }
     UI.toast(moved ? 'Took ' + moved + ' things into your backpack' : 'Your backpack is full'); if (moved) Audio2.pickup();
   }
-  // tõstuk: osta / paranda / ehita uuesti
+  // ---------- garaaž: ostumenüü ----------
   function liftInteraction(o) {
-    const v = list.find((q) => !q.dead && Math.hypot(q.x - o.cx, q.z - o.cz) < 3.6);
-    const d = DEF.buggy;
-    if (!o.on) return { label: 'Car lift', sub: 'No power', disabled: true };
-    if (v && v.hp < v.maxHp) {
-      const can = G.res.scrap >= 10;
-      return { label: 'Repair the buggy', sub: '10 scrap · hp ' + Math.round(v.hp) + '/' + v.maxHp, disabled: !can, hold: 1.6, act: () => { G.res.scrap -= 10; v.hp = Math.min(v.maxHp, v.hp + 120); Audio2.repair(); }, tick: () => FX.repair(o.cx, OY0() + 1, o.cz) };
-    }
-    if (v) return { label: 'Car lift', sub: 'Buggy is ready · ' + Math.round(v.hp) + ' hp', disabled: true };
-    const can = G.res.cr >= d.cost.c && G.res.scrap >= d.cost.s;
-    return { label: 'Buy a buggy', sub: d.cost.c + ' ₵ + ' + d.cost.s + ' scrap · 2 seats, rear machine gun, cargo box' + (can ? '' : ' · not enough'), disabled: !can, hold: 1.2,
-      act: () => {
-        if (G.res.cr < d.cost.c || G.res.scrap < d.cost.s) return;
-        G.res.cr -= d.cost.c; G.res.scrap -= d.cost.s;
-        const yaw = o.rot * Math.PI / 2;
-        const nv = spawn('buggy', o.cx, o.cz, yaw); nv.y = groundAt(nv.x, nv.z, OY0() + 0.5);
-        Audio2.cash(); UI.banner('Buggy bought', 'Two seats, a rear machine gun and a cargo box. E to drive.', 'good');
-        G.flags.buggy = true;
-      } };
+    if (!o.on) return { label: 'Garage', sub: 'No power', disabled: true };
+    const v = vehicleOnLift(o);
+    return { label: 'Open the garage', sub: v ? nameOf(v) + ' on the lift · ' + Math.round(v.hp) + '/' + v.maxHp + ' hp' : 'Buy vehicles, repair and sell', act: () => UI.openGarage(o) };
   }
+  function vehicleOnLift(o) { return list.find((q) => !q.dead && Math.hypot(q.x - o.cx, q.z - o.cz) < 3.6) || null; }
+  function canBuy(type, o) {
+    const d = DEF[type];
+    if (!o || !o.on) return 'The lift has no power';
+    if (vehicleOnLift(o)) return 'Drive the vehicle off the lift first';
+    if (G.res.cr < d.cost.c) return 'Need ' + d.cost.c + ' ₵';
+    if (G.res.scrap < d.cost.s) return 'Need ' + d.cost.s + ' scrap';
+    return null;
+  }
+  function buy(type, o) {
+    if (canBuy(type, o)) return false;
+    const d = DEF[type];
+    G.res.cr -= d.cost.c; G.res.scrap -= d.cost.s;
+    const nv = spawn(type, o.cx, o.cz, o.rot * Math.PI / 2); nv.y = groundAt(nv.x, nv.z, OY0() + 0.5);
+    Audio2.cash(); UI.banner(d.name + ' bought', d.desc + ' E to drive.', 'good');
+    G.flags.buggy = true;
+    return nv;
+  }
+  function repairCost(v) { return Math.ceil((v.maxHp - v.hp) / 12); }
+  function repair(v) { const c = repairCost(v); if (c <= 0 || G.res.scrap < c) return false; G.res.scrap -= c; v.hp = v.maxHp; Audio2.repair(); return true; }
+  function sell(v) { if (v.seats.some(Boolean)) return false; const d = DEF[v.type], val = Math.round(d.cost.c * 0.4 * (v.hp / v.maxHp)); G.res.cr += val; list.splice(list.indexOf(v), 1); Audio2.cash(); UI.toast(d.name + ' sold for ' + val + ' ₵'); return true; }
+  function owned() { return list.filter((v) => v.team === 'crew'); }
+
+  // ---------- AI juhid (meeskond ja konkurendid) ----------
+  // Ents.goTo kutsub: kui tee on pikk ja lähedal on vaba oma sõiduk, sõidab inimene sellega
+  function tryRide(e, x, z, goalCells, lv) {
+    if (!e || e._noRide || e.inVehicle || e.kind !== 'human' || e.downed || lv) return false;
+    const team = e.team; if (team !== 'crew' && !e.rival) return false;
+    const dist = Math.hypot(x - e.pos.x, z - e.pos.z); if (dist < 110) return false;
+    // juba ootav sõiduk sama sihtkohaga -> kõrvalistmele
+    for (const v of list) {
+      if (v.dead || v.team !== team || !v.ai || v.seats[1] || v.ai.go || Math.hypot(v.x - e.pos.x, v.z - e.pos.z) > 14) continue;
+      if (Math.hypot(v.ai.dest.x - x, v.ai.dest.z - z) > 40) continue;
+      board(v, e, 1, x, z, goalCells, lv); return true;
+    }
+    const v = list.filter((q) => !q.dead && q.team === team && !q.seats[0] && !q.seats[1] && q !== Player.vehicle && Math.hypot(q.x - e.pos.x, q.z - e.pos.z) < 26)
+      .sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
+    if (!v) return false;
+    // sihtpunkt: baasi puhul garaaži tõstuk (kui on), muidu otse
+    let dx = x, dz = z;
+    const B = Bases.at(x, z);
+    if (team === 'crew' && B === Base) { const lift = Base.objsOfType('tostuk')[0]; if (lift) { dx = lift.cx; dz = lift.cz; } else { const a = Math.atan2(e.pos.x - x, e.pos.z - z); dx = x + Math.sin(a) * 16; dz = z + Math.cos(a) * 16; } }
+    v.ai = { dest: { x: dx, z: dz }, wait: 1.6, stuckT: 0, revT: 0, go: false, home: B === Base || (e.rival && Math.hypot(x - e.rival.base.x, z - e.rival.base.z) < 30) };
+    board(v, e, 0, x, z, goalCells, lv);
+    return true;
+  }
+  function board(v, e, seat, x, z, goalCells, lv) {
+    v.seats[seat] = e; e.inVehicle = v; e.ride = { goal: { x, z }, goalCells: goalCells || null, lv: lv || 0 };
+    e.path = [{ x, z }]; e.pathI = 0; e.goal = { x, z };
+    if (e.crew) e.crew.act = seat === 0 ? 'Driving the ' + nameOf(v).toLowerCase() : 'Riding along';
+  }
+  function aiDrive(v, dt) {
+    const a = v.ai, d = DEF[v.type];
+    if (a.wait > 0) { a.wait -= dt; v.throttle = 0; v.steerIn = 0; v.brake = 1; if (a.wait <= 0) a.go = true; return; }
+    const dx = a.dest.x - v.x, dz = a.dest.z - v.z, dist = Math.hypot(dx, dz);
+    const want = Math.atan2(dx, dz), err = angDiff(v.yaw, want);
+    const arriveR = a.home ? 6 : 9;
+    if (dist < arriveR || (a.home && Bases.at(v.x, v.z) && Bases.at(v.x, v.z).isInside(v.x, v.z) && dist < 14)) { arrive(v); return; }
+    // tagurdamine, kui kinni
+    if (a.revT > 0) { a.revT -= dt; v.throttle = -0.8; v.steerIn = err > 0 ? 1 : -1; v.brake = 0; return; }
+    v.steerIn = clamp(-err * 2.2, -1, 1) * (v.speed < 0 ? -1 : 1);
+    const slow = dist < 30 ? 0.45 : Math.abs(err) > 1.0 ? 0.35 : 1;
+    v.throttle = slow; v.brake = Math.abs(v.speed) > d.maxSpeed * 0.55 && dist < 20 ? 1 : 0;
+    if (Math.abs(v.speed) < 1.2) { a.stuckT += dt; if (a.stuckT > 2.2) { a.stuckT = 0; a.revT = 1.3; a.stuckN = (a.stuckN || 0) + 1; if (a.stuckN > 5) arrive(v); } } else a.stuckT = 0;
+  }
+  function arrive(v) {
+    v.throttle = 0; v.steerIn = 0; v.brake = 1; v.speed *= 0.3;
+    v.ai = null;
+    for (let k = 1; k >= 0; k--) { const e = v.seats[k]; if (e && e !== Player) leave(v, e); }
+  }
+  // konkurent ostab sõiduki samadel tingimustel (raha + vanaraud)
+  function rivalBuy(r, type) {
+    const d = DEF[type];
+    const f = Math.atan2(-r.base.x, -r.base.z), x = r.base.x + Math.sin(f + 0.9) * 9, z = r.base.z + Math.cos(f + 0.9) * 9;
+    return spawn(type, x, z, f, { team: r.team, rivalId: r.id });
+  }
+  function teamVehicles(team) { return list.filter((v) => v.team === team && !v.dead); }
   function OY0() { return Base.OY || 0; }
 
   // ---------- joonistus ----------
@@ -388,17 +486,20 @@ const Vehicles = (() => {
     for (const v of list) {
       M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll);
       const tint = v.dead ? [0.25, 0.22, 0.2, 0] : v.hurtT > 0 ? [1.6, 0.7, 0.6, 0] : null;
-      GFX.draw(M.body, v.m, tint, null, { rust: 0.7 });
-      for (let k = 0; k < 4; k++) {
-        const [wx, wy, wz] = WHEELS[k];
-        M4.child(v.wm[k], v.m, wx, wy, wz, k < 2 ? -v.steer : 0, v.wheelRot, 0);
+      const d = DEF[v.type];
+      const rt = !tint && v.team !== 'crew' && typeof Rivals !== 'undefined' && Rivals.get(v.team) ? Rivals.get(v.team).tint : tint;
+      GFX.draw(M[d.mesh], v.m, rt, null, { rust: 0.7 });
+      for (let k = 0; k < d.wheels.length; k++) {
+        const [wx, wy, wz] = d.wheels[k];
+        M4.child(v.wm[k], v.m, wx, wy, wz, k < 2 ? -v.steer : 0, v.wheelRot / d.wheelS, 0, d.wheelS, d.wheelS, d.wheelS);
         GFX.draw(M.wheel, v.wm[k], v.dead ? tint : null, null, { rust: 0.3 });
       }
       // kuulipilduja: maailma suunas
-      const gp = M4.point(v.m, GUN.x, GUN.y, GUN.z, tmp);
-      const own = Player.vehicle === v && Player.seat === 1;
-      M4.compose(v.gm, gp.x, gp.y, gp.z, v.gunYaw, -v.gunPitch * (own ? 1 : 1), 0);
-      GFX.draw(M.gun, v.gm, tint, null, { rust: 0.4 });
+      if (d.gun) {
+        const gp = M4.point(v.m, d.gun.x, d.gun.y, d.gun.z, tmp);
+        M4.compose(v.gm, gp.x, gp.y, gp.z, v.gunYaw, -v.gunPitch, 0);
+        GFX.draw(M.gun, v.gm, tint, null, { rust: 0.4 });
+      }
       if (!v.dead && GFX.env.night > 0.35) {
         const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
         GFX.addLight(v.x + fx * 6, v.y + 1.2, v.z + fz * 6, 16, 1.0, 0.95, 0.8, 1.8);
@@ -414,9 +515,10 @@ const Vehicles = (() => {
   function sound(dt) { /* mootorit kuuleb läbi tolmu */ }
 
   // ---------- salvestus ----------
-  function serialize() { return list.map((v) => ({ id: v.id, type: v.type, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp, dead: v.dead, cargo: v.cargo })); }
-  function deserialize(arr) { reset(); for (const d of arr || []) { const v = spawn(d.type || 'buggy', d.x, d.z, d.yaw, { id: d.id, hp: d.hp, dead: !!d.dead, cargo: d.cargo || {} }); v.y = groundAt(v.x, v.z, 0.5); } }
-  function reset() { for (const v of list) for (const e of v.seats) if (e && e !== Player) e.inVehicle = null; list.length = 0; if (typeof Player !== 'undefined') { Player.vehicle = null; Player.seat = 0; } }
+  function serialize() { return list.map((v) => ({ id: v.id, type: v.type, team: v.team, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp, dead: v.dead, cargo: v.cargo })); }
+  function deserialize(arr) { reset(); for (const d of arr || []) { const v = spawn(d.type || 'buggy', d.x, d.z, d.yaw, { id: d.id, hp: d.hp, dead: !!d.dead, cargo: d.cargo || {}, team: d.team || 'crew' }); v.y = groundAt(v.x, v.z, 0.5); } }
+  function reset() { for (const v of list) for (const e of v.seats) if (e && e !== Player) { e.inVehicle = null; e.ride = null; } list.length = 0; if (typeof Player !== 'undefined') { Player.vehicle = null; Player.seat = 0; } }
 
-  return { DEF, list, initMeshes, spawn, near, update, draw, enter, leave, playerUpdate, camera, interactions, liftInteraction, serialize, deserialize, reset, cargoCount, sound };
+  return { DEF, list, initMeshes, spawn, near, update, draw, enter, leave, playerUpdate, camera, interactions, liftInteraction, serialize, deserialize, reset, cargoCount, sound,
+    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, rivalBuy, teamVehicles, nameOf, cargoText };
 })();

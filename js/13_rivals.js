@@ -206,6 +206,14 @@ const Rivals = (() => {
       r.buildT -= dt;
       if (r.buildT > 0) continue;
       r.buildT = rand(100, 160);
+      // sõiduk samadel tingimustel: garaaž (tõstuk) + sõiduk, kui raha jätkub ja mehi on
+      if (typeof Vehicles !== 'undefined' && !Vehicles.teamVehicles(r.team).length && (r.men || 0) >= 3) {
+        const vc = Vehicles.DEF.buggy.cost, gc = r.hasGarage ? { s: 0, c: 0 } : OBJ.tostuk.cost;
+        if (spend(r, { s: vc.s + gc.s, c: vc.c + gc.c }, reserve(r) + 150)) {
+          r.hasGarage = true; Vehicles.rivalBuy(r, 'buggy');
+          if (Math.hypot(Player.pos.x - r.base.x, Player.pos.z - r.base.z) < 200 || Math.random() < 0.5) UI.msg('Radio: ' + r.short + ' bought an armed buggy.', 'rival');
+        }
+      }
       if (r.bb.rooms.size >= 8) continue;
       if (growBase(r, true)) {
         r.bb.rebuildNow();
@@ -243,6 +251,7 @@ const Rivals = (() => {
     return findThreat(e.pos.x, e.pos.y + 1.4, e.pos.z, range, e.team, extra);
   }
   function unitAI(e, dt) {
+    if (e.inVehicle) return;   // sõidab (Vehicles juhib)
     if (e.cool > 0) e.cool -= dt;
     // haavatud korjaja/ründaja taandub koju (palgatud inimesi on vähe)
     if ((e.mission === 'scav' || e.mission === 'raid') && e.hp < e.maxHp * 0.4) { e.mission = 'flee'; e.path = null; }

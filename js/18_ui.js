@@ -526,6 +526,7 @@ const UI = (() => {
     else if (panelKind === 'inv') renderInv(body);
     else if (panelKind === 'coop') Net.renderPanel(body);
     else if (panelKind === 'saves') renderSaves(body);
+    else if (panelKind === 'garage') renderGarage(body);
     if (soft) body.scrollTop = scroll;
   }
   function btn(id, label, opts = {}) { return `<button class="pbtn ${opts.primary ? 'primary' : ''}" data-act="${id}" ${opts.disabled ? 'disabled' : ''}>${label}</button>`; }
@@ -831,6 +832,42 @@ const UI = (() => {
   }
   function openHelp() { openPanel('help'); }
   function openMap() { openPanel('map'); }
+  // ---------- garaaž: sõidukite ostmine, parandamine, müük ----------
+  let garageObj = null;
+  function openGarage(o) { garageObj = o; openPanel('garage'); }
+  function renderGarage(body) {
+    $('pTitle').textContent = 'Garage'; $('pTabs').innerHTML = '';
+    const o = garageObj, onLift = o ? Vehicles.vehicleOnLift(o) : null;
+    let h = `<div class="kv"><div><div class="k">Money</div><div class="v">${fmtInt(G.res.cr)} ₵</div></div><div><div class="k">Scrap</div><div class="v">${fmtInt(G.res.scrap)}</div></div><div><div class="k">On the lift</div><div class="v">${onLift ? esc(Vehicles.nameOf(onLift)) : 'empty'}</div></div></div>`;
+    h += '<h4 style="margin:12px 0 6px">Buy</h4><div class="cards">';
+    for (const [k, d] of Object.entries(Vehicles.DEF)) {
+      const why = Vehicles.canBuy(k, o);
+      h += `<div class="card"><h4>${esc(d.name)}</h4><div class="act">${esc(d.desc)}</div>
+        <div class="trait">${d.hp} hp · top speed ${Math.round(d.maxSpeed * 3.6)} km/h · cargo ${d.cargoCap}${d.gun ? ' · rear machine gun' : ''}</div>
+        <div class="row">${btn('vbuy:' + k, 'Buy · ' + fmtInt(d.cost.c) + ' ₵ + ' + d.cost.s + ' scrap', { primary: !why, disabled: !!why })}</div>${why ? `<div class="note">${esc(why)}</div>` : ''}</div>`;
+    }
+    h += '</div>';
+    const own = Vehicles.owned();
+    h += '<h4 style="margin:14px 0 6px">Your vehicles</h4>';
+    if (!own.length) h += '<div class="empty">No vehicles yet.</div>';
+    else {
+      h += '<div class="cards">';
+      for (const v of own) {
+        const near = o && Math.hypot(v.x - o.cx, v.z - o.cz) < 9, d = Math.round(Math.hypot(v.x - Player.pos.x, v.z - Player.pos.z));
+        const rc = Vehicles.repairCost(v);
+        h += `<div class="card"><h4>${esc(Vehicles.nameOf(v))}${v.dead ? ' (wreck)' : ''}</h4><div class="act">${Math.round(v.hp)} / ${v.maxHp} hp · ${d} m away · cargo: ${esc(Vehicles.cargoText(v))}</div>
+          <div class="row">${v.dead ? '' : btn('vrep:' + v.id, rc > 0 ? 'Repair · ' + rc + ' scrap' : 'In good shape', { disabled: !near || rc <= 0 || G.res.scrap < rc })}${v.dead ? '' : btn('vsell:' + v.id, 'Sell', { disabled: !near })}</div>${!near && !v.dead ? '<div class="note">Bring it to the garage to repair or sell it.</div>' : ''}</div>`;
+      }
+      h += '</div>';
+    }
+    body.innerHTML = h;
+    const byId = (id) => Vehicles.list.find((v) => String(v.id) === id);
+    bindActs(body, {
+      vbuy: (k) => { if (Vehicles.buy(k, o)) closePanel(); else renderPanel(true); },
+      vrep: (id) => { const v = byId(id); if (v) Vehicles.repair(v); renderPanel(true); },
+      vsell: (id) => { const v = byId(id); if (v) Vehicles.sell(v); renderPanel(true); },
+    });
+  }
   // salakood meeskonna menüüs
   function tryCode(v) {
     const code = String(v || '').trim().toLowerCase();
@@ -942,7 +979,7 @@ const UI = (() => {
   return {
     bubble, init, msg, toast, banner, damage, hitMarker, armorHit, whiz, shake, getShake, joy, lockHint, showHUD, update, updateObjective,
     openTerminal, openCrew, openMap, openMenu, openHelp, openInv, invDirty, closePanel, isPanelOpen, openPanel, btn, bindActs, esc, tabs,
-    showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,
+    openGarage, showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,
     get panelKind() { return panelKind; }, get panelTab() { return panelTab; },
     get waypoint() { return waypoint; }, set waypoint(v) { waypoint = v; },
   };
