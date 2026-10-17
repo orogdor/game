@@ -14,8 +14,8 @@ const Boss = (() => {
   function spawn(saved) {
     const n = World.sites.nest;
     const e = Ents.spawn('boss', 'wild', n.x, n.z, { radius: 8.5, state: 'sleep', maxHp: 1 });
-    e.nodes = NODE_POS.map((p, i) => ({ hp: 520, max: 520, alive: true, m: M4.create(), i }));
-    e.heartHp = 2600; e.heartMax = 2600; e.guardT = 0; e.guarded = false;
+    e.nodes = NODE_POS.map((p, i) => ({ hp: 1040, max: 1040, alive: true, m: M4.create(), i }));
+    e.heartHp = 5200; e.heartMax = 5200; e.guardT = 0; e.guarded = false;
     e.stompCD = 4; e.barrageCD = 6; e.summonCD = 16; e.chargeCD = 12; e.act = null; e.actT = 0; e.lastSeen = 0; e.roarT = 0;
     e.yaw = rand(0, TAU); e.ms = [];
     if (saved) {

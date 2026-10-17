@@ -18,9 +18,15 @@ const Ents = (() => {
       state: 'idle', stateT: 0, cool: 0, path: null, pathI: 0, target: null, aim: 0, pose: 'stand', deathT: 0,
       lastPos: { x, z }, stuckT: 0, detour: null, flash: 0, spheres: [], parts: {}, hurtT: 0,
     }, o);
-    e.hp = e.maxHp = o.maxHp || o.hp || defaultHp(kind);
+    e.hp = e.maxHp = (o.maxHp || o.hp || defaultHp(kind)) * (isFoe(kind, team) ? FOE_HP : 1);
     list.push(e);
     return e;
+  }
+  // kõik vastased on 2x vastupidavamad (v48)
+  const FOE_HP = 2;
+  function isFoe(kind, team) {
+    if (kind === 'human') return !(team === 'crew' || team === 'player' || team === 'neutral');
+    return kind === 'stalker' || kind === 'kiskja' || kind === 'crab' || kind === 'bug' || kind === 'core' || kind === 'rturret';
   }
   function defaultHp(kind) { return { human: 70, goat: 30, ram: 60, stalker: 55, kiskja: 320, crab: 170, jelly: 15, boss: 4000, core: 900, rturret: 260 }[kind] || 50; }
   function remove(e) { const i = list.indexOf(e); if (i >= 0) list.splice(i, 1); }
