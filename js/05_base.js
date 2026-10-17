@@ -80,10 +80,15 @@ function createBase(opt) {
   const cellRoom = new Int16Array(N * N);
   const cellObj = new Int16Array(N * N);
   const cellObjUp = new Int16Array(N * N);   // teise korruse esemed
-  const upper = new Set();                    // teise korrusega rakud 'i:j'
-  const tall = new Set();                     // kahekorruselise kõrgusega (läbi kahe korruse) toa rakud 'i:j'
-  const upWalls = new Set();                  // ainult teise korruse seinad (vaheseinad üleval)
-  const upOpen = new Map();                   // teise korruse seinte avad: 'door' | 'window' | 'wall' (sulgeb vaikimisi akna)
+  // TEINE KORRUS ehitatakse nagu esimene: oma seinad -> oma toad. Toad võivad esimesest korrusest kuni 3 ruutu üle ulatuda.
+  const upWalls = new Set();                  // teise korruse seinad 'v:i:j'
+  const upOpen = new Map();                   // teise korruse avad: 'door' | 'window'
+  const voids = new Set();                    // kustutatud vahelagi (teise korruse toas, esimese korruse toa kohal) -> kõrge ruum
+  const upper = new Set();                    // arvutatud: teise korruse tubade rakud 'i:j'
+  const upRoomCell = new Int16Array(N * N);   // arvutatud: teise korruse toa id raku kohta
+  const upRooms = new Map();                  // id -> { id, cells, style }
+  const lowDist = new Uint8Array(N * N);      // kaugus esimese korruse toast (ruutudes, 8 suunda)
+  const OVERHANG = 3;
   const cellStyle = new Uint8Array(N * N).fill(255);
   const cellRust = new Uint8Array(N * N);
   const walls = new Set();
@@ -117,47 +122,111 @@ function createBase(opt) {
   const roomAt = (i, j) => (inGrid(i, j) ? cellRoom[j * N + i] : 0);
   const objAt = (i, j) => (inGrid(i, j) ? cellObj[j * N + i] : 0);
   const objUpAt = (i, j) => (inGrid(i, j) ? cellObjUp[j * N + i] : 0);
-  const upAt = (i, j) => roomAt(i, j) > 0 && upper.has(i + ':' + j);
-  const tallAt = (i, j) => roomAt(i, j) > 0 && tall.has(i + ':' + j);
-  const hiAt = (i, j) => upAt(i, j) || tallAt(i, j);   // seinad ja katus kahe korruse kõrgusel
-  // teise korruse sein servas: alumise seina jätk (kui kummalgi pool on kõrge osa) või ainult üleval ehitatud sein
-  function upWallAt(t, i, j) {
-    const k = t + ':' + i + ':' + j;
-    if (upWalls.has(k)) return true;
-    if (!walls.has(k)) return false;
-    const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
-    return hiAt(ai, aj) || hiAt(bi, bj);
-  }
-  function upOpening(t, i, j) {
-    const k = t + ':' + i + ':' + j;
-    if (!upWallAt(t, i, j)) return null;
-    if (upOpen.has(k)) { const v = upOpen.get(k); return v === 'wall' ? null : v; }
-    if (upWalls.has(k)) return null;
-    const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
-    const uA = hiAt(ai, aj), uB = hiAt(bi, bj), bothUp = upAt(ai, aj) && upAt(bi, bj), lowerOp = openings.get(k);
-    return uA && uB ? (lowerOp === 'door' && bothUp ? 'door' : null) : (lowerOp === 'window' || ((i + j) % 2 === 0 && lowerOp !== 'door' && lowerOp !== 'garage') ? 'window' : null);
+  const upRoomAt = (i, j) => (inGrid(i, j) ? upRoomCell[j * N + i] : 0);
+  const hiAt = (i, j) => upRoomAt(i, j) > 0;                                   // teise korruse tuba (seinad/katus 2 korruse kõrgusel)
+  const upAt = (i, j) => hiAt(i, j) && !voids.has(i + ':' + j);              // teise korruse põrand olemas
+  const tallAt = (i, j) => roomAt(i, j) > 0 && hiAt(i, j) && voids.has(i + ':' + j);   // vahelagi kustutatud -> kõrge ruum
+  const lowDistAt = (i, j) => (inGrid(i, j) ? lowDist[j * N + i] : 99);
+  function upWallAt(t, i, j) { return upWalls.has(t + ':' + i + ':' + j); }
+  function upOpening(t, i, j) { const k = t + ':' + i + ':' + j; return upWalls.has(k) ? (upOpen.get(k) || null) : null; }
+  // teise korruse toad (nagu computeRooms, aga upWalls põhjal); tuba kehtib, kui kõik rakud on esimesest korrusest <= 3 ruudu kaugusel
+  function computeUpRooms() {
+    // kaugus esimese korruse tubadest
+    lowDist.fill(99); const q = [];
+    for (let k = 0; k < N * N; k++) if (cellRoom[k] > 0) { lowDist[k] = 0; q.push(k); }
+    for (let h = 0; h < q.length; h++) {
+      const k = q[h], i = k % N, j = (k / N) | 0, d = lowDist[k];
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const ni = i + di, nj = j + dj; if (!inGrid(ni, nj)) continue; const nk = nj * N + ni; if (lowDist[nk] > d + 1) { lowDist[nk] = d + 1; q.push(nk); } }
+    }
+    const outside = new Uint8Array(N * N), st = [];
+    for (let i = 0; i < N; i++) for (const j of [0, N - 1]) { const k = j * N + i; if (!outside[k]) { outside[k] = 1; st.push(k); } }
+    for (let j = 0; j < N; j++) for (const i of [0, N - 1]) { const k = j * N + i; if (!outside[k]) { outside[k] = 1; st.push(k); } }
+    while (st.length) {
+      const k = st.pop(), i = k % N, j = (k / N) | 0;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj; if (!inGrid(ni, nj)) continue;
+        const nk = nj * N + ni; if (outside[nk]) continue;
+        const [t, a, b] = edgeOf(i, j, di, dj); if (upWalls.has(ekey(t, a, b))) continue;
+        outside[nk] = 1; st.push(nk);
+      }
+    }
+    upRoomCell.fill(0); upRooms.clear(); upper.clear();
+    const seen = new Uint8Array(N * N); let id = 1;
+    for (let k0 = 0; k0 < N * N; k0++) {
+      if (outside[k0] || seen[k0]) continue;
+      const cells = []; const s2 = [k0]; seen[k0] = 1;
+      while (s2.length) {
+        const k = s2.pop(), i = k % N, j = (k / N) | 0; cells.push([i, j]);
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ni = i + di, nj = j + dj; if (!inGrid(ni, nj)) continue;
+          const nk = nj * N + ni; if (seen[nk] || outside[nk]) continue;
+          const [t, a, b] = edgeOf(i, j, di, dj); if (upWalls.has(ekey(t, a, b))) continue;
+          seen[nk] = 1; s2.push(nk);
+        }
+      }
+      if (cells.some(([i, j]) => lowDist[j * N + i] > OVERHANG)) continue;   // ulatub esimesest korrusest üle 3 ruudu -> põrandat ei tule
+      const votes = new Map();
+      for (const [i, j] of cells) { const r = rooms.get(cellRoom[j * N + i]); if (r) votes.set(r.style, (votes.get(r.style) || 0) + 1); }
+      let style = 1, bv = 0; for (const [sty, n] of votes) if (n > bv) { bv = n; style = sty; }
+      const r = { id, cells, style }; upRooms.set(id, r);
+      for (const [i, j] of cells) { upRoomCell[j * N + i] = id; upper.add(i + ':' + j); }
+      id++;
+    }
+    for (const k of [...voids]) { const [i, j] = k.split(':').map(Number); if (!(roomAt(i, j) && hiAt(i, j))) voids.delete(k); }
   }
   function canPlaceUpWall(t, i, j) {
     const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
-    if (!inGrid(ai, aj) || !inGrid(bi, bj)) return { ok: false, why: 'Outside the build area.' };
+    if (!inGrid(ai, aj) || !inGrid(bi, bj) || !inArea(ai, aj) && !inArea(bi, bj)) return { ok: false, why: 'Outside the build area.' };
     if (upWallAt(t, i, j)) return { ok: false, why: 'There\'s already a wall here.' };
-    if (!upAt(ai, aj) || !upAt(bi, bj)) return { ok: false, why: 'Upper-floor walls go between upper-floor tiles (the outer walls come from floor 1).' };
-    if (holeAt(ai, aj) || holeAt(bi, bj)) return { ok: false, why: 'The stairwell is in the way.' };
-    for (const c of [[ai, aj], [bi, bj]]) if (objUpAt(c[0], c[1])) { const o = objs.get(objUpAt(c[0], c[1])); if (o && o.w * o.h > 1 && cellsOf(o.i, o.j, o.w, o.h).some(([x, y]) => (x === ai && y === aj)) && cellsOf(o.i, o.j, o.w, o.h).some(([x, y]) => (x === bi && y === bj))) return { ok: false, why: 'An item is in the way.' }; }
+    if (Math.min(lowDistAt(ai, aj), lowDistAt(bi, bj)) > OVERHANG) return { ok: false, why: 'Upper rooms may reach at most ' + OVERHANG + ' tiles past the ground floor.' };
+    if (holeAt(ai, aj) && holeAt(bi, bj)) return { ok: false, why: 'The stairwell is in the way.' };
+    for (const c of [[ai, aj], [bi, bj]]) if (inGrid(c[0], c[1]) && objUpAt(c[0], c[1])) { const o = objs.get(objUpAt(c[0], c[1])); if (o && o.w * o.h > 1 && cellsOf(o.i, o.j, o.w, o.h).some(([x, y]) => (x === ai && y === aj)) && cellsOf(o.i, o.j, o.w, o.h).some(([x, y]) => (x === bi && y === bj))) return { ok: false, why: 'An item is in the way.' }; }
     return { ok: true };
   }
-  function addUpWalls(edges) { const out = []; for (const [t, i, j] of edges) if (canPlaceUpWall(t, i, j).ok) { upWalls.add(t + ':' + i + ':' + j); out.push([t, i, j]); } if (out.length) dirty = true; return out; }
-  function removeUpWalls(edges) { const out = []; for (const [t, i, j] of edges) { const k = t + ':' + i + ':' + j; if (upWalls.delete(k)) { upOpen.delete(k); out.push([t, i, j]); } } if (out.length) dirty = true; return out; }
+  function upChanged() { const before = upRooms.size; computeUpRooms(); pruneObjects(); dirty = true; return upRooms.size - before; }
+  function addUpWalls(edges) { const out = []; for (const [t, i, j] of edges) if (canPlaceUpWall(t, i, j).ok) { upWalls.add(t + ':' + i + ':' + j); out.push([t, i, j]); } if (out.length) upChanged(); return out; }
+  function removeUpWalls(edges) { const out = []; for (const [t, i, j] of edges) { const k = t + ':' + i + ':' + j; if (upWalls.delete(k)) { upOpen.delete(k); out.push([t, i, j]); } } if (out.length) upChanged(); return out; }
   function isUpWallCustom(t, i, j) { return upWalls.has(t + ':' + i + ':' + j); }
   function canSetUpOpening(t, i, j, type) {
     if (!upWallAt(t, i, j)) return { ok: false, why: 'There\'s no upper-floor wall here.' };
     const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
-    const inA = upAt(ai, aj), inB = upAt(bi, bj);
+    const inA = hiAt(ai, aj), inB = hiAt(bi, bj);
     if (type === 'window' && inA && inB) return { ok: false, why: 'Windows only go in outer walls.' };
-    if (type === 'door' && !(inA && inB)) return { ok: false, why: 'An upstairs door has to lead into another upstairs room (no balconies yet).' };
+    if (type === 'door' && !(inA && inB)) return { ok: false, why: 'An upstairs door has to lead into another upstairs room.' };
     return { ok: true };
   }
-  function setUpOpening(t, i, j, type) { upOpen.set(t + ':' + i + ':' + j, type || 'wall'); dirty = true; }
+  function setUpOpening(t, i, j, type) { const k = t + ':' + i + ':' + j; if (type && type !== 'wall') upOpen.set(k, type); else upOpen.delete(k); dirty = true; }
+  // vahelagi: kustuta / taasta (kõrge ruum tekib kustutatud põranda kohale)
+  function canVoid(i, j) {
+    if (!hiAt(i, j)) return { ok: false, why: 'No upper-floor room here.' };
+    if (!roomAt(i, j)) return { ok: false, why: 'Only floor above a ground-floor room can be removed.' };
+    if (holeAt(i, j)) return { ok: false, why: 'That is the stairwell.' };
+    if (objUpAt(i, j)) return { ok: false, why: 'Something stands on this floor tile.' };
+    for (const so of objs.values()) if (so.type === 'sisetrepp') { const ex = stairExit(so); if (ex && ex.i === i && ex.j === j) return { ok: false, why: 'The top of the stairs needs this floor.' }; }
+    return { ok: true };
+  }
+  function setVoid(i, j, on) { const k = i + ':' + j; if (on) { if (!canVoid(i, j).ok) return false; voids.add(k); } else voids.delete(k); pruneObjects(); dirty = true; return true; }
+  const voidAt = (i, j) => voids.has(i + ':' + j);
+  // ühe esimese korruse toa seinad üles (tööriist "2nd floor"): uued servad
+  function upperWallsFor(rid) {
+    const r = rooms.get(rid); if (!r) return [];
+    const out = [];
+    for (const [t, i, j] of roomEdges(r)) if (!upWalls.has(ekey(t, i, j))) out.push([t, i, j]);
+    return out;
+  }
+  function raiseRoom(rid) {   // kopeerib toa seinad üles + aknad/uksed
+    const r = rooms.get(rid); if (!r) return 0;
+    let n = 0;
+    for (const [t, i, j] of roomEdges(r)) {
+      const k = ekey(t, i, j); if (upWalls.has(k)) continue;
+      upWalls.add(k); n++;
+      const [ra, rb] = edgeRooms(t, i, j), lo = openings.get(k);
+      if (ra && rb) { if (lo === 'door') upOpen.set(k, 'door'); }
+      else if (lo === 'window' || ((i + j) % 2 === 0 && lo !== 'door' && lo !== 'garage')) upOpen.set(k, 'window');
+    }
+    upChanged();
+    return n;
+  }
   // trepiava teisel korrusel (siseterepi rakud)
   const holeAt = (i, j) => { const id = objAt(i, j); return !!id && objs.get(id) && objs.get(id).type === 'sisetrepp'; };
   const cellCenter = (i, j) => ({ x: X0 + (i + 0.5) * CS, z: Z0 + (j + 0.5) * CS });
@@ -297,21 +366,13 @@ function createBase(opt) {
     rooms.clear();
     for (const [k, v] of newRooms) rooms.set(k, v);
     nextRoomId = Math.max(nextRoomId, ...[...rooms.keys()].map((x) => x + 1), 1);
+    computeUpRooms();
     dirty = true;
   }
   // välja jäänud siseesemed eemaldatakse; tagastab eemaldatud
   function pruneObjects() {
     const removed = [];
-    // teine korrus: toa rakud kas kõik üleval või ükski (seinte muutmise järel)
-    const byRoom = new Map();
-    for (const r of rooms.values()) { let n = 0; for (const [i, j] of r.cells) if (upper.has(i + ':' + j)) n++; byRoom.set(r.id, n * 2 >= r.cells.length && n > 0); }
-    for (const k of [...upper]) { const [i, j] = k.split(':').map(Number); if (!roomAt(i, j)) upper.delete(k); }
-    for (const r of rooms.values()) for (const [i, j] of r.cells) { if (byRoom.get(r.id)) upper.add(i + ':' + j); else upper.delete(i + ':' + j); }
-    for (const k of [...upWalls]) { const [t, a, b] = k.split(':'); const i = +a, j = +b; const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]]; if (!(roomAt(ai, aj) && roomAt(bi, bj) && upper.has(ai + ':' + aj) && upper.has(bi + ':' + bj))) { upWalls.delete(k); upOpen.delete(k); } }
-    const byRoomT = new Map();
-    for (const r of rooms.values()) { let n = 0; for (const [i, j] of r.cells) if (tall.has(i + ':' + j)) n++; byRoomT.set(r.id, n * 2 >= r.cells.length && n > 0 && !byRoom.get(r.id)); }
-    for (const k of [...tall]) { const [i, j] = k.split(':').map(Number); if (!roomAt(i, j)) tall.delete(k); }
-    for (const r of rooms.values()) for (const [i, j] of r.cells) { if (byRoomT.get(r.id)) tall.add(i + ':' + j); else tall.delete(i + ':' + j); }
+    for (const k of [...upOpen.keys()]) if (!upWalls.has(k)) upOpen.delete(k);
     for (const o of [...objs.values()]) {
       const def = OBJ[o.type];
       if (o.lv || def.needsUpper) { if (cellsOf(o.i, o.j, o.w, o.h).some(([a, b]) => !upAt(a, b))) { removed.push(o); removeObj(o.id); } continue; }
@@ -443,7 +504,7 @@ function createBase(opt) {
         if (!inArea(ii, jj) || !upAt(ii, jj)) return { ok: false, why: 'This spot has no upper floor.' };
         if (holeAt(ii, jj)) return { ok: false, why: 'The stairwell is here.' };
         if (objUpAt(ii, jj)) return { ok: false, why: 'That spot is already taken.' };
-        const r = roomAt(ii, jj); if (rm === -1) rm = r; else if (rm !== r) return { ok: false, why: 'An item can\'t be in two rooms at once.' };
+        const r = upRoomAt(ii, jj); if (rm === -1) rm = r; else if (rm !== r) return { ok: false, why: 'An item can\'t be in two rooms at once.' };
         for (const so of objs.values()) if (so.type === 'sisetrepp') { const ex = stairExit(so); if (ex && ex.i === ii && ex.j === jj) return { ok: false, why: 'Keep the top of the stairs free.' }; }
       }
       for (const [ii, jj] of cellsOf(i, j, w, h)) {
@@ -453,15 +514,15 @@ function createBase(opt) {
       return { ok: true };
     }
     if (def.needsUpper) {
-      for (const [ii, jj] of cellsOf(i, j, w, h)) if (!upAt(ii, jj)) return { ok: false, why: 'Build the upper floor on this room first (tool: 2nd floor).' };
+      for (const [ii, jj] of cellsOf(i, j, w, h)) if (!upAt(ii, jj)) return { ok: false, why: 'Needs an upper-floor room with floor above (Floor 2: build walls, or tool 2nd floor).' };
       const ex = stairExit({ i, j, w, h, rot, type });
-      if (!ex || !upAt(ex.i, ex.j) || roomAt(ex.i, ex.j) !== roomAt(i, j) || objUpAt(ex.i, ex.j)) return { ok: false, why: 'The high end of the stairs needs a free upper-floor tile behind it (in the same room).' };
+      if (!ex || !upAt(ex.i, ex.j) || roomAt(ex.i, ex.j) !== roomAt(i, j) || upRoomAt(ex.i, ex.j) !== upRoomAt(i, j) || objUpAt(ex.i, ex.j)) return { ok: false, why: 'The high end of the stairs needs a free upper-floor tile behind it (in the same room).' };
       const en = stairEntry({ i, j, w, h, rot, type });
       if (!en || roomAt(en.i, en.j) !== roomAt(i, j) || objAt(en.i, en.j)) return { ok: false, why: 'Leave a free tile in front of the low end of the stairs.' };
       for (const [ii, jj] of cellsOf(i, j, w, h)) if (objUpAt(ii, jj)) return { ok: false, why: 'Something stands on the upper floor there.' };
     }
     if (def.needsTall) {
-      for (const [ii, jj] of cellsOf(i, j, w, h)) if (!tallAt(ii, jj)) return { ok: false, why: 'Needs a two-storey tall room (tool: Tall room).' };
+      for (const [ii, jj] of cellsOf(i, j, w, h)) if (!tallAt(ii, jj)) return { ok: false, why: 'Needs a two-storey tall room (tool Tall room, or remove the floor upstairs).' };
     }
     if (def.garage) {
       for (const [t, a, b] of frontEdges(i, j, w, h, rot)) {
@@ -667,20 +728,14 @@ function createBase(opt) {
         if (sdf) IL.floor[q].push([c.x, OY, c.z, ((i * 7 + j * 3) % 4) * Math.PI / 2, col.map((v) => v / 0.78)]);
         else for (const b of [B.main[q], B.low[q]]) b.color(col, r.rust > 0.5 ? MAT.RUST : MAT.WORN).boxB(c.x, -0.1, c.z, CS, FLOOR_Y + 0.1, CS);
         const x0 = c.x - CS / 2, x1 = c.x + CS / 2, z0 = c.z - CS / 2, z1 = c.z + CS / 2;
-        const upC = hiAt(i, j), tl = tallAt(i, j), hole = holeAt(i, j), RY = upC ? WH * 2 : WH;
+        const upC = hiAt(i, j), tl = tallAt(i, j), hole = holeAt(i, j), RY = WH;
         if (!hole && !tl) B.roof[q].color(st.ceil).quad([x0, WH - 0.01, z0], [x1, WH - 0.01, z0], [x1, WH - 0.01, z1], [x0, WH - 0.01, z1]);
-        if (upC) {   // teise korruse põrand (trepiava kohal auk) ja ülemine lagi
-          if (!hole && !tl) {
-            if (sdf) IL.upFloor[q].push([c.x, OY + WH, c.z, ((i * 5 + j * 3) % 4) * Math.PI / 2, col.map((v) => v / 0.78)]);
-            else B.up[q].color(col, r.rust > 0.5 ? MAT.RUST : MAT.WORN).boxB(c.x, WH - 0.05, c.z, CS, FLOOR_Y + 0.05, CS);
-          }
-          B.roof[q].color(st.ceil).quad([x0, RY - 0.01, z0], [x1, RY - 0.01, z0], [x1, RY - 0.01, z1], [x0, RY - 0.01, z1]);
-        }
+        if (upC) continue;   // teise korruse tuba peal: põrand/katus tehakse allpool teise korruse tsüklis
         if (sdf) IL.roof[q].push([c.x, OY + RY, c.z, 0, EXT2.map((v) => v / 0.62)]);
         else B.roof[q].color(EXT2, MAT.RUST).boxB(c.x, RY, c.z, CS + 0.02, 0.16, CS + 0.02);
-        // äärisrinnatis seal, kus naaberrakk pole tuba (teisel korrusel: kus naabril pole teist korrust)
+        // äärisrinnatis seal, kus naaberrakk pole tuba
         for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          if (upC ? hiAt(i + di, j + dj) : roomAt(i + di, j + dj)) continue;
+          if (roomAt(i + di, j + dj)) continue;
           if (sdf) { IL.edge[q].push([c.x + di * (CS / 2 + 0.07), OY + RY, c.z + dj * (CS / 2 + 0.07), di ? Math.PI / 2 : 0, EXT.map((v) => v / 0.72)]); continue; }
           B.roof[q].color(EXT, MAT.RUST).boxB(c.x + di * (CS / 2 + 0.07), RY + 0.16, c.z + dj * (CS / 2 + 0.07), di ? 0.14 : CS + 0.28, 0.22, dj ? 0.14 : CS + 0.28);
         }
@@ -899,21 +954,72 @@ function createBase(opt) {
         addWallCol(p0x, p0z, p3x, p3z, 0, WH);
       }
     }
-    // ---------- teise korruse seinad (alumise korruse seinte peal) ----------
+    // ---------- teise korruse toad: põrand (v.a kustutatud vahelagi), üleulatuva osa alumine pind, lagi ja katus ----------
+    const upPillars = new Set();
+    for (const ur of upRooms.values()) {
+      const st = ROOM_STYLES[ur.style] || ROOM_STYLES[1];
+      for (const [i, j] of ur.cells) {
+        const c = cellCenter(i, j), col = (i + j) % 2 ? st.floor : st.floor2;
+        const x0 = c.x - CS / 2, x1 = c.x + CS / 2, z0 = c.z - CS / 2, z1 = c.z + CS / 2, RY = WH * 2;
+        const vd = voidAt(i, j), hole = holeAt(i, j), over = !roomAt(i, j);
+        if (!vd && !hole) {
+          if (sdf) IL.upFloor[0].push([c.x, OY + WH, c.z, ((i * 5 + j * 3) % 4) * Math.PI / 2, col.map((v) => v / 0.78)]);
+          else B.up[0].color(col, MAT.WORN).boxB(c.x, WH - 0.05, c.z, CS, FLOOR_Y + 0.05, CS);
+        }
+        if (over) {   // üleulatuv osa: alt nähtav plaat + äär
+          B.main[0].color([0.22, 0.22, 0.23], MAT.RUST).boxB(c.x, WH - 0.24, c.z, CS + 0.02, 0.22, CS + 0.02);
+          B.main[0].color(st.ceil).quad([x0, WH - 0.25, z0], [x1, WH - 0.25, z0], [x1, WH - 0.25, z1], [x0, WH - 0.25, z1]);
+          // tugipost, kui ulatub üle 2 ruudu
+          if (lowDistAt(i, j) >= OVERHANG) for (const [vi, vj] of [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]]) {
+            const around = [[vi - 1, vj - 1], [vi, vj - 1], [vi - 1, vj], [vi, vj]].filter(([a, b]) => hiAt(a, b)).length;
+            if (around === 4) continue;                              // keskel, mitte ääres
+            if (around !== 1 && (vi + vj) % 2) continue;              // äärtel iga teine, nurkades alati
+            upPillars.add(vi + ':' + vj);
+          }
+        }
+        B.roof[0].color(st.ceil).quad([x0, RY - 0.01, z0], [x1, RY - 0.01, z0], [x1, RY - 0.01, z1], [x0, RY - 0.01, z1]);
+        if (sdf) IL.roof[0].push([c.x, OY + RY, c.z, 0, EXT2.map((v) => v / 0.62)]);
+        else B.roof[0].color(EXT2, MAT.RUST).boxB(c.x, RY, c.z, CS + 0.02, 0.16, CS + 0.02);
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (!hiAt(i + di, j + dj)) {
+            if (sdf) IL.edge[0].push([c.x + di * (CS / 2 + 0.07), OY + RY, c.z + dj * (CS / 2 + 0.07), di ? Math.PI / 2 : 0, EXT.map((v) => v / 0.72)]);
+            else B.roof[0].color(EXT, MAT.RUST).boxB(c.x + di * (CS / 2 + 0.07), RY + 0.16, c.z + dj * (CS / 2 + 0.07), di ? 0.14 : CS + 0.28, 0.22, dj ? 0.14 : CS + 0.28);
+          }
+          // rõduäär: põrand -> kustutatud vahelagi (seina pole)
+          const ni = i + di, nj = j + dj;
+          if (!vd && !hole && voidAt(ni, nj) && upRoomAt(ni, nj) && !upWalls.has(ekey(...edgeOf(i, j, di, dj)))) {
+            const ex = c.x + di * CS / 2, ez = c.z + dj * CS / 2, ax = ex - (dj ? CS / 2 : 0), az = ez - (di ? CS / 2 : 0), bx = ex + (dj ? CS / 2 : 0), bz = ez + (di ? CS / 2 : 0);
+            const bu = B.up[0];
+            bu.color([0.2, 0.2, 0.21], MAT.RUST).boxB(ex, WH + FLOOR_Y + 0.98, ez, dj ? CS : 0.07, 0.07, di ? CS : 0.07);
+            bu.color([0.2, 0.2, 0.21], MAT.RUST).boxB(ex, WH + FLOOR_Y + 0.45, ez, dj ? CS : 0.04, 0.04, di ? CS : 0.04);
+            for (let k = 0; k <= 4; k++) bu.color([0.24, 0.24, 0.25]).boxB(ax + (bx - ax) * k / 4, WH + FLOOR_Y, az + (bz - az) * k / 4, 0.05, 1.0, 0.05);
+            bu.color([0.16, 0.16, 0.17]).boxB(ex, WH - 0.2, ez, dj ? CS : 0.1, 0.3, di ? CS : 0.1);   // põranda serv
+            colliders.push({ t: 's', ax, az, bx, bz, r: 0.08, y0: OY + WH, y1: OY + WH + 1.15, kind: 'wall', noRay: true });
+          }
+        }
+      }
+    }
+    for (const k of upPillars) {
+      const [vi, vj] = k.split(':').map(Number), x = X0 + vi * CS, z = Z0 + vj * CS;
+      B.main[0].color(POST, MAT.WORN).boxB(x, -1.2, z, 0.34, WH + 1.0, 0.34);
+      B.main[0].color([0.08, 0.08, 0.09]).boxB(x, -0.05, z, 0.5, 0.2, 0.5);
+      B.low[0].color(POST, MAT.WORN).boxB(x, 0, z, 0.34, LOW_H, 0.34);
+      colliders.push({ t: 'c', x, z, r: 0.24, y0: OY - 1, y1: OY + WH, kind: 'wall' });
+    }
+    // ---------- teise korruse seinad ----------
     const upPosts = new Set();
-    for (const key of new Set([...walls, ...upWalls])) {
+    for (const key of upWalls) {
       const [t, si, sj] = key.split(':'); const i = +si, j = +sj;
       const [[ai, aj], [bi, bj]] = edgeCells(t, i, j);
-      const uA = hiAt(ai, aj), uB = hiAt(bi, bj);
-      if (!uA && !uB) continue;
-      const bothUp = upAt(ai, aj) && upAt(bi, bj);
+      const uA = hiAt(ai, aj), uB = hiAt(bi, bj);   // seinad joonistatakse ka siis, kui tuba pole veel kinni
       const [ra, rb] = edgeRooms(t, i, j);
       const q = Math.max(rustQ(ra), rustQ(rb));
       let ax, az, bx, bz, nx, nz;
       if (t === 'v') { ax = X0 + i * CS; bx = ax; az = Z0 + j * CS; bz = az + CS; nx = 1; nz = 0; }
       else { az = Z0 + j * CS; bz = az; ax = X0 + i * CS; bx = ax + CS; nx = 0; nz = 1; }
       upPosts.add(i + ':' + j); upPosts.add(t === 'v' ? i + ':' + (j + 1) : (i + 1) + ':' + j);
-      const sA = uB ? sideStyle(rb) : sideStyle(0), sB = uA ? sideStyle(ra) : sideStyle(0);
+      const upStyle = (u) => { const r = upRooms.get(u); const st = ROOM_STYLES[(r && r.style) || 1] || ROOM_STYLES[1]; return { col: st.wall, col2: st.wall2, mat: MAT.WORN }; };
+      const sA = uB ? upStyle(upRoomAt(bi, bj)) : sideStyle(0), sB = uA ? upStyle(upRoomAt(ai, aj)) : sideStyle(0);
       const lowerOp = openings.get(key);
       const op = upOpening(t, i, j);
       const L = CS, ux = (bx - ax) / L, uz = (bz - az) / L;
@@ -1312,7 +1418,7 @@ function createBase(opt) {
     return r;
   }
   function reset() {
-    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); tall.clear(); upWalls.clear(); upOpen.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
+    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); voids.clear(); upWalls.clear(); upOpen.clear(); upRoomCell.fill(0); upRooms.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
     nextRoomId = 1; nextObjId = 1; dirty = true;
   }
   function isInside(x, z) { const c = toCell(x, z); return roomAt(c.i, c.j) > 0; }
@@ -1339,19 +1445,32 @@ function createBase(opt) {
   }
   function levelAt(x, z, y) { const c = toCell(x, z); return y > OY + WH * 0.55 && upAt(c.i, c.j) ? 1 : 0; }
   // teise korruse lisamine / eemaldamine tervele toale
+  // kõrge tuba: seinad üles (kui pole) ja kogu vahelagi ära
   function setTall(rid, on) {
     const r = rooms.get(rid); if (!r) return false;
-    for (const [i, j] of r.cells) { if (on) { tall.add(i + ':' + j); upper.delete(i + ':' + j); } else tall.delete(i + ':' + j); }
+    if (on) { if (!r.cells.every(([i, j]) => hiAt(i, j))) raiseRoom(rid); for (const [i, j] of r.cells) if (canVoid(i, j).ok) voids.add(i + ':' + j); }
+    else for (const [i, j] of r.cells) voids.delete(i + ':' + j);
     pruneObjects(); dirty = true; return true;
   }
-  function roomIsTall(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && tall.has(r.cells[0][0] + ':' + r.cells[0][1])); }
+  function roomIsTall(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && r.cells.every(([i, j]) => tallAt(i, j))); }
   function setUpper(rid, on) {
     const r = rooms.get(rid); if (!r) return false;
-    for (const [i, j] of r.cells) { if (on) { upper.add(i + ':' + j); tall.delete(i + ':' + j); } else upper.delete(i + ':' + j); }
-    if (!on) pruneObjects();
-    dirty = true; return true;
+    if (on) { raiseRoom(rid); for (const [i, j] of r.cells) voids.delete(i + ':' + j); }
+    else { const ur = new Set(r.cells.map(([i, j]) => upRoomAt(i, j)).filter(Boolean)); removeUpRooms(ur); }
+    pruneObjects(); dirty = true; return true;
   }
-  function roomHasUpper(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && upper.has(r.cells[0][0] + ':' + r.cells[0][1])); }
+  // teise korruse toa(de) eemaldamine: seinad, mis ei piira ühtki teist alles jäävat tuba
+  function removeUpRooms(ids) {
+    for (const k of [...upWalls]) {
+      const [t, a, b] = k.split(':'); const [[ai, aj], [bi, bj]] = edgeCells(t, +a, +b);
+      const ua = upRoomAt(ai, aj), ub = upRoomAt(bi, bj);
+      const keepA = ua && !ids.has(ua), keepB = ub && !ids.has(ub);
+      if ((ids.has(ua) || ids.has(ub)) && !keepA && !keepB) { upWalls.delete(k); upOpen.delete(k); }
+    }
+    for (const id of ids) { const r = upRooms.get(id); if (r) for (const [i, j] of r.cells) voids.delete(i + ':' + j); }
+    upChanged();
+  }
+  function roomHasUpper(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && r.cells.some(([i, j]) => hiAt(i, j))); }
   // teekond korruste vahel: lähim siseterepp
   // teise korruse teekond (BFS üle ülemise korruse rakkude; seinast läbi ainult alumise ukse kohalt)
   function pathUp(ax, az, bx, bz) {
@@ -1395,7 +1514,7 @@ function createBase(opt) {
   function serialize() {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
-    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, upper: [...upper], tall: [...tall], upWalls: [...upWalls], upOpen: [...upOpen.entries()], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
+    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
@@ -1408,17 +1527,33 @@ function createBase(opt) {
     }
     openings.clear();
     for (const [k, v] of d.openings) if (walls.has(k)) openings.set(k, v);
-    for (const k of d.upper || []) upper.add(k);
-    for (const k of d.tall || []) tall.add(k);
-    for (const k of d.upWalls || []) upWalls.add(k);
-    for (const [k, v] of d.upOpen || []) upOpen.set(k, v);
+    if (d.up2) {
+      for (const k of d.upWalls || []) upWalls.add(k);
+      for (const [k, v] of d.upOpen || []) if (v === 'door' || v === 'window') upOpen.set(k, v);
+      for (const k of d.voids || []) voids.add(k);
+    } else if ((d.upper && d.upper.length) || (d.tall && d.tall.length)) {
+      // vana salvestus: teise korruse seinad tuletatakse esimese korruse seintest nagu varem
+      const hi = new Set([...(d.upper || []), ...(d.tall || [])]), oldUp = new Set(d.upper || []);
+      const H = (i, j) => hi.has(i + ':' + j);
+      for (const k of walls) {
+        const [t, a, b] = k.split(':'); const i = +a, j = +b; const [[ai, aj], [bi, bj]] = edgeCells(t, i, j);
+        const uA = H(ai, aj), uB = H(bi, bj); if (!uA && !uB) continue;
+        upWalls.add(k);
+        const lo = openings.get(k);
+        if (uA && uB) { if (lo === 'door' && oldUp.has(ai + ':' + aj) && oldUp.has(bi + ':' + bj)) upOpen.set(k, 'door'); }
+        else if (lo === 'window' || ((i + j) % 2 === 0 && lo !== 'door' && lo !== 'garage')) upOpen.set(k, 'window');
+      }
+      for (const k of d.upWalls || []) upWalls.add(k);
+      for (const [k, v] of d.upOpen || []) { if (v === 'door' || v === 'window') upOpen.set(k, v); else if (v === 'wall') upOpen.delete(k); }
+      for (const k of d.tall || []) voids.add(k);
+    }
     for (const o of d.objs) addObj(o.type, o.i, o.j, o.rot, { hp: o.hp, broken: o.broken, data: o.data || {}, lv: o.lv || 0 }, o.id);
     computeRooms();
     dirty = true;
   }
   return {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
-    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
+    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,

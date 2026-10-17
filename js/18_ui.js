@@ -325,7 +325,7 @@ const UI = (() => {
     $('dmg').style.opacity = Math.max(dmgV, lowHp, Player.dead ? 0.8 : 0);
     if (dmgDirT > 0) { dmgDirT -= dt; if (dmgDirT <= 0) $('dmgDir').style.opacity = 0; }
     shakeV = Math.max(0, shakeV - dt * 1.6);
-    if (panelKind && G.mode !== 'title') { panelRefreshT -= dt; if (panelRefreshT <= 0) { panelRefreshT = 0.5; if (panelKind === 'crew' || (panelKind === 'terminal' && panelTab === 'pank')) renderPanel(true); } }
+    if (panelKind && G.mode !== 'title') { panelRefreshT -= dt; if (panelRefreshT <= 0) { panelRefreshT = 0.5; if ((panelKind === 'crew' && !(document.activeElement && document.activeElement.id === 'cheatIn')) || (panelKind === 'terminal' && panelTab === 'pank')) renderPanel(true); } }
   }
   function updatePrompt() {
     const it = Player.inter;
@@ -653,8 +653,10 @@ const UI = (() => {
         <div class="row">${btn('fol:' + m.id, c.follow ? 'Send back to work' : 'Ask to follow', c.follow ? { primary: true } : {})}${btn('fire:' + m.id, fireConfirm === m.id ? 'Kinnita: vallanda' : 'Dismiss')}</div></div>`;
     }
     h += '</div>';
+    h += `<div class="row" style="margin-top:14px"><input id="cheatIn" placeholder="Code" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);color:inherit;font:inherit">${btn('cheat', 'OK')}</div>`;
     body.innerHTML = h;
-    bindActs(body, { ceq: (a) => { const [id, key] = a.split(':'); const m = ms.find((q) => String(q.id) === id); if (m) cycleCrewGear(m, key); renderPanel(true); },
+    const ci = $('cheatIn'); if (ci) ci.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { tryCode(ci.value); ci.value = ''; } };
+    bindActs(body, { cheat: () => { const c = $('cheatIn'); if (c) { tryCode(c.value); c.value = ''; } }, ceq: (a) => { const [id, key] = a.split(':'); const m = ms.find((q) => String(q.id) === id); if (m) cycleCrewGear(m, key); renderPanel(true); },
       fol: (id) => { const m = ms.find((q) => String(q.id) === id); if (m) Crew.setFollow(m, !m.crew.follow); renderPanel(true); },
       folall: () => { const on = ms.some((m) => !m.crew.follow); for (const m of ms) if (m.crew.follow !== on) Crew.setFollow(m, on); renderPanel(true); },
       fire: (id) => { const m = ms.find((q) => String(q.id) === id); if (!m) return; if (fireConfirm === m.id) { Crew.fire(m); fireConfirm = null; } else fireConfirm = m.id; renderPanel(true); } });
@@ -829,6 +831,22 @@ const UI = (() => {
   }
   function openHelp() { openPanel('help'); }
   function openMap() { openPanel('map'); }
+  // salakood meeskonna menüüs
+  function tryCode(v) {
+    const code = String(v || '').trim().toLowerCase();
+    if (code === 'money') {
+      G.res.cr += 10000; G.res.scrap += 10000;
+      Audio2.cash(); toast('Code accepted: +10 000 ₵ and +10 000 scrap'); msg('Someone wired 10 000 ₵ and a shipment of building material to the station.', 'money');
+      return true;
+    }
+    if (code) toast('Unknown code');
+    return false;
+  }
+  let codeBuf = '';
+  window.addEventListener('keydown', (e) => {
+    if (panelKind !== 'crew' || (document.activeElement && document.activeElement.id === 'cheatIn')) return;
+    if (e.key && e.key.length === 1) { codeBuf = (codeBuf + e.key.toLowerCase()).slice(-12); if (codeBuf.endsWith('money')) { codeBuf = ''; tryCode('money'); } }
+  });
   function openCrew() { if (Net.role === 'guest') { toast('Only the host manages the crew in co-op. Press V near people to take them along.'); return; } openPanel('crew'); }
   function renderHelp(body) {
     $('pTitle').textContent = 'How to play'; $('pTabs').innerHTML = '';
@@ -850,8 +868,8 @@ const UI = (() => {
     else showHUD(true);
   }
   function buildTools(S) {
-    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['obj', 'Items', 'box'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
-      ;
+    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['floor', 'Floor', 'box'], ['obj', 'Items', 'box'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
+      .filter(([k]) => k !== 'floor' || S.level);
     $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k || (k === 'level' && S.level) ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
     $('bTools').querySelectorAll('.tool').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));
     let h = '';
