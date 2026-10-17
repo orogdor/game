@@ -770,7 +770,7 @@ const Ents = (() => {
   return {
     __layDY: (v) => { LAY_DY = v; },
     list, projs, pickups, noises, spawn, remove, update, updateProjs, draw, drawTitleFigure, damage, kill, raycast, friendly, isHuman, noise, clear,
-    goTo, stopMove, arrived, stepMove, face, groundY, nearestHuman, countAlive, updateSpheres, lightNear,
+    goTo, stopMove, arrived, stepMove, face, groundY, nearestHuman, countAlive, updateSpheres, lightNear, drawHuman,
   };
 })();
 

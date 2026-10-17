@@ -15,7 +15,7 @@ const Save = (() => {
       v: FMT, seed: G.seed, diff: G.diff, time: G.time, res: G.res, carry: G.carry, debt: G.debt, up: G.up, scan: G.scan,
       flags: Object.assign({}, G.flags, { music: false }), stats: G.stats, market: G.market, candidates: G.candidates,
       player: { x: Player.pos.x, z: Player.pos.z, yaw: Player.yaw, hp: Player.hp },
-      base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(), pcore: Rivals.playerCoreHp(),
+      base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(), pcore: Rivals.playerCoreHp(), vehicles: Vehicles.serialize(),
       wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), ores: World.ores.map((o) => [o.amount, o.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
       pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data })),
       look: Look.clean(G.look), pname: G.pname, inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
@@ -215,6 +215,7 @@ const Game = (() => {
     if (!ok) { const L = document.getElementById('loading'); L.style.cssText += ';font-size:14px;letter-spacing:0;padding:20px;text-align:center'; L.textContent = initErr ? 'Graphics failed to start: ' + initErr : 'This device doesn\'t support WebGL2 graphics. Try a newer browser.'; return; }
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.getElementById('loading').hidden = false; document.getElementById('loading').textContent = 'Graphics reset. Reload the page.'; });
     buildModels();
+    Vehicles.initMeshes();
     Chars.init();
     Input.init(canvas);
     Build.init(canvas);
@@ -266,7 +267,7 @@ const Game = (() => {
     World.generate(seed);
     GFX.setTerrain(null, false); World.setTerrainShadow(Q[qKey].terrainShadow);
     UI.buildMapCanvas();
-    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Objectives.reset();
+    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Objectives.reset(); Vehicles.reset();
     Ents.list.push(Player);
   }
   function newGame() {
@@ -314,6 +315,7 @@ const Game = (() => {
     Rivals.init(true);
     if (d.pcore !== 0) Rivals.spawnPlayerCore(d.pcore);
     Boss.spawn(d.boss);
+    Vehicles.deserialize(d.vehicles || []);
     Comets.deserialize(d.comets || {});
     Crew.deserialize(d.crew);
     for (const p of d.pickups || []) Ents.pickups.push({ kind: p.kind, x: p.x, y: Ents.groundY(p.x, p.z), z: p.z, data: p.data });
@@ -422,6 +424,7 @@ const Game = (() => {
     Ents.update(dt);
     Crew.update(dt);
     Waves.update(dt);
+    Vehicles.update(dt);
     Rivals.update(dt);
     Comets.update(dt);
     Boss.updateScanner(dt);
@@ -448,6 +451,8 @@ const Game = (() => {
     C.fov = vf;
     GFX.S.vmFov = (aspect < 1 ? 64 : 56) * DEG;
     C.far = Math.max(450, 1400 * (GFX.S.viewMul || 1)); C.near = 0.08;
+    const drv = Player.vehicle && Vehicles.camera(C);
+    { const cr = document.getElementById('cross'); if (cr && drv) cr.style.opacity = '0'; }
   }
   function cameraTitle(dt) {
     titleT += dt;
@@ -503,7 +508,7 @@ const Game = (() => {
     World.draw();
     if (G.mode === 'title') { Base.power.lightsOn = true; GFX.addLight(-1, 2.6, 6.2, 9, 1, 0.75, 0.45, 2.2); }
     Base.draw(G.mode === 'build', GFX.env.night > 0.5 || G.mode === 'title', G.time.total);
-    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else Ents.drawTitleFigure();
+    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else Ents.drawTitleFigure();
     Build.draw();
     if (G.mode === 'play') Player.drawViewmodel(dt);
     GFX.render(sc);

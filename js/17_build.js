@@ -210,6 +210,11 @@ const Build = (() => {
       else commitEdge(hover.edge, S.tool);
     } else if (S.tool === 'paint' && hover && moved < 25) {
       paintAt(hover);
+    } else if (S.tool === 'tall' && hover && moved < 25) {
+      const rid = Base.roomAt(hover.i, hover.j);
+      if (!rid) deny('Tap a room to make it two storeys tall.');
+      else if (touch) { pending = { kind: 'tall', rid }; showPendingConfirm(); }
+      else commitTall(rid);
     } else if (S.tool === 'upper' && hover && moved < 25) {
       const rid = Base.roomAt(hover.i, hover.j);
       if (!rid) deny('Tap a room to give it a second floor.');
@@ -287,6 +292,24 @@ const Build = (() => {
     return true;
   }
   const upperCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 6 });
+  const tallCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 4 });
+  function commitTall(rid) {
+    const r = Base.rooms.get(rid);
+    if (Base.roomIsTall(rid)) {   // tagasi tavaliseks
+      for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === rid && OBJ[o.type].needsTall) { deny('Remove the ' + OBJ[o.type].name + ' first.'); return false; }
+      const ref = half(tallCost(rid)); pay(ref, -1); Base.setTall(rid, false);
+      UI.toast('The room is one storey again. Refund: ' + costStr(ref)); Audio2.build(); pending = null; UI.buildConfirm(null); return true;
+    }
+    if (Base.roomHasUpper(rid)) { deny('This room has a second floor – remove it first (Floor 2 → Demolish).'); return false; }
+    for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === rid && (o.type === 'sisetrepp' || o.lv)) { deny('Remove the stairs first.'); return false; }
+    if (r.cells.length < 6) { deny('A tall room needs at least 6 tiles.'); return false; }
+    const cost = tallCost(rid), af = afford(cost); if (af) { deny(af); return false; }
+    pay(cost); Base.setTall(rid, true);
+    undo.push({ type: 'tall', rid, cost });
+    Audio2.build(); pending = null; UI.buildConfirm(null);
+    UI.toast('Tall two-storey room built. Garage: Items → Work → Car lift (front against an outer wall).');
+    return true;
+  }
   function commitUpper(rid) {
     if (Base.roomHasUpper(rid)) { deny('This room already has a second floor. Use Demolish on floor 2 to remove it.'); return false; }
     const r = Base.rooms.get(rid);
@@ -389,6 +412,7 @@ const Build = (() => {
     if (u.type === 'walls') { const r = Base.removeWalls(u.edges, true); if (!r.ok) { deny(r.why); undo.push(u); return; } pay(u.cost, -1); for (const o of r.lost || []) pay(OBJ[o.type].cost, -1); }
     else if (u.type === 'obj') { Base.removeObj(u.id); pay(u.cost, -1); }
     else if (u.type === 'edge') { Base.setOpening(u.ed.t, u.ed.i, u.ed.j, u.prev); pay(u.cost, -1); }
+    else if (u.type === 'tall') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && OBJ[o.type].needsTall) { deny('Remove the ' + OBJ[o.type].name + ' first.'); undo.push(u); return; } Base.setTall(u.rid, false); pay(u.cost, -1); }
     else if (u.type === 'upper') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && (o.lv || o.type === 'sisetrepp')) { deny('Remove the stairs and the upstairs items first.'); undo.push(u); return; } Base.setUpper(u.rid, false); pay(u.cost, -1); }
     Audio2.ui(); UI.toast('Undone');
     Crew.assignBeds();
@@ -399,6 +423,7 @@ const Build = (() => {
     if (pending.kind === 'walls') commitWalls(pending.edges);
     else if (pending.kind === 'obj') commitObj(pending.type, pending.i, pending.j, pending.rot, pending.lv || 0);
     else if (pending.kind === 'upper') commitUpper(pending.rid);
+    else if (pending.kind === 'tall') commitTall(pending.rid);
     else if (pending.kind === 'edge') commitEdge(pending.e, pending.type);
     else if (pending.kind === 'demolish') doDemolish(pending.tg);
   }
@@ -408,6 +433,7 @@ const Build = (() => {
     let label = 'Build', ok = true, cost = '';
     if (pending.kind === 'walls') { const wi = wallInfo(pending.edges); cost = costStr(wi.cost); ok = wi.n > 0 && !afford(wi.cost); label = 'Build wall'; }
     else if (pending.kind === 'obj') { cost = costStr(OBJ[pending.type].cost); ok = Base.canPlaceObj(pending.type, pending.i, pending.j, pending.rot, pending.lv || 0).ok && !afford(OBJ[pending.type].cost); label = 'Place'; }
+    else if (pending.kind === 'tall') { const c = tallCost(pending.rid); const on = Base.roomIsTall(pending.rid); cost = on ? 'refund ' + costStr(half(c)) : costStr(c); ok = on || !afford(c); label = on ? 'Make normal' : 'Tall room'; }
     else if (pending.kind === 'upper') { const c = upperCost(pending.rid); cost = costStr(c); ok = !afford(c) && !Base.roomHasUpper(pending.rid); label = '2nd floor'; }
     else if (pending.kind === 'edge') { const cur = Base.edgeType(pending.e.t, pending.e.i, pending.e.j); if (cur === pending.type) { label = 'Remove'; cost = '+' + (pending.type === 'door' ? 4 : 3) + ' scrap'; } else { cost = (pending.type === 'door' ? 8 : 6) + ' scrap'; ok = Base.canPlaceOpening(pending.e.t, pending.e.i, pending.e.j, pending.type).ok; } }
     else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.kind === 'upper' ? 'Second floor' : pending.tg.edges.length + ' wall segments'; }
@@ -425,6 +451,7 @@ const Build = (() => {
       obj: S.item ? '' : 'Pick an item from the catalogue.',
       paint: 'Tap a room to change its colour. Cleaning a rusty room costs 10 scrap.',
       demolish: S.level ? 'Tap an upstairs item, or an empty upper floor to remove it.' : 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
+      tall: 'Tap a room to make it two storeys tall (4 scrap per tile) – no floor in between. Good for a garage: then place the Car lift against an outer wall. Tap a tall room again to make it normal.',
       upper: 'Tap a room to build a second floor on it (6 scrap per tile). Then add Indoor stairs and switch to Floor 2 to furnish it.',
     };
     txt = hints[S.tool] || '';
@@ -497,12 +524,12 @@ const Build = (() => {
       const e2 = pending && pending.kind === 'edge' ? pending.e : hover.edge;
       edgeBox(e2, Base.isWall(e2.t, e2.i, e2.j) ? (S.tool === 'door' ? YEL : BLUE) : RED);
     } else if (pending && pending.kind === 'edge') edgeBox(pending.e, YEL);
-    if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper') && (hover || pending)) {
+    if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper' || S.tool === 'tall') && (hover || pending)) {
       const tg = pending && pending.kind === 'demolish' ? pending.tg : S.tool === 'demolish' && hover && !drag ? demolishTarget(hover) : null;
       if (tg && tg.kind === 'obj') { const o = tg.o; box(o.cx, 0.7, o.cz, o.w * Base.CS, 1.4, o.h * Base.CS, RED, 0.35); }
       else if (tg && tg.kind === 'upper') cellsBox(Base.rooms.get(tg.rid), RED);
       else if (tg && tg.kind === 'walls') { for (const [t, i, j] of tg.edges) edgeBox({ t, i, j }, RED); }
-      else if ((S.tool === 'paint' || S.tool === 'upper') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
+      else if ((S.tool === 'paint' || S.tool === 'upper' || S.tool === 'tall') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
     }
     // toad, mida ei saa liigutada: peahoone silt
   }

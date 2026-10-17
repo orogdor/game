@@ -755,6 +755,7 @@ const Crew = (() => {
   function roomTypeAt(x, z) { const c = Base.toCell(x, z); return roomTypes().get(Base.roomAt(c.i, c.j)) || null; }
   function crewAI(e, dt) {
     const c = e.crew; if (!c) return;
+    if (e.inVehicle) return;   // istub bagis (Vehicles juhib)
     const sleeping = e.pose === 'lie';
     // vajadused
     if (c.thirst === undefined) c.thirst = 90;

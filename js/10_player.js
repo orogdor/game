@@ -11,6 +11,7 @@ const WEAPONS = {
   plasma: { name: 'Plasma rifle', dmg: 30, rate: 0.11, mag: 30, reload: 2.0, spread: 0.011, range: 200, kick: 0.35, recoil: 0.22, snd: 'plasma', plasma: true },
   gl: { name: 'Grenade launcher', dmg: 150, rate: 0.85, mag: 6, reload: 3.0, spread: 0.004, range: 120, kick: 1.0, recoil: 0.9, snd: 'gl', launcher: true },
   ashot: { name: 'Auto shotgun', dmg: 11, pellets: 8, rate: 0.24, mag: 10, reload: 2.8, spread: 0.07, range: 42, kick: 0.8, recoil: 0.55, snd: 'shotgun' },
+  bugmg: { name: 'Buggy MG', dmg: 22, rate: 0.085, mag: 120, reload: 3.0, spread: 0.018, range: 260, kick: 0.35, recoil: 0.18, snd: 'lmg' },
   lmg: { name: 'Machine gun', dmg: 26, rate: 0.095, mag: 100, reload: 4.2, spread: 0.028, range: 260, kick: 0.5, recoil: 0.32, slow: 0.78, snd: 'lmg' },
 };
 function weaponStats(w) {
@@ -44,6 +45,8 @@ const Player = {
       if (this.deadT > 4.5) this.respawn();
       return;
     }
+    // sõidukis: eraldi juhtimine
+    if (this.vehicle) { Vehicles.playerUpdate(this, dt, inp); return; }
     // taastumine
     if (this.lastHurt > 6 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + dt * 4 * Inv.regenMul());
     Inv.update(dt);
@@ -244,6 +247,7 @@ const Player = {
     if (this.dead || G.mode !== 'play' && G.mode !== 'build') return;
     if (G.mode === 'build') return;
     amt *= Inv.dmgMul();
+    if (this.vehicle && !this.vehicle.dead) { this.vehicle.hp -= amt * 0.55; this.vehicle.hurtT = 0.25; amt *= this.seat === 1 ? 0.6 : 0.4; }   // sõiduk võtab osa löögist
     this.hp -= amt;
     this.hurtT = 0.4; this.lastHurt = 0;
     Audio2.hurt();
@@ -352,13 +356,14 @@ const Player = {
       if (!p.id) p.id = Math.floor(Math.random() * 1e9);
       consider({ key: 'p' + p.id, label: p.kind === 'stones' ? 'Take the heartstones' : 'Pick up bag', hold: p.kind === 'stones' ? 1.5 : 0.6, act: () => pickupBag(p) }, p.x, p.z, 2.4);
     }
+    if (typeof Vehicles !== 'undefined') Vehicles.interactions(consider);
     return best;
   },
 
   // ---------- vaatemudel ----------
   drawViewmodel(dt) {
     const sc = document.getElementById('scope');
-    if (this.dead || G.mode !== 'play') { this.adsT = 0; if (sc) sc.style.opacity = '0'; return; }
+    if (this.dead || G.mode !== 'play' || this.vehicle) { this.adsT = 0; if (sc) sc.style.opacity = '0'; return; }
     this.adsT = lerp(this.adsT || 0, this.zoom && this.reloadT <= 0 ? 1 : 0, Math.min(1, dt * 12));
     // sihik: täisekraani optika, relvamudel peidetakse
     const so = clamp((this.adsT - 0.55) / 0.35, 0, 1);
@@ -409,6 +414,8 @@ const Player = {
 function objInteraction(o) {
   const d = OBJ[o.type];
   switch (o.type) {
+    case 'tostuk':
+      return Vehicles.liftInteraction(o);
     case 'vanagen':
       if (o.broken) return { label: 'Repair the generator', sub: '25 scrap', hold: 2.6, cost: { s: 25 }, act: () => repairObj(o, 25, () => { G.flags.gen = true; Audio2.powerOn(); UI.msg('The generator coughed and started. The lights are back on!', 'good'); Objectives.check(); }), tick: () => FX.repair(o.cx, 1.4, o.cz) };
       return { label: 'Old generator', sub: Base.power.supply + ' ⚡ produced · ' + Base.power.demand + ' ⚡ used', disabled: true };
