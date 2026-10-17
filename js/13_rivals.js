@@ -16,7 +16,7 @@ const Rivals = (() => {
 
   function reset() {
     for (const r of list) {
-      Object.assign(r, { men: 0, hireT: DAY_LEN * rand(0.15, 0.3), cmdT: 0, progress: r.id === 'krell' ? 7 : 4, alive: true, raidT: DAY_LEN * (r.id === 'krell' ? 1.75 : 2.6), assaultT: -1, assaultActive: false, found: false, core: null, structs: [], cols: [] });
+      Object.assign(r, { res: { cr: 150, scrap: 40, kris: 0 }, slots: 3, men: 0, hireT: DAY_LEN * rand(0.1, 0.2), salvT: DAY_LEN * rand(0.2, 0.4), cmdT: 0, progress: 0, alive: true, raidT: DAY_LEN * (r.id === 'krell' ? 1.75 : 2.6), assaultT: -1, assaultActive: false, found: false, core: null, structs: [], cols: [] });
     }
     pending.length = 0; tauntT = 200;
     for (const r of list) { r.bb = null; r.bbData = null; r.roomsBuilt = 0; r.buildT = 0; }
@@ -63,10 +63,7 @@ const Rivals = (() => {
         r.core = Ents.spawn('core', r.team, cx, cz, { maxHp: 900, radius: 2.2, rival: r });
         if (r.coreHp !== undefined) { r.core.hp = r.coreHp; }
         r.cols.push(World.addCol({ t: 'c', x: cx, z: cz, r: 2.0, y0: cy - 2, y1: cy + 5, kind: 'struct' }));
-        for (let k = 0; k < 2; k++) {
-          const a = face + (k ? 0.5 : -0.5), x = cx + Math.sin(a) * 10, z = cz + Math.cos(a) * 10;
-          Ents.spawn('rturret', r.team, x, z, { maxHp: 260, radius: 0.8, rival: r, yaw: face, aim: face, cool: 0, scanT: 0 });
-        }
+        for (const t of r.turrets || []) Ents.spawn('rturret', r.team, t[0], t[1], { maxHp: OBJ.kahur.hp, radius: 0.8, rival: r, yaw: t[2], aim: t[2], cool: 0, scanT: 0 });
         if (!r.cmdT) spawnCommander(r);
         topUpGuards(r);
       }
@@ -74,11 +71,29 @@ const Rivals = (() => {
   }
 
   // ---------- konkurentide baasid: ehitavad tube nagu mängija ----------
-  const FURN = [['generaator', 'nari', 'laud'], ['nari', 'nari', 'toolaud'], ['nari', 'diivan', 'pliit'], ['skanner', 'nari'], ['nari', 'laud', 'ravila'], ['lihvija', 'nari'], ['nari', 'nari', 'jukebox']];
+  // esimene tuba = sama mis mängija alustusmaja: vana generaator ja üks voodi (skänner ostetakse eraldi)
+  const FURN = [['vanagen', 'voodi'], ['nari', 'laud'], ['generaator', 'nari', 'laud'], ['nari', 'nari', 'toolaud'], ['nari', 'diivan', 'pliit'], ['nari', 'laud', 'ravila'], ['lihvija', 'nari'], ['nari', 'nari', 'jukebox']];
   function guardTarget(r) { return Math.min(10, 2 + (r.bb ? r.bb.countBeds() : 2)); }
   // ---------- inimesed: konkurent alustab ühest komandörist ja palkab inimesi nagu mängija ----------
+  // Kõik arvud on samad mis mängija poolel: algressursid, palkamistasu ja palk (valvur), meeskonna max 10 ja voodid,
+  // relvakahju/täpsus/kiirus nagu mängija valvuril, kahur nagu mängija kahur, ehitus maksab sama palju vanarauda/krediite.
   const HUMAN_HP = 70, CMD_HP = 100;   // sama mis mängija meeskonnal ja mängijal
-  function menCap(r) { return Math.max(2, Math.min(14, r.bb ? r.bb.countBeds() : 2)); }
+  const WAGE = ROLES.valvur.wage, FEE = WAGE * 2, FOOD_CR = 8;   // toit: mängija poes 5 toitu = 40 ₵
+  const UNIT = { dmg: 11, acc: 0.62, speed: 4.4 };                // nagu mängija valvur (crewDmg/crewAcc/speedOf)
+  function menCap(r) { return Math.max(0, Math.min(10, r.bb ? r.bb.countBeds() : 0)); }   // nagu mängijal: iga palgatu vajab voodit, max 10
+  // eelarve: palgad ja toit kaheks päevaks + (väikese meeskonna korral) järgmise palkamise tasu jäävad alati alles
+  function reserve(r) { return ((r.men || 0) + 1) * (WAGE + FOOD_CR) * 2 + ((r.men || 0) < 4 ? FEE : 0); }
+  function spend(r, cost, keep = 0) {
+    const s = cost.s || 0, c = cost.c || 0, k = cost.k || 0;
+    const packs = Math.max(0, Math.ceil((s - r.res.scrap) / 20));   // vanarauda puudu -> ostab turult nagu mängija (20 vr = 45 ₵)
+    if (r.res.cr - packs * 45 - c < keep || (r.res.kris || 0) < k) return false;
+    r.res.cr -= packs * 45; r.res.scrap += packs * 20;
+    r.res.scrap -= s; r.res.cr -= c; r.res.kris -= k; return true;
+  }
+  function sellKris(r) {
+    const keep = r.bb && !r.bb.objsOfType('skanner').length && r.res.cr >= 250 ? Math.min(r.res.kris, OBJ.skanner.cost.k || 0) : 0;   // kui raha on, hoiab skänneri jaoks teemandid alles
+    const n = r.res.kris - keep; if (n > 0) { r.res.cr += n * G.market.price; r.res.kris = keep; }
+  }
   function unitsOf(r) { return Ents.list.filter((u) => u.alive && !u.remove && u.kind === 'human' && u.team === r.team && !u.commander); }
   function freeMen(r) { return Math.max(0, (r.men || 0) - unitsOf(r).length); }
   // võta missiooniks n meest: kõigepealt kasarmust, siis valvurite seast (vähemalt keep jääb koju)
@@ -97,17 +112,26 @@ const Rivals = (() => {
     for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-10, 10), r.base.z + rand(-10, 10), 'guard');
   }
   function spawnCommander(r) {
-    if (Ents.list.some((u) => u.alive && u.commander && u.team === r.team)) return;
+    if (!r.alive || Ents.list.some((u) => u.alive && u.commander && u.team === r.team)) return;
     const look = Object.assign(Look.player(), { top: r.color.map((v) => v * 0.6), gearCol: 1, hairStyle: r.id === 'krell' ? 'short' : 'long', beardStyle: r.id === 'krell' ? 'none' : 'full' });
-    const e = spawnUnit(r, r.base.x + rand(-4, 4), r.base.z + rand(-4, 4), 'guard', { commander: true, maxHp: CMD_HP, look, acc: Math.min(0.75, 0.56 + G.time.day * 0.012) });
+    const e = spawnUnit(r, r.base.x + rand(-4, 4), r.base.z + rand(-4, 4), 'guard', { commander: true, maxHp: CMD_HP, look });
     e.cmdName = r.id === 'krell' ? 'Director Varga' : 'Chieftain Sarn';
     return e;
   }
+  function commanderOf(r) { return Ents.list.find((u) => u.alive && u.commander && u.team === r.team) || null; }
+  function sendCommander(r, mission, extra) {
+    const c = commanderOf(r); if (!c || c.mission !== 'guard') return false;
+    Object.assign(c, { mission, path: null, carry: 0, scavCl: null, salvGo: false }, extra || {});
+    return true;
+  }
   function hireTick(r, dt) {
-    r.hireT = (r.hireT || 0) - dt * (G.dk.rival || 1);
+    r.hireT = (r.hireT || 0) - dt;
     if (r.hireT > 0) return;
-    r.hireT = DAY_LEN * ((r.men || 0) < 4 ? rand(0.12, 0.2) : rand(0.25, 0.4));
-    if ((r.men || 0) >= menCap(r)) return;
+    r.hireT = DAY_LEN * rand(0.1, 0.25);
+    // nagu mängija: päevas 3 kandidaati, vaja vaba voodit ja raha palkamistasuks (+ homse palga varu)
+    if ((r.slots || 0) <= 0 || (r.men || 0) >= menCap(r)) return;
+    if (r.res.cr < FEE + (r.men + 1) * (WAGE + FOOD_CR) * 3) return;   // palkab alles siis, kui 3 päeva palgad on olemas
+    r.res.cr -= FEE; r.slots--;
     r.men = (r.men || 0) + 1;
     topUpGuards(r);
     const d = Math.hypot(Player.pos.x - r.base.x, Player.pos.z - r.base.z);
@@ -123,7 +147,7 @@ const Rivals = (() => {
     Bases.list.push(r.bb);
     r.buildT = r.buildT || rand(50, 80);
     if (fromSave && r.bbData) { r.bb.deserialize(r.bbData); r.bbData = null; }
-    else { r.roomsBuilt = 0; for (let k = 0; k < 2; k++) growBase(r); }
+    else { r.roomsBuilt = 0; growBase(r); r.res.scrap -= Math.min(r.res.scrap, 40); }   // nagu mängija: terminal (15) + generaator (25) tuleb parandada
     r.bb.rebuildNow();
     if (!r.alive) r.bb.power.lightsOn = false;
   }
@@ -137,10 +161,11 @@ const Rivals = (() => {
     }
     return true;
   }
-  function furnish(r, room, list) {
+  function furnish(r, room, list, pay) {
     const b = r.bb;
     for (const type of list) {
       const def = OBJ[type]; let done = false;
+      if (pay && !spend(r, def.cost || {}, reserve(r))) continue;
       for (let tries = 0; tries < 40 && !done; tries++) {
         const [ci, cj] = room.cells[Math.floor(Math.random() * room.cells.length)];
         const rot = b.autoRot(type, ci, cj);
@@ -149,7 +174,7 @@ const Rivals = (() => {
     }
     b.updatePower(true);
   }
-  function growBase(r) {
+  function growBase(r, pay) {
     const b = r.bb, c = b.N / 2;
     const style = r.id === 'krell' ? 6 : 1;
     let rect = null;
@@ -167,28 +192,31 @@ const Rivals = (() => {
       if (rectFree(r, ...cand)) rect = cand;
     }
     if (!rect) return false;
+    if (pay && (r.men || 0) < menCap(r) - 1) return false;   // ehitab juurde alles siis, kui voodid hakkavad täis saama
+    if (pay && !spend(r, { s: 2 * ((rect[2] - rect[0] + 1) + (rect[3] - rect[1] + 1)) * 3 }, reserve(r))) return false;   // seinad 3 vr/lõik
     const room = b.addRoom(rect[0], rect[1], rect[2], rect[3], style, Math.random() < 0.4 ? 1 : 0);
     if (!room) return false;
-    furnish(r, room, FURN[(r.roomsBuilt || 0) % FURN.length]);
+    furnish(r, room, FURN[(r.roomsBuilt || 0) % FURN.length], pay);
     r.roomsBuilt = (r.roomsBuilt || 0) + 1;
     return true;
   }
   function updateBuilders(dt) {
     for (const r of list) {
       if (!r.alive || !r.bb) continue;
-      r.buildT -= dt * (G.dk.rival || 1);
+      r.buildT -= dt;
       if (r.buildT > 0) continue;
       r.buildT = rand(100, 160);
       if (r.bb.rooms.size >= 8) continue;
-      if (growBase(r)) {
+      if (growBase(r, true)) {
         r.bb.rebuildNow();
         const d = Math.hypot(Player.pos.x - r.base.x, Player.pos.z - r.base.z);
         if (d < 120) UI.msg(r.short + ' is expanding their base.', 'rival');
         // aeg-ajalt uus kahur baasi ette
         const tur = Ents.countAlive((e) => e.kind === 'rturret' && e.rival === r);
-        if (tur < 2 + Math.floor(r.bb.rooms.size / 3)) {
+        if (tur < Math.floor(r.bb.rooms.size / 3) && spend(r, OBJ.kahur.cost, reserve(r))) {   // kahur maksab sama palju mis mängijal
           const face = Math.atan2(-r.base.x, -r.base.z), a = face + rand(-0.9, 0.9), x = r.base.x + Math.sin(a) * rand(12, 16), z = r.base.z + Math.cos(a) * rand(12, 16);
-          Ents.spawn('rturret', r.team, x, z, { maxHp: 260, radius: 0.8, rival: r, yaw: a, aim: a, cool: 0, scanT: 0 });
+          Ents.spawn('rturret', r.team, x, z, { maxHp: OBJ.kahur.hp, radius: 0.8, rival: r, yaw: a, aim: a, cool: 0, scanT: 0 });
+          (r.turrets = r.turrets || []).push([x, z, a]);
         }
       }
     }
@@ -196,10 +224,9 @@ const Rivals = (() => {
   function updateBases(dt, humans) { for (const r of list) if (r.bb) r.bb.update(dt, humans); }
   function drawBases(night, time) { for (const r of list) if (r.bb) r.bb.draw(false, night, time); }
   function spawnUnit(r, x, z, mission, extra) {
-    const day = G.time.day;
     const e = Ents.spawn('human', r.team, x, z, Object.assign({
       maxHp: HUMAN_HP, radius: 0.38, ai: unitAI, mission, home: { x: r.base.x, z: r.base.z },
-      dmg: 6 * G.dk.edmg, acc: Math.min(0.66, 0.48 + day * 0.012), speedU: r.speed, scanT: rand(0, 0.5), cool: rand(0, 1), carry: 0, rival: r,
+      dmg: UNIT.dmg, acc: UNIT.acc, speedU: UNIT.speed, skill: randi(1, 3), scanT: rand(0, 0.5), cool: rand(0, 1), carry: 0, rival: r,
     }, extra || {}));
     return e;
   }
@@ -224,7 +251,8 @@ const Rivals = (() => {
       e.scanT = 0.4 + Math.random() * 0.3;
       const rng = e.mission === 'guard' ? 46 : e.mission === 'assault' ? 34 : 38;
       e.threat = findTarget(e, rng);
-      if (e.mission === 'assault' && Boss.e && Boss.e.alive && !e.threat && Math.hypot(Boss.e.pos.x - e.pos.x, Boss.e.pos.z - e.pos.z) < 40 && e.planted) e.threat = Boss.e;
+      if (!e.threat && e.mission === 'raid' && pcore && pcore.alive && Math.hypot(pcore.pos.x - e.pos.x, pcore.pos.z - e.pos.z) < 30) e.threat = pcore;
+      if (e.mission === 'assault' && Boss.e && Boss.e.alive && !e.threat && Math.hypot(Boss.e.pos.x - e.pos.x, Boss.e.pos.z - e.pos.z) < 40) e.threat = Boss.e;
     }
     const t = e.threat;
     const sp = e.speedU || 4;
@@ -242,8 +270,8 @@ const Rivals = (() => {
         e.path = [{ x: e.pos.x + sx * 2, z: e.pos.z + sz * 2 }]; e.pathI = 0; Ents.stepMove(e, dt, sp * 0.45);
       }
       if (e.cool <= 0 && Math.abs(angDiff(e.yaw, Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z))) < 0.35) {
-        fireAt(e, t, t.kind === 'boss' ? 5 : e.dmg, e.acc, 'enemy');
-        e.cool = rand(0.55, 0.95);
+        fireAt(e, t, e.dmg, e.acc, 'enemy');
+        e.cool = rand(0.45, 0.6);
       }
       return;
     }
@@ -267,55 +295,58 @@ const Rivals = (() => {
           const k = Math.min(15, Math.floor(G.res.kris * 0.4) + (G.res.kris > 0 ? 1 : 0), G.res.kris);
           const s = Math.min(20, Math.floor(G.res.scrap * 0.3));
           G.res.kris -= k; G.res.scrap -= s;
-          e.carry = k; e.carryScrap = s;
+          e.stoleKris = k; e.carryScrap = s;
           if (k || s) UI.msg(e.rival.short + ' stole from storage ' + k + ' diamonds and ' + s + ' scrap!', 'danger');
           e.mission = 'return'; e.raidGo = false; Ents.goTo(e, e.home.x, e.home.z);
         }
         if (Math.random() < dt * 0.05 && !e.path) Ents.goTo(e, 0, 0);
         break;
       }
-      case 'scav': {
+      case 'scav': {   // komandör kannab nagu mängija (40), palgaline nagu mängija kaevur (8)
         const s = e.site;
-        if (!s || Comets.siteTotal(s) <= 0 || e.carry >= 12) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
+        if (!s || Comets.siteTotal(s) <= 0 || e.carry >= (e.commander ? CARRY_MAX : 8)) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
         if (!e.scavCl || e.scavCl.amount <= 0) {
           e.scavCl = s.clusters.filter((c) => c.amount > 0).sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
           if (e.scavCl) Ents.goTo(e, e.scavCl.x + rand(-1, 1), e.scavCl.z + rand(-1, 1));
           e.mineT = 0;
         }
         if (Ents.stepMove(e, dt, sp) && e.scavCl) {
-          e.mineT += dt;
+          e.mineT += dt * (0.75 + e.skill * 0.25);
           if (Math.random() < 0.3) FX.beam(e.pos.x, e.pos.y + 1.2, e.pos.z, e.scavCl.x, e.scavCl.y + 0.5, e.scavCl.z);
-          if (e.mineT > 2.0) { e.mineT = 0; e.carry += Comets.takeUnits(e.scavCl, 1); }
+          if (e.mineT > 2.4) { e.mineT = 0; e.carry += Comets.takeUnits(e.scavCl, 1); e.carryKris = true; }
         }
         break;
       }
       case 'return': case 'flee': {
         if (!e.path) Ents.goTo(e, e.home.x, e.home.z);
         if (Ents.stepMove(e, dt, sp) || Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) < 8) {
-          if (e.carry && e.rival.alive) { e.rival.progress = Math.min(100, e.rival.progress + e.carry * 0.4 * G.dk.rival); }
-          e.remove = true;
+          const rv = e.rival;
+          if (rv.alive) {
+            if (e.carryKris) rv.res.kris += e.carry;
+            if (e.stoleKris) rv.res.kris += e.stoleKris;
+            if (e.carryScrap) rv.res.scrap += e.carryScrap;
+            sellKris(rv);
+          }
+          if (e.commander) { Object.assign(e, { mission: 'guard', carry: 0, carryKris: false, carryScrap: 0, stoleKris: 0, path: null, site: null, scavCl: null, wreck: null, salvGo: false, stateT: 0 }); }
+          else e.remove = true;
         }
         break;
       }
       case 'assault': {
         const b = Boss.e;
         if (!b || !b.alive) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
-        const d = Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z);
-        if (d > 26) { if (!e.path || Ents.arrived(e) || Math.random() < dt * 0.3) Ents.goTo(e, b.pos.x + rand(-6, 6), b.pos.z + rand(-6, 6)); Ents.stepMove(e, dt, sp); }
-        else {
-          e.moveAmt = Math.max(0, e.moveAmt - dt * 4);
-          e.plantT = (e.plantT || 0) + dt;
-          e.hasGun = false;
-          if (Math.random() < dt * 2) FX.sparks(e.pos.x, e.pos.y + 0.4, e.pos.z, [1, 0.8, 0.3], 3, 2);
-          if (e.plantT > 9 && !e.planted) {
-            e.planted = true; e.hasGun = true;
-            const party = Ents.list.filter((u) => u.alive && u.team === e.team && u.mission === 'assault' && u.planted);
-            if (party.length >= 2 && !e.rival.chargeSet) {
-              e.rival.chargeSet = true;
-              UI.msg('Intercepted radio: ' + e.rival.short + ' planted charges under the Stoneheart!', 'danger');
-              pending.push({ t: G.time.total + 12, fn: () => { e.rival.chargeSet = false; Boss.charge(e.rival); } });
-            }
-          }
+        if (!e.path || Ents.arrived(e) || Math.random() < dt * 0.3) Ents.goTo(e, b.pos.x + rand(-20, 20), b.pos.z + rand(-20, 20));
+        Ents.stepMove(e, dt, sp);
+        break;
+      }
+      case 'salvage': {
+        const w = e.wreck;
+        if (!w || w.scrap <= 0 || e.carry > 0) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
+        if (!e.salvGo) { const a = Math.atan2(e.pos.z - w.z, e.pos.x - w.x); Ents.goTo(e, w.x + Math.cos(a) * (w.rad + 0.9), w.z + Math.sin(a) * (w.rad + 0.9)); e.salvGo = true; e.mineT = 0; }
+        if (Ents.stepMove(e, dt, sp) || Math.hypot(e.pos.x - w.x, e.pos.z - w.z) < w.rad + 1.6) {
+          e.hasGun = false; e.mineT += dt * (0.75 + e.skill * 0.25);   // sama tempo mis mängija meeskonnal
+          if (Math.random() < 0.2) FX.repair(w.x + rand(-1, 1), w.y + 1, w.z + rand(-1, 1));
+          if (e.mineT > 6) { const n = Math.min(10, w.scrap); w.scrap -= n; e.carryScrap = (e.carryScrap || 0) + n; e.carry = n; e.hasGun = true; if (w.scrap <= 0 && World.clearWreck) World.clearWreck(w); }
         }
         break;
       }
@@ -325,9 +356,8 @@ const Rivals = (() => {
     const r = e.rival;
     if (r) {
       if (e.commander) {
-        r.cmdT = DAY_LEN * 0.6; r.progress = Math.max(0, r.progress - 15);
-        UI.msg((e.cmdName || r.short + ' commander') + ' has fallen! ' + r.short + ' is in disarray.', 'good');
-        UI.banner('Commander down', r.short + ' lost their leader', 'good');
+        r.cmdT = 4.5;
+        UI.msg((e.cmdName || r.short + ' commander') + ' collapsed – their rescue team carries them back to base.', 'good');
       } else r.men = Math.max(0, (r.men || 0) - 1);
     }
     const items = Inv.rivalLoot(e);
@@ -337,21 +367,22 @@ const Rivals = (() => {
   function onComet(site) {
     for (const r of list) {
       if (!r.alive) continue;
+      (r.sites = r.sites || []).push(site);   // meeles: komandör/mehed lähevad kohale, kui vabanevad
       pending.push({ t: G.time.total + rand(16, 38), fn: () => {
         if (!r.alive || Comets.siteTotal(site) <= 0) return;
-        if ((r.men || 0) < 4) return;   // väike seltskond ei saada mehi kaugele komeedile
-        const n = takeMen(r, randi(2, 3), 2); if (n < 2) return;
-        const p = towardSpawn(r, site.x, site.z, 130);
-        for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-4, 4), p.z + rand(-4, 4), 'scav', { site });
+        // väike seltskond: komandör läheb ise (nagu mängija), suurem saadab 2–3 meest
+        const n = (r.men || 0) >= 3 ? takeMen(r, 3, 1) : 0;
+        if (n < 2 && !sendCommander(r, 'scav', { site })) { if (!n) return; }
+        for (let k = 0; k < n; k++) spawnUnit(r, r.base.x + rand(-6, 6), r.base.z + rand(-6, 6), 'scav', { site });   // jalgsi oma baasist
         if (Math.random() < 0.6) UI.msg('Radio: ' + r.short + ' collectors are driving toward the comet.', 'warn');
       } });
     }
   }
   function launchRaid(r) {
-    const want = Math.min(7, Math.round((2 + G.time.day * 0.45) * G.dk.raid));
-    if (freeMen(r) + Math.max(0, unitsOf(r).filter((u) => u.mission === 'guard').length - 1) < 3) { r.raidT = DAY_LEN * rand(0.4, 0.7); return; }   // liiga vähe mehi
-    const n = takeMen(r, want, 1);
-    const p = towardSpawn(r, 0, 0, 150);
+    const avail = freeMen(r) + Math.max(0, unitsOf(r).filter((u) => u.mission === 'guard').length - 1);
+    if (avail < 3) { r.raidT = DAY_LEN * rand(0.4, 0.7); return; }   // liiga vähe mehi
+    const n = takeMen(r, Math.min(7, avail), 1);
+    const p = r.base;   // tulevad jalgsi oma baasist
     for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-6, 6), p.z + rand(-6, 6), 'raid');
     const dir = bearingWord(p.x, p.z);
     UI.msg(r.short + ' raid approaching ' + dir + '! ' + n + ' armed mercenaries.', 'danger');
@@ -361,9 +392,9 @@ const Rivals = (() => {
   }
   function launchAssault(r) {
     const b = World.sites.nest;
-    const n = takeMen(r, Math.min(8, 4 + Math.floor(G.time.day / 3)), 1);
+    const n = takeMen(r, 8, 1);
     if (n < 2) { r.assaultT = DAY_LEN * 0.3; return; }
-    const p = towardSpawn(r, b.x, b.z, 110);
+    const p = r.base;
     for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-6, 6), p.z + rand(-6, 6), 'assault');
     r.assaultActive = true;
     UI.msg('Intercepted radio: ' + r.short + ' sent ' + n + ' men to attack the Stoneheart\'s nest!', 'danger');
@@ -373,9 +404,48 @@ const Rivals = (() => {
     for (const r of list) {
       if (!r.alive) continue;
       hireTick(r, dt);
-      if (r.cmdT > 0) { r.cmdT -= dt; if (r.cmdT <= 0) { r.cmdT = 0; spawnCommander(r); UI.msg('Radio: ' + r.short + ' has a new commander.', 'rival'); } }
+      // komandör ärkab nagu mängija: 4,5 s pärast baasis, päästearve kuni 50 ₵
+      if (r.cmdT > 0) { r.cmdT -= dt; if (r.cmdT <= 0) { r.cmdT = 0; r.res.cr -= Math.min(r.res.cr, 50); spawnCommander(r); } }
+      // pesa otsimine samadel tingimustel: süvaskänner (32%/päev, 2+ skännerit x1.4) või keegi jõuab pesast 140 m kaugusele
+      if (!r.found && r.bb) {
+        const sc = r.bb.objsOfType('skanner').filter((o) => o.on !== false).length;
+        if (sc) r.progress = Math.min(100, r.progress + (32 / DAY_LEN) * (sc > 1 ? 1.4 : 1) * dt);
+        const n = World.sites.nest;
+        if (Ents.list.some((u) => u.alive && u.team === r.team && u.kind === 'human' && Math.hypot(u.pos.x - n.x, u.pos.z - n.z) < 140)) r.progress = 100;
+      }
+      // teemandid on peamine sissetulek: kui mõnel teadaoleval komeedil on veel kristalle, läheb komandör (või vaba mees) korjama
+      r.siteT = (r.siteT || 0) - dt;
+      if (r.siteT <= 0) {
+        r.siteT = 20;
+        r.sites = (r.sites || []).filter((q) => Comets.siteTotal(q) > 0);
+        const site = r.sites.sort((a, b) => Math.hypot(a.x - r.base.x, a.z - r.base.z) - Math.hypot(b.x - r.base.x, b.z - r.base.z))[0];
+        if (site && !Econ.isNight() && !unitsOf(r).some((u) => u.mission === 'scav') && !(commanderOf(r) && commanderOf(r).mission === 'scav')) {
+          const k = (r.men || 0) >= 3 ? takeMen(r, 2, 1) : 0;
+          for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-6, 6), r.base.z + rand(-6, 6), 'scav', { site });
+          if (!k) sendCommander(r, 'scav', { site });
+        }
+      }
+      // öösel tulevad korjajad koju (hiilijad)
+      if (Econ.isNight()) for (const u of Ents.list) if (u.alive && u.team === r.team && (u.mission === 'scav' || u.mission === 'salvage') && !u.carry) { u.mission = 'return'; u.path = null; }
+      // süvaskänner on esimene suur ost (pesa leidmiseks), nagu mängijal
+      if (r.bb && !r.bb.objsOfType('skanner').length && r.res.kris >= (OBJ.skanner.cost.k || 0) && r.res.cr >= (OBJ.skanner.cost.c || 0) + reserve(r)) {
+        for (const room of r.bb.rooms.values()) { const before = r.bb.objsOfType('skanner').length; furnish(r, room, ['skanner'], true); if (r.bb.objsOfType('skanner').length > before) { r.bb.rebuildNow(); break; } }
+      }
+      // vanaraua korjamine vrakkidest (nagu mängija kaevur) – kui komeete pole
+      r.salvT -= dt;
+      if (r.salvT <= 0) {
+        r.salvT = DAY_LEN * rand(0.2, 0.35);
+        if (r.res.scrap < 80 && !(r.sites || []).length && World.wrecks) {
+          const w = World.wrecks.filter((q) => q.scrap > 0 && !q.gone && Math.hypot(q.x - r.base.x, q.z - r.base.z) < 420).sort((a, b) => Math.hypot(a.x - r.base.x, a.z - r.base.z) - Math.hypot(b.x - r.base.x, b.z - r.base.z))[0];
+          if (w) {
+            const k = (r.men || 0) >= 3 ? takeMen(r, 2, 1) : 0;
+            for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-6, 6), r.base.z + rand(-6, 6), 'salvage', { wreck: w });
+            if (!k) sendCommander(r, 'salvage', { wreck: w });
+          }
+        }
+      }
       r.raidT -= dt;
-      if (r.raidT <= 0) { r.raidT = DAY_LEN * rand(1.3, 2.2) / G.dk.raid; if (G.time.day >= 2) launchRaid(r); }
+      if (r.raidT <= 0) { r.raidT = DAY_LEN * rand(1.3, 2.2); if (G.time.day >= 2) launchRaid(r); }
       if (r.progress >= 100 && !r.found && Boss.e && Boss.e.alive) {
         r.found = true; G.flags.nestKnown = true;
         UI.msg('Intercepted radio: ' + r.short + ' found the Stoneheart\'s nest! The coordinates are now on your map too.', 'danger');
@@ -399,11 +469,33 @@ const Rivals = (() => {
   function daily() {
     for (const r of list) {
       if (!r.alive) continue;
-      r.progress = Math.min(100, r.progress + rand(5.5, 9) * G.dk.rival);
+      sellKris(r);
+      // palgad ja toit nagu mängijal; kellele ei jätku, see lahkub
+      const bill = (r.men || 0) * (WAGE + FOOD_CR);
+      if (r.res.cr >= bill) r.res.cr -= bill;
+      else { const canPay = Math.floor(r.res.cr / (WAGE + FOOD_CR)); r.res.cr -= canPay * (WAGE + FOOD_CR); const quit = r.men - canPay; r.men = canPay; for (const u of unitsOf(r).slice(0, Math.max(0, unitsOf(r).length - r.men))) u.remove = true; if (quit > 0) UI.msg('Radio: ' + quit + ' of ' + r.short + '\'s unpaid mercenaries walked out.', 'rival'); }
+      r.slots = 3;
       topUpGuards(r);
     }
   }
+  // mängija baasi tuum: sama mis konkurentidel (900 elu); kui see hävib, on mäng läbi
+  let pcore = null;
+  function spawnPlayerCore(hp) {
+    const x = Base.OX + 2, z = Base.OZ + 13;
+    pcore = Ents.spawn('core', 'crew', x, z, { maxHp: 900, radius: 2.2, playerCore: true });
+    if (hp !== undefined && hp !== null) pcore.hp = Math.max(1, hp);
+    const y = World.heightAt(x, z);
+    if (pcore.col) World.removeCol(pcore.col);
+    pcore.col = World.addCol({ t: 'c', x, z, r: 2.0, y0: y - 2, y1: y + 5, kind: 'struct' });
+    return pcore;
+  }
+  function playerCoreHp() { return pcore && pcore.alive ? Math.round(pcore.hp) : (pcore ? 0 : null); }
   function coreDestroyed(e) {
+    if (e.playerCore) {
+      FX.explosion(e.pos.x, e.pos.y + 3, e.pos.z, [1, 0.6, 0.3], 4); Audio2.explode(e.pos.x, e.pos.z, true); UI.shake(0.8);
+      setTimeout(() => Game.over('core'), 2500);
+      return;
+    }
     const r = e.rival; if (!r) return;
     r.alive = false;
     FX.explosion(e.pos.x, e.pos.y + 3, e.pos.z, [1, 0.6, 0.3], 4);
@@ -420,16 +512,16 @@ const Rivals = (() => {
   function turretAI(e, dt) {
     if (e.cool > 0) e.cool -= dt;
     e.scanT -= dt;
-    if (e.scanT <= 0) { e.scanT = 0.35; e.threat = findThreat(e.pos.x, e.pos.y + 1.7, e.pos.z, 32, e.team, Crew.turretTargets()); }
+    if (e.scanT <= 0) { e.scanT = 0.35; e.threat = findThreat(e.pos.x, e.pos.y + 1.7, e.pos.z, 34, e.team, Crew.turretTargets()); }
     const t = e.threat;
     if (t && targetAlive(t)) {
       const tp = targetPoint(t);
       const want = Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z);
       e.aim += angDiff(e.aim, want) * Math.min(1, dt * 5);
       if (e.cool <= 0 && Math.abs(angDiff(e.aim, want)) < 0.15) {
-        e.cool = 0.42;
+        e.cool = 0.26;
         const fake = { pos: { x: e.pos.x, y: e.pos.y + 0.3, z: e.pos.z }, yaw: e.aim, team: e.team };
-        fireAt(fake, t, 7 * G.dk.edmg, 0.55, 'turret');
+        fireAt(fake, t, 9, 0.75, 'turret');
       }
     } else e.aim += dt * 0.4;
   }
@@ -445,9 +537,9 @@ const Rivals = (() => {
   function drawCore(e) {
     if (!e.m) e.m = M4.create();
     M4.compose(e.m, e.pos.x, e.pos.y, e.pos.z, G.time.total * 0.2);
-    const alive = e.alive;
+    const alive = e.alive, col = e.rival ? e.rival.color : [0.35, 0.95, 0.6];
     GFX.draw(MODELS.camp_core || MODELS.obj.core, e.m, e.hurtT > 0 ? [1.5, 0.8, 0.7, 0] : alive ? [1, 1, 1, 0] : [0.3, 0.3, 0.3, 0], null, { rust: 1 });
-    if (alive) GFX.addLight(e.pos.x, e.pos.y + 4.5, e.pos.z, 18, e.rival.color[0], e.rival.color[1], e.rival.color[2], 2.2);
+    if (alive) GFX.addLight(e.pos.x, e.pos.y + 4.5, e.pos.z, 18, col[0], col[1], col[2], 2.2);
     else if (Math.random() < 0.3) FX.smoke(e.pos.x, e.pos.y + 3, e.pos.z);
   }
   function drawTurret(e) {
@@ -458,9 +550,9 @@ const Rivals = (() => {
     M4.child(e.hm, e.m, 0, 1.55, 0, e.aim, e.alive ? 0 : 0.5, 0);
     GFX.draw(MODELS.obj.kahurHead, e.hm, tint, null, { rust: 1 });
   }
-  function serialize() { return list.map((r) => ({ id: r.id, progress: r.progress, alive: r.alive, raidT: r.raidT, found: r.found, assaultT: r.assaultT, coreHp: r.core ? r.core.hp : 0, buildT: r.buildT, roomsBuilt: r.roomsBuilt, men: r.men || 0, hireT: r.hireT, cmdT: r.cmdT || 0, bb: r.bb ? r.bb.serialize() : null })); }
+  function serialize() { return list.map((r) => ({ id: r.id, progress: r.progress, alive: r.alive, raidT: r.raidT, found: r.found, assaultT: r.assaultT, coreHp: r.core ? r.core.hp : 0, buildT: r.buildT, roomsBuilt: r.roomsBuilt, men: r.men || 0, hireT: r.hireT, cmdT: r.cmdT || 0, res: r.res, slots: r.slots, turrets: r.turrets || [], bb: r.bb ? r.bb.serialize() : null })); }
   function deserialize(arr) {
-    for (const d of arr || []) { const r = get(d.id); if (!r) continue; Object.assign(r, { progress: d.progress, alive: d.alive, raidT: d.raidT, found: d.found, assaultT: d.assaultT, coreHp: d.coreHp, buildT: d.buildT, roomsBuilt: d.roomsBuilt || 0, bbData: d.bb || null, men: d.men !== undefined ? d.men : 4, hireT: d.hireT || DAY_LEN * 0.3, cmdT: d.cmdT || 0 }); }
+    for (const d of arr || []) { const r = get(d.id); if (!r) continue; Object.assign(r, { progress: d.progress, alive: d.alive, raidT: d.raidT, found: d.found, assaultT: d.assaultT, coreHp: d.coreHp, buildT: d.buildT, roomsBuilt: d.roomsBuilt || 0, bbData: d.bb || null, men: d.men !== undefined ? d.men : 4, hireT: d.hireT || DAY_LEN * 0.3, cmdT: 0, res: d.res || { cr: 300, scrap: 60, kris: 0 }, slots: d.slots !== undefined ? d.slots : 3, turrets: d.turrets || [], salvT: DAY_LEN * 0.3 }); }
   }
-  return { list, get, reset, init, updateBases, drawBases, update, daily, onComet, onUnitDeath, coreDestroyed, unitAI, turretAI, draw, drawCore, drawTurret, launchRaid, serialize, deserialize, spawnUnit, freeMen, menCap };
+  return { list, get, reset, init, updateBases, drawBases, update, daily, onComet, onUnitDeath, coreDestroyed, unitAI, turretAI, draw, drawCore, drawTurret, launchRaid, serialize, deserialize, spawnUnit, freeMen, menCap, spawnPlayerCore, playerCoreHp, get playerCore() { return pcore; } };
 })();

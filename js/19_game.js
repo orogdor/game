@@ -15,7 +15,7 @@ const Save = (() => {
       v: FMT, seed: G.seed, diff: G.diff, time: G.time, res: G.res, carry: G.carry, debt: G.debt, up: G.up, scan: G.scan,
       flags: Object.assign({}, G.flags, { music: false }), stats: G.stats, market: G.market, candidates: G.candidates,
       player: { x: Player.pos.x, z: Player.pos.z, yaw: Player.yaw, hp: Player.hp },
-      base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(),
+      base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(), pcore: Rivals.playerCoreHp(),
       wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), ores: World.ores.map((o) => [o.amount, o.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
       pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data })),
       look: Look.clean(G.look), pname: G.pname, inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
@@ -278,6 +278,7 @@ const Game = (() => {
     Base.rebuildNow();
     Spawner.init();
     Rivals.init(false);
+    Rivals.spawnPlayerCore();
     Boss.spawn();
     Econ.genCandidates();
     Inv.startKit();
@@ -311,6 +312,7 @@ const Game = (() => {
     Spawner.init();
     Rivals.deserialize(d.rivals);
     Rivals.init(true);
+    if (d.pcore !== 0) Rivals.spawnPlayerCore(d.pcore);
     Boss.spawn(d.boss);
     Comets.deserialize(d.comets || {});
     Crew.deserialize(d.crew);
@@ -352,6 +354,7 @@ const Game = (() => {
     Save.clear();
     const texts = {
       pankrot: 'The bank didn\'t wait. The creditors took station K-7 and everything in it. Your family\'s debt stays in the dark.',
+      core: 'Your base core was destroyed. Without it station K-7 is just a heap of scrap – the bank takes what is left.',
       rival: (r ? r.name : 'Rival') + ' reached the Stoneheart before you. The heartstones left the planet on their ship and your debt remains.',
     };
     UI.end(kind, texts[kind] || '', endStats());

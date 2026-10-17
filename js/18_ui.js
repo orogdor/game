@@ -597,7 +597,7 @@ const UI = (() => {
       const sc = Base.objsOfType('skanner').length;
       h += bar('Your deep scanner', G.scan.found || G.flags.nestKnown ? 100 : G.scan.p, 'var(--crystal)', G.flags.nestKnown ? 'nest found' : sc ? null : 'no scanner');
       for (const r of Rivals.list) h += bar(r.name, r.alive ? r.progress : 0, r.id === 'krell' ? '#ff6d55' : '#b796ff', r.alive ? (r.found ? 'nest found' : null) : 'camp destroyed');
-      h += `<p class="note" style="margin-top:10px">The rivals' progress grows every day and with every comet whose diamonds they grab. Destroying their camp core ends their search.</p>`;
+      h += `<p class="note" style="margin-top:10px">Rivals play by your rules: they start with one commander and the same money, hire and pay people, buy scrap, build and search for the nest with a deep scanner or by scouting. Destroying their camp core ends their search – and the same goes for you: protect your own base core.</p>`;
       if (G.flags.stonesHome) h += `<div class="row"><div class="grow"><div class="t">The heartstones are in storage</div><div class="s">Sell them and wipe out the whole debt.</div></div>${btn('win', 'Sell the heartstones', { primary: true })}</div>`;
     }
     body.innerHTML = h;
@@ -912,7 +912,7 @@ const UI = (() => {
   function end(kind, sub, stats) {
     showHUD(false); $('build').hidden = true; $('panel').hidden = true; panelKind = null;
     const el = $('end'); el.hidden = false;
-    const t = { win: 'Debt paid off', pankrot: 'Bankrupt', rival: 'The others got there first' }[kind] || 'The end';
+    const t = { win: 'Debt paid off', pankrot: 'Bankrupt', rival: 'The others got there first', core: 'Core destroyed' }[kind] || 'The end';
     const s = stats;
     el.firstElementChild.innerHTML = `<h2 class="${kind === 'win' ? 'win' : 'lose'}">${t}</h2><p>${sub}</p>
       <div class="ledger"><span>Days in the desert</span><b>${s.day}</b><span>Diamonds collected</span><b>${s.crystals}</b><span>Comets seen</span><b>${s.comets}</b><span>Crew at the end</span><b>${s.crew}</b><span>Debt remaining</span><b>${fmtInt(s.debt)} ₵</b></div>

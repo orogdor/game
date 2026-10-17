@@ -26,7 +26,7 @@ const Ents = (() => {
   const FOE_HP = 2;
   function isFoe(kind, team) {
     if (kind === 'human') return false;   // inimvastased: samad elud mis mängijal / meeskonnal
-    return kind === 'stalker' || kind === 'kiskja' || kind === 'crab' || kind === 'bug' || kind === 'core' || kind === 'rturret';
+    return kind === 'stalker' || kind === 'kiskja' || kind === 'crab' || kind === 'bug';   // konkurentide ehitised: samad elud mis mängija omadel
   }
   function defaultHp(kind) { return { human: 70, goat: 30, ram: 60, stalker: 55, kiskja: 320, crab: 170, jelly: 15, boss: 4000, core: 900, rturret: 260 }[kind] || 50; }
   function remove(e) { const i = list.indexOf(e); if (i >= 0) list.splice(i, 1); }
