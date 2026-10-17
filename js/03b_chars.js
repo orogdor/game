@@ -327,7 +327,7 @@ const Chars = (() => {
   function writeBones(T, row, hide) {
     const out = GFX.boneRowData(row);
     for (let k = 0; k < T.nj; k++) {
-      if (hide && hide[k]) { const c = hide === T.fpHide ? (T.fpTo && T.fpTo[k] >= 0 ? T.fpTo[k] : (k === T.j.spine2 || T.parent[k] === T.j.spine2 ? T.j.spine2 : T.j.neck)) : T.j.neck; out.fill(0, k * 12, k * 12 + 12); out[k * 12 + 3] = P[c * 3]; out[k * 12 + 7] = P[c * 3 + 1]; out[k * 12 + 11] = P[c * 3 + 2]; continue; }
+      if (hide && hide[k]) { const c = hide === T.fpHide ? (k === T.j.spine2 || T.parent[k] === T.j.spine2 ? T.j.spine2 : T.j.neck) : T.j.neck; out.fill(0, k * 12, k * 12 + 12); out[k * 12 + 3] = P[c * 3]; out[k * 12 + 7] = P[c * 3 + 1]; out[k * 12 + 11] = P[c * 3 + 2]; continue; }
       const hr = T.handScale && T.handRoot ? T.handRoot[k] : -1;
       if (hr >= 0) {   // esimese isiku vaates käed ja sõrmed väiksemaks (randme ümber), et need ei paistaks kohmakad
         const s = T.handScale;
@@ -341,6 +341,8 @@ const Chars = (() => {
       out[o + 4] = tm[1]; out[o + 5] = tm[5]; out[o + 6] = tm[9]; out[o + 7] = tm[13];
       out[o + 8] = tm[2]; out[o + 9] = tm[6]; out[o + 10] = tm[10]; out[o + 11] = tm[14];
     }
+    // esimese isiku vaade: õlavars järgib küünarvart (vt drawFP)
+    if (hide && hide === T.fpHide && T.fpCopy) for (let k = 0; k < T.nj; k++) { const f = T.fpCopy[k]; if (f >= 0) out.copyWithin(k * 12, f * 12, f * 12 + 12); }
   }
   // tagastab: { gun: maailmamaatriks või null } ; m = mudeli maailmamaatriks
   const DEF_OPT = {};
@@ -426,10 +428,9 @@ const Chars = (() => {
     if (!T.fpHide) {
       T.fpHide = new Uint8Array(T.nj).fill(1);
       for (const n of ['LeftForeArm', 'RightForeArm']) if (T.idxOf[n] !== undefined) { T.fpHide[T.idxOf[n]] = 0; for (const j of T.desc[T.idxOf[n]]) T.fpHide[j] = 0; }
-      // peidetud õlavars ja õlg tõmmatakse küünarnukki kokku (mitte kaela juurde -> pole venitatud riba)
-      T.fpTo = new Int16Array(T.nj).fill(-1);
-      const sideTo = (names, fore) => { for (const n of names) if (T.idxOf[n] !== undefined && fore >= 0) T.fpTo[T.idxOf[n]] = fore; };
-      sideTo(['LeftArm', 'LeftShoulder'], T.j.foreL); sideTo(['RightArm', 'RightShoulder'], T.j.foreR);
+      // õlavars joonistatakse küünarvarre sirge jätkuna (taha, kaadrist välja): pole õlga kaamera ees ega lõigatud käeotsa
+      T.fpCopy = new Int16Array(T.nj).fill(-1);
+      for (const [a, f] of [['LeftArm', T.j.foreL], ['RightArm', T.j.foreR]]) if (T.idxOf[a] !== undefined && f >= 0) { T.fpHide[T.idxOf[a]] = 0; T.fpCopy[T.idxOf[a]] = f; }
     }
     if (!T.handRoot) {
       T.handRoot = new Int16Array(T.nj).fill(-1);

@@ -55,13 +55,11 @@ const Build = (() => {
   }
   function setLevel(lv) {
     S.level = lv ? 1 : 0; Base.viewLevel = S.level; pending = null; drag = null; hover = null;
-    if (S.level && (S.tool === 'upper' || S.tool === 'tall')) S.tool = 'look';
     UI.buildTools(S); UI.buildConfirm(null); info();
     UI.toast(S.level ? 'Floor 2 – walls, doors, windows and items upstairs' : 'Floor 1');
   }
   function setTool(t) {
     if (t === 'level') { setLevel(!S.level); return; }
-    if (S.level && (t === 'upper' || t === 'tall')) { deny('Switch to floor 1 for that.'); return; }
     S.tool = t; pending = null; drag = null;
     if (t !== 'obj') S.item = null;
     UI.buildTools(S);
@@ -302,8 +300,8 @@ const Build = (() => {
     Objectives.check();
     return true;
   }
-  const upperCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 6 });
-  const tallCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 4 });
+  const upperCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 4 });
+  const tallCost = (rid) => ({ s: Base.rooms.get(rid).cells.length * 3 });
   function commitTall(rid) {
     const r = Base.rooms.get(rid);
     if (Base.roomIsTall(rid)) {   // tagasi tavaliseks
@@ -483,8 +481,8 @@ const Build = (() => {
       obj: S.item ? '' : 'Pick an item from the catalogue.',
       paint: 'Tap a room to change its colour. Cleaning a rusty room costs 10 scrap.',
       demolish: S.level ? 'Tap an upstairs item, or an empty upper floor to remove it.' : 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
-      tall: 'Tap a room to make it two storeys tall (4 scrap per tile) – no floor in between. Good for a garage: then place the Car lift against an outer wall. Tap a tall room again to make it normal.',
-      upper: 'Tap a room to build a second floor on it (6 scrap per tile). Then add Indoor stairs and switch to Floor 2 to furnish it.',
+      tall: 'Tap a room to make it two storeys tall (3 scrap per tile) – no floor in between. Good for a garage: then place the Car lift against an outer wall. Tap a tall room again to make it normal.',
+      upper: 'Tap a room to build a second floor on it (4 scrap per tile). Then add Indoor stairs and switch to Floor 2 to furnish it.',
     };
     txt = hints[S.tool] || '';
     if (S.tool === 'wall' && (drag || (pending && pending.kind === 'walls'))) {
@@ -492,6 +490,18 @@ const Build = (() => {
       const wi = wallInfo(edges), af = afford(wi.cost);
       txt = 'Wall ' + edges.length * Base.CS + ' m · ' + (wi.n ? costStr(wi.cost) : 'already there') + (wi.bad ? ' · ' + wi.bad : '') + (af ? ' · ' + af : '');
       cls = wi.n && !af ? 'good' : 'bad';
+    }
+    // 2. korrus / kõrge tuba: näita kohe, mida see tuba maksab ja kas saab
+    if ((S.tool === 'upper' || S.tool === 'tall') && hover) {
+      const rid = Base.roomAt(hover.i, hover.j);
+      if (rid) {
+        const r = Base.rooms.get(rid), back = S.tool === 'tall' && Base.roomIsTall(rid), c = S.tool === 'upper' ? upperCost(rid) : back ? half(tallCost(rid)) : tallCost(rid), af = back ? null : afford(c);
+        let why = null;
+        if (S.tool === 'upper') { if (Base.roomHasUpper(rid)) why = 'already has a second floor'; else if (r.cells.length < 4) why = 'room too small'; }
+        else if (!Base.roomIsTall(rid)) { if (Base.roomHasUpper(rid)) why = 'has a second floor – remove it first'; else if (r.cells.length < 6) why = 'needs at least 6 tiles'; }
+        txt = (S.tool === 'upper' ? '2nd floor' : back ? 'Back to one storey' : 'Tall room') + ' · ' + r.cells.length + ' tiles · ' + (back ? 'refund ' : '') + costStr(c) + (why ? ' · ' + why : af ? ' · ' + af : '');
+        cls = why || af ? 'bad' : 'good';
+      }
     }
     if (S.tool === 'obj' && S.item) {
       const d = OBJ[S.item];

@@ -851,7 +851,7 @@ const UI = (() => {
   }
   function buildTools(S) {
     const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['obj', 'Items', 'box'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
-      .filter(([k]) => !(S.level && (k === 'upper' || k === 'tall')));
+      ;
     $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k || (k === 'level' && S.level) ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
     $('bTools').querySelectorAll('.tool').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));
     let h = '';
