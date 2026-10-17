@@ -16,7 +16,7 @@ const Rivals = (() => {
 
   function reset() {
     for (const r of list) {
-      Object.assign(r, { progress: r.id === 'krell' ? 7 : 4, alive: true, raidT: DAY_LEN * (r.id === 'krell' ? 1.75 : 2.6), assaultT: -1, assaultActive: false, found: false, core: null, structs: [], cols: [] });
+      Object.assign(r, { men: 0, hireT: DAY_LEN * rand(0.15, 0.3), cmdT: 0, progress: r.id === 'krell' ? 7 : 4, alive: true, raidT: DAY_LEN * (r.id === 'krell' ? 1.75 : 2.6), assaultT: -1, assaultActive: false, found: false, core: null, structs: [], cols: [] });
     }
     pending.length = 0; tauntT = 200;
     for (const r of list) { r.bb = null; r.bbData = null; r.roomsBuilt = 0; r.buildT = 0; }
@@ -67,7 +67,8 @@ const Rivals = (() => {
           const a = face + (k ? 0.5 : -0.5), x = cx + Math.sin(a) * 10, z = cz + Math.cos(a) * 10;
           Ents.spawn('rturret', r.team, x, z, { maxHp: 260, radius: 0.8, rival: r, yaw: face, aim: face, cool: 0, scanT: 0 });
         }
-        for (let k = 0; k < guardTarget(r); k++) spawnUnit(r, cx + rand(-10, 10), cz + rand(-10, 10), 'guard');
+        if (!r.cmdT) spawnCommander(r);
+        topUpGuards(r);
       }
     });
   }
@@ -75,6 +76,43 @@ const Rivals = (() => {
   // ---------- konkurentide baasid: ehitavad tube nagu mängija ----------
   const FURN = [['generaator', 'nari', 'laud'], ['nari', 'nari', 'toolaud'], ['nari', 'diivan', 'pliit'], ['skanner', 'nari'], ['nari', 'laud', 'ravila'], ['lihvija', 'nari'], ['nari', 'nari', 'jukebox']];
   function guardTarget(r) { return Math.min(10, 2 + (r.bb ? r.bb.countBeds() : 2)); }
+  // ---------- inimesed: konkurent alustab ühest komandörist ja palkab inimesi nagu mängija ----------
+  const HUMAN_HP = 70, CMD_HP = 100;   // sama mis mängija meeskonnal ja mängijal
+  function menCap(r) { return Math.max(2, Math.min(14, r.bb ? r.bb.countBeds() : 2)); }
+  function unitsOf(r) { return Ents.list.filter((u) => u.alive && !u.remove && u.kind === 'human' && u.team === r.team && !u.commander); }
+  function freeMen(r) { return Math.max(0, (r.men || 0) - unitsOf(r).length); }
+  // võta missiooniks n meest: kõigepealt kasarmust, siis valvurite seast (vähemalt keep jääb koju)
+  function takeMen(r, n, keep = 1) {
+    let got = Math.min(n, freeMen(r));
+    if (got < n) {
+      const guards = unitsOf(r).filter((u) => u.mission === 'guard');
+      while (got < n && guards.length > keep) { const g = guards.pop(); g.remove = true; got++; }
+    }
+    return got;
+  }
+  function topUpGuards(r) {
+    if (!r.alive || !r.base) return;
+    const g = unitsOf(r).filter((u) => u.mission === 'guard').length;
+    const k = Math.min(freeMen(r), guardTarget(r) - g);
+    for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-10, 10), r.base.z + rand(-10, 10), 'guard');
+  }
+  function spawnCommander(r) {
+    if (Ents.list.some((u) => u.alive && u.commander && u.team === r.team)) return;
+    const look = Object.assign(Look.player(), { top: r.color.map((v) => v * 0.6), gearCol: 1, hairStyle: r.id === 'krell' ? 'short' : 'long', beardStyle: r.id === 'krell' ? 'none' : 'full' });
+    const e = spawnUnit(r, r.base.x + rand(-4, 4), r.base.z + rand(-4, 4), 'guard', { commander: true, maxHp: CMD_HP, look, acc: Math.min(0.75, 0.56 + G.time.day * 0.012) });
+    e.cmdName = r.id === 'krell' ? 'Director Varga' : 'Chieftain Sarn';
+    return e;
+  }
+  function hireTick(r, dt) {
+    r.hireT = (r.hireT || 0) - dt * (G.dk.rival || 1);
+    if (r.hireT > 0) return;
+    r.hireT = DAY_LEN * rand(0.3, 0.5);
+    if ((r.men || 0) >= menCap(r)) return;
+    r.men = (r.men || 0) + 1;
+    topUpGuards(r);
+    const d = Math.hypot(Player.pos.x - r.base.x, Player.pos.z - r.base.z);
+    if (d < 120 || Math.random() < 0.25) UI.msg('Radio: ' + r.short + ' hired a new mercenary (' + r.men + ' people).', 'rival');
+  }
   function setupBase(r, cx, cy, cz, face, fromSave) {
     const fx = Math.sin(face), fz = Math.cos(face);
     const ox = cx - fx * 28, oz = cz - fz * 28;
@@ -160,7 +198,7 @@ const Rivals = (() => {
   function spawnUnit(r, x, z, mission, extra) {
     const day = G.time.day;
     const e = Ents.spawn('human', r.team, x, z, Object.assign({
-      maxHp: Math.min(120, 58 + day * 4 + r.hpBonus), radius: 0.38, ai: unitAI, mission, home: { x: r.base.x, z: r.base.z },
+      maxHp: HUMAN_HP, radius: 0.38, ai: unitAI, mission, home: { x: r.base.x, z: r.base.z },
       dmg: 6 * G.dk.edmg, acc: Math.min(0.66, 0.48 + day * 0.012), speedU: r.speed, scanT: rand(0, 0.5), cool: rand(0, 1), carry: 0, rival: r,
     }, extra || {}));
     return e;
@@ -282,6 +320,14 @@ const Rivals = (() => {
     }
   }
   function onUnitDeath(e, src) {
+    const r = e.rival;
+    if (r) {
+      if (e.commander) {
+        r.cmdT = DAY_LEN * 0.6; r.progress = Math.max(0, r.progress - 15);
+        UI.msg((e.cmdName || r.short + ' commander') + ' has fallen! ' + r.short + ' is in disarray.', 'good');
+        UI.banner('Commander down', r.short + ' lost their leader', 'good');
+      } else r.men = Math.max(0, (r.men || 0) - 1);
+    }
     const items = Inv.rivalLoot(e);
     if (items.length) Ents.pickups.push({ kind: 'bag', x: e.pos.x, y: Ents.groundY(e.pos.x, e.pos.z), z: e.pos.z, data: { items }, id: Math.random() });
     if (e.kind === 'human' && src && src.kind === 'player') G.stats.rivalsKilled = (G.stats.rivalsKilled || 0) + 1;
@@ -289,9 +335,9 @@ const Rivals = (() => {
   function onComet(site) {
     for (const r of list) {
       if (!r.alive) continue;
-      const n = randi(2, 3);
       pending.push({ t: G.time.total + rand(16, 38), fn: () => {
         if (!r.alive || Comets.siteTotal(site) <= 0) return;
+        const n = takeMen(r, randi(2, 3), 1); if (!n) return;
         const p = towardSpawn(r, site.x, site.z, 130);
         for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-4, 4), p.z + rand(-4, 4), 'scav', { site });
         if (Math.random() < 0.6) UI.msg('Radio: ' + r.short + ' collectors are driving toward the comet.', 'warn');
@@ -299,7 +345,9 @@ const Rivals = (() => {
     }
   }
   function launchRaid(r) {
-    const n = Math.min(7, Math.round((2 + G.time.day * 0.45) * G.dk.raid));
+    const want = Math.min(7, Math.round((2 + G.time.day * 0.45) * G.dk.raid));
+    if (freeMen(r) + Math.max(0, unitsOf(r).filter((u) => u.mission === 'guard').length - 1) < 2) { r.raidT = DAY_LEN * rand(0.4, 0.7); return; }   // liiga vähe mehi
+    const n = takeMen(r, want, 1);
     const p = towardSpawn(r, 0, 0, 150);
     for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-6, 6), p.z + rand(-6, 6), 'raid');
     const dir = bearingWord(p.x, p.z);
@@ -310,7 +358,8 @@ const Rivals = (() => {
   }
   function launchAssault(r) {
     const b = World.sites.nest;
-    const n = Math.min(8, 4 + Math.floor(G.time.day / 3));
+    const n = takeMen(r, Math.min(8, 4 + Math.floor(G.time.day / 3)), 1);
+    if (n < 2) { r.assaultT = DAY_LEN * 0.3; return; }
     const p = towardSpawn(r, b.x, b.z, 110);
     for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-6, 6), p.z + rand(-6, 6), 'assault');
     r.assaultActive = true;
@@ -320,6 +369,8 @@ const Rivals = (() => {
     for (let i = pending.length - 1; i >= 0; i--) if (G.time.total >= pending[i].t) { const p = pending.splice(i, 1)[0]; p.fn(); }
     for (const r of list) {
       if (!r.alive) continue;
+      hireTick(r, dt);
+      if (r.cmdT > 0) { r.cmdT -= dt; if (r.cmdT <= 0) { r.cmdT = 0; spawnCommander(r); UI.msg('Radio: ' + r.short + ' has a new commander.', 'rival'); } }
       r.raidT -= dt;
       if (r.raidT <= 0) { r.raidT = DAY_LEN * rand(1.3, 2.2) / G.dk.raid; if (G.time.day >= 2) launchRaid(r); }
       if (r.progress >= 100 && !r.found && Boss.e && Boss.e.alive) {
@@ -346,8 +397,7 @@ const Rivals = (() => {
     for (const r of list) {
       if (!r.alive) continue;
       r.progress = Math.min(100, r.progress + rand(5.5, 9) * G.dk.rival);
-      const g = Ents.countAlive((e) => e.team === r.team && e.mission === 'guard');
-      for (let k = g; k < guardTarget(r); k++) spawnUnit(r, r.base.x + rand(-10, 10), r.base.z + rand(-10, 10), 'guard');
+      topUpGuards(r);
     }
   }
   function coreDestroyed(e) {
@@ -405,9 +455,9 @@ const Rivals = (() => {
     M4.child(e.hm, e.m, 0, 1.55, 0, e.aim, e.alive ? 0 : 0.5, 0);
     GFX.draw(MODELS.obj.kahurHead, e.hm, tint, null, { rust: 1 });
   }
-  function serialize() { return list.map((r) => ({ id: r.id, progress: r.progress, alive: r.alive, raidT: r.raidT, found: r.found, assaultT: r.assaultT, coreHp: r.core ? r.core.hp : 0, buildT: r.buildT, roomsBuilt: r.roomsBuilt, bb: r.bb ? r.bb.serialize() : null })); }
+  function serialize() { return list.map((r) => ({ id: r.id, progress: r.progress, alive: r.alive, raidT: r.raidT, found: r.found, assaultT: r.assaultT, coreHp: r.core ? r.core.hp : 0, buildT: r.buildT, roomsBuilt: r.roomsBuilt, men: r.men || 0, hireT: r.hireT, cmdT: r.cmdT || 0, bb: r.bb ? r.bb.serialize() : null })); }
   function deserialize(arr) {
-    for (const d of arr || []) { const r = get(d.id); if (!r) continue; Object.assign(r, { progress: d.progress, alive: d.alive, raidT: d.raidT, found: d.found, assaultT: d.assaultT, coreHp: d.coreHp, buildT: d.buildT, roomsBuilt: d.roomsBuilt || 0, bbData: d.bb || null }); }
+    for (const d of arr || []) { const r = get(d.id); if (!r) continue; Object.assign(r, { progress: d.progress, alive: d.alive, raidT: d.raidT, found: d.found, assaultT: d.assaultT, coreHp: d.coreHp, buildT: d.buildT, roomsBuilt: d.roomsBuilt || 0, bbData: d.bb || null, men: d.men !== undefined ? d.men : 4, hireT: d.hireT || DAY_LEN * 0.3, cmdT: d.cmdT || 0 }); }
   }
-  return { list, get, reset, init, updateBases, drawBases, update, daily, onComet, onUnitDeath, coreDestroyed, unitAI, turretAI, draw, drawCore, drawTurret, launchRaid, serialize, deserialize, spawnUnit };
+  return { list, get, reset, init, updateBases, drawBases, update, daily, onComet, onUnitDeath, coreDestroyed, unitAI, turretAI, draw, drawCore, drawTurret, launchRaid, serialize, deserialize, spawnUnit, freeMen, menCap };
 })();
