@@ -55,13 +55,13 @@ const Build = (() => {
   }
   function setLevel(lv) {
     S.level = lv ? 1 : 0; Base.viewLevel = S.level; pending = null; drag = null; hover = null;
-    if (S.level && (S.tool === 'wall' || S.tool === 'door' || S.tool === 'window')) S.tool = 'look';
+    if (S.level && (S.tool === 'upper' || S.tool === 'tall')) S.tool = 'look';
     UI.buildTools(S); UI.buildConfirm(null); info();
-    UI.toast(S.level ? 'Floor 2 – place items upstairs' : 'Floor 1');
+    UI.toast(S.level ? 'Floor 2 – walls, doors, windows and items upstairs' : 'Floor 1');
   }
   function setTool(t) {
     if (t === 'level') { setLevel(!S.level); return; }
-    if (S.level && (t === 'wall' || t === 'door' || t === 'window')) { deny('Walls, doors and windows are built on floor 1 – the upper floor follows them.'); return; }
+    if (S.level && (t === 'upper' || t === 'tall')) { deny('Switch to floor 1 for that.'); return; }
     S.tool = t; pending = null; drag = null;
     if (t !== 'obj') S.item = null;
     UI.buildTools(S);
@@ -137,7 +137,7 @@ const Build = (() => {
     if (!p) { hover = null; return; }
     const c = Base.toCell(p.x, p.z);
     hover = { x: p.x, z: p.z, i: c.i, j: c.j, vi: Math.round((p.x - Base.X0) / Base.CS), vj: Math.round((p.z - Base.Z0) / Base.CS) };
-    if (S.tool === 'door' || S.tool === 'window' || (S.tool === 'demolish' && !S.level)) hover.edge = edgeAt(p);
+    if (S.tool === 'door' || S.tool === 'window' || S.tool === 'demolish') hover.edge = edgeAt(p);
     if (S.tool === 'obj' && S.item) {
       const [w, h] = Base.footprint(S.item, S.rot);
       hover.oi = Math.round((p.x - Base.X0) / Base.CS - w / 2); hover.oj = Math.round((p.z - Base.Z0) / Base.CS - h / 2);
@@ -200,8 +200,9 @@ const Build = (() => {
     if (S.tool === 'wall') {
       if (line.length) { if (touch) { pending = { kind: 'walls', edges: line }; showPendingConfirm(); } else commitWalls(line); }
     } else if (S.tool === 'demolish' && line.length && moved >= 25) {
-      const ex = line.filter(([t, i, j]) => Base.isWall(t, i, j));
-      if (ex.length) { if (touch) { pending = { kind: 'demolish', tg: { kind: 'walls', edges: ex } }; showPendingConfirm(); } else doDemolish({ kind: 'walls', edges: ex }); }
+      const kind = S.level ? 'upwalls' : 'walls';
+      const ex = line.filter(([t, i, j]) => (S.level ? Base.isUpWallCustom(t, i, j) : Base.isWall(t, i, j)));
+      if (ex.length) { if (touch) { pending = { kind: 'demolish', tg: { kind, edges: ex } }; showPendingConfirm(); } else doDemolish({ kind, edges: ex }); }
     } else if (S.tool === 'obj' && S.item) {
       if (touch) { movePendingObj(); showPendingConfirm(); }
       else if (hover) commitObj(S.item, hover.oi, hover.oj, hover.rot);
@@ -253,15 +254,25 @@ const Build = (() => {
   function half(cost) { return { s: Math.floor((cost.s || 0) / 2), c: Math.floor((cost.c || 0) / 2), k: Math.floor((cost.k || 0) / 2) }; }
   function costStr(c) { const p = []; if (c.s) p.push(c.s + ' scrap'); if (c.c) p.push(c.c + ' ₵'); if (c.k) p.push(c.k + ' diamonds'); return p.join(' · ') || 'free'; }
   const WALL_COST = 3;
+  const wallHere = (t, i, j) => (S.level ? Base.upWallAt(t, i, j) : Base.isWall(t, i, j));
+  const canWall = (t, i, j) => (S.level ? Base.canPlaceUpWall(t, i, j) : Base.canPlaceWall(t, i, j));
   function wallInfo(edges) {
     let n = 0, bad = null;
-    for (const [t, i, j] of edges) { if (Base.isWall(t, i, j)) continue; const ok = Base.canPlaceWall(t, i, j); if (!ok.ok) { bad = ok.why; continue; } n++; }
+    for (const [t, i, j] of edges) { if (wallHere(t, i, j)) continue; const ok = canWall(t, i, j); if (!ok.ok) { bad = ok.why; continue; } n++; }
     return { n, bad, cost: { s: n * WALL_COST } };
   }
   function commitWalls(edges) {
     const wi = wallInfo(edges);
     if (!wi.n) { deny(wi.bad || 'There\'s already a wall here.'); return false; }
     const af = afford(wi.cost); if (af) { deny(af); return false; }
+    if (S.level) {   // teise korruse vaheseinad
+      const added = Base.addUpWalls(edges);
+      pay({ s: added.length * WALL_COST });
+      undo.push({ type: 'upwalls', edges: added, cost: { s: added.length * WALL_COST } });
+      Audio2.build(); pending = null; UI.buildConfirm(null);
+      UI.toast('Upper-floor wall built. Add a door with the Door tool so people can pass.');
+      return true;
+    }
     const roomsBefore = new Set(Base.rooms.keys()), nBefore = Base.rooms.size;
     const added = Base.addWalls(edges);
     pay({ s: added.length * WALL_COST });
@@ -323,6 +334,18 @@ const Build = (() => {
     return true;
   }
   function commitEdge(ed, type) {
+    if (S.level) {
+      const cur = Base.upOpening(ed.t, ed.i, ed.j);
+      if (cur === type) {
+        Base.setUpOpening(ed.t, ed.i, ed.j, 'wall'); const refund = type === 'door' ? 4 : 3; G.res.scrap += refund;
+        undo.push({ type: 'upedge', ed, prev: type, cost: { s: -refund } }); Audio2.build(); pending = null; UI.buildConfirm(null); return true;
+      }
+      const ok = Base.canSetUpOpening(ed.t, ed.i, ed.j, type); if (!ok.ok) { deny(ok.why); return false; }
+      const cost = { s: type === 'door' ? 8 : 6 }; const af = afford(cost); if (af) { deny(af); return false; }
+      pay(cost); undo.push({ type: 'upedge', ed, prev: cur || 'wall', cost });
+      Base.setUpOpening(ed.t, ed.i, ed.j, type); Audio2.build(); pending = null; UI.buildConfirm(null);
+      return true;
+    }
     const cur = Base.edgeType(ed.t, ed.i, ed.j);
     if (cur === type) {
       if (type === 'door') {
@@ -362,6 +385,7 @@ const Build = (() => {
   }
   function demolishTarget(h) {
     if (S.level) {
+      if (h.edge && Base.isUpWallCustom(h.edge.t, h.edge.i, h.edge.j)) return { kind: 'upwalls', edges: [[h.edge.t, h.edge.i, h.edge.j]] };
       const uid = Base.objUpAt(h.i, h.j);
       if (uid) return { kind: 'obj', o: Base.objs.get(uid) };
       const rid = Base.roomAt(h.i, h.j);
@@ -379,6 +403,11 @@ const Build = (() => {
     doDemolish(tg);
   }
   function doDemolish(tg) {
+    if (tg.kind === 'upwalls') {
+      const rem = Base.removeUpWalls(tg.edges); pay({ s: rem.length }, -1);
+      UI.toast(rem.length + ' upper-floor wall segments demolished. Refund: ' + rem.length + ' scrap');
+      Audio2.build(); pending = null; UI.buildConfirm(null); undo.length = 0; return;
+    }
     if (tg.kind === 'upper') {
       for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === tg.rid && (o.lv || o.type === 'sisetrepp')) { deny('Remove the stairs and the upstairs items first.'); return; }
       const ref = half(upperCost(tg.rid)); pay(ref, -1);
@@ -412,6 +441,8 @@ const Build = (() => {
     if (u.type === 'walls') { const r = Base.removeWalls(u.edges, true); if (!r.ok) { deny(r.why); undo.push(u); return; } pay(u.cost, -1); for (const o of r.lost || []) pay(OBJ[o.type].cost, -1); }
     else if (u.type === 'obj') { Base.removeObj(u.id); pay(u.cost, -1); }
     else if (u.type === 'edge') { Base.setOpening(u.ed.t, u.ed.i, u.ed.j, u.prev); pay(u.cost, -1); }
+    else if (u.type === 'upwalls') { Base.removeUpWalls(u.edges); pay(u.cost, -1); }
+    else if (u.type === 'upedge') { Base.setUpOpening(u.ed.t, u.ed.i, u.ed.j, u.prev); pay(u.cost, -1); }
     else if (u.type === 'tall') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && OBJ[o.type].needsTall) { deny('Remove the ' + OBJ[o.type].name + ' first.'); undo.push(u); return; } Base.setTall(u.rid, false); pay(u.cost, -1); }
     else if (u.type === 'upper') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && (o.lv || o.type === 'sisetrepp')) { deny('Remove the stairs and the upstairs items first.'); undo.push(u); return; } Base.setUpper(u.rid, false); pay(u.cost, -1); }
     Audio2.ui(); UI.toast('Undone');
@@ -435,6 +466,7 @@ const Build = (() => {
     else if (pending.kind === 'obj') { cost = costStr(OBJ[pending.type].cost); ok = Base.canPlaceObj(pending.type, pending.i, pending.j, pending.rot, pending.lv || 0).ok && !afford(OBJ[pending.type].cost); label = 'Place'; }
     else if (pending.kind === 'tall') { const c = tallCost(pending.rid); const on = Base.roomIsTall(pending.rid); cost = on ? 'refund ' + costStr(half(c)) : costStr(c); ok = on || !afford(c); label = on ? 'Make normal' : 'Tall room'; }
     else if (pending.kind === 'upper') { const c = upperCost(pending.rid); cost = costStr(c); ok = !afford(c) && !Base.roomHasUpper(pending.rid); label = '2nd floor'; }
+    else if (pending.kind === 'edge' && S.level) { const cur = Base.upOpening(pending.e.t, pending.e.i, pending.e.j); if (cur === pending.type) { label = 'Remove'; cost = '+' + (pending.type === 'door' ? 4 : 3) + ' scrap'; } else { cost = (pending.type === 'door' ? 8 : 6) + ' scrap'; ok = Base.canSetUpOpening(pending.e.t, pending.e.i, pending.e.j, pending.type).ok; } }
     else if (pending.kind === 'edge') { const cur = Base.edgeType(pending.e.t, pending.e.i, pending.e.j); if (cur === pending.type) { label = 'Remove'; cost = '+' + (pending.type === 'door' ? 4 : 3) + ' scrap'; } else { cost = (pending.type === 'door' ? 8 : 6) + ' scrap'; ok = Base.canPlaceOpening(pending.e.t, pending.e.i, pending.e.j, pending.type).ok; } }
     else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.kind === 'upper' ? 'Second floor' : pending.tg.edges.length + ' wall segments'; }
     UI.buildConfirm({ label, cost, ok, canRotate: pending.kind === 'obj' });
@@ -445,7 +477,7 @@ const Build = (() => {
     let txt = '', cls = '';
     const hints = {
       look: Input.isTouch ? 'Drag with one finger to move the camera. Use two fingers to zoom and rotate.' : 'WASD moves, Q/E rotates, the wheel zooms.',
-      wall: 'Drag walls from corner to corner. When the walls fully enclose an area, a room and a door appear. A wall segment costs 3 scrap.',
+      wall: S.level ? 'Floor 2: drag walls between upstairs tiles to split the upper floor into rooms (3 scrap per segment). Add doors with the Door tool.' : 'Drag walls from corner to corner. When the walls fully enclose an area, a room and a door appear. A wall segment costs 3 scrap.',
       door: 'Tap the wall where you want a door. Tap again to remove it.',
       window: 'Tap the outer wall where you want a window.',
       obj: S.item ? '' : 'Pick an item from the catalogue.',
@@ -491,13 +523,13 @@ const Build = (() => {
       const edges = drag ? Base.lineEdges(drag.vi, drag.vj, drag.wi, drag.wj) : pending && pending.kind === 'walls' ? pending.edges : null;
       if (edges && edges.length) {
         const af = !!afford(wallInfo(edges).cost);
-        for (const [t, i, j] of edges) edgeBox({ t, i, j }, Base.isWall(t, i, j) ? BLUE : (!Base.canPlaceWall(t, i, j).ok || af) ? RED : GREEN);
+        for (const [t, i, j] of edges) edgeBox({ t, i, j }, wallHere(t, i, j) ? BLUE : (!canWall(t, i, j).ok || af) ? RED : GREEN);
       }
       if (drag) { vertexBox(drag.vi, drag.vj, YEL); vertexBox(drag.wi, drag.wj, YEL); }
       else if (hover) vertexBox(hover.vi, hover.vj, YEL);
     }
     if (S.tool === 'demolish' && drag && (drag.wi !== drag.vi || drag.wj !== drag.vj)) {
-      for (const [t, i, j] of Base.lineEdges(drag.vi, drag.vj, drag.wi, drag.wj)) if (Base.isWall(t, i, j)) edgeBox({ t, i, j }, RED);
+      for (const [t, i, j] of Base.lineEdges(drag.vi, drag.vj, drag.wi, drag.wj)) if (S.level ? Base.isUpWallCustom(t, i, j) : Base.isWall(t, i, j)) edgeBox({ t, i, j }, RED);
     }
     if (S.tool === 'obj' && S.item) {
       const t = pending && pending.kind === 'obj' ? pending : hover ? { type: S.item, i: hover.oi, j: hover.oj, rot: hover.rot } : null;
@@ -522,19 +554,20 @@ const Build = (() => {
     }
     if ((S.tool === 'door' || S.tool === 'window') && hover && hover.edge) {
       const e2 = pending && pending.kind === 'edge' ? pending.e : hover.edge;
-      edgeBox(e2, Base.isWall(e2.t, e2.i, e2.j) ? (S.tool === 'door' ? YEL : BLUE) : RED);
+      edgeBox(e2, wallHere(e2.t, e2.i, e2.j) ? (S.tool === 'door' ? YEL : BLUE) : RED);
     } else if (pending && pending.kind === 'edge') edgeBox(pending.e, YEL);
     if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper' || S.tool === 'tall') && (hover || pending)) {
       const tg = pending && pending.kind === 'demolish' ? pending.tg : S.tool === 'demolish' && hover && !drag ? demolishTarget(hover) : null;
       if (tg && tg.kind === 'obj') { const o = tg.o; box(o.cx, 0.7, o.cz, o.w * Base.CS, 1.4, o.h * Base.CS, RED, 0.35); }
       else if (tg && tg.kind === 'upper') cellsBox(Base.rooms.get(tg.rid), RED);
-      else if (tg && tg.kind === 'walls') { for (const [t, i, j] of tg.edges) edgeBox({ t, i, j }, RED); }
+      else if (tg && (tg.kind === 'walls' || tg.kind === 'upwalls')) { for (const [t, i, j] of tg.edges) edgeBox({ t, i, j }, RED); }
       else if ((S.tool === 'paint' || S.tool === 'upper' || S.tool === 'tall') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
     }
     // toad, mida ei saa liigutada: peahoone silt
   }
   function edgeBox(ed, tint) {
-    const box = (x, y, z, sx, sy, sz) => { const m = M4.compose(M4.create(), x, y, z, 0, 0, 0, sx, sy, sz); GFX.draw(boxMesh, m, tint, null, { alpha: 0.6, shadow: false }); };
+    const LY = S.level ? Base.WH : 0;
+    const box = (x, y, z, sx, sy, sz) => { const m = M4.compose(M4.create(), x, y + LY, z, 0, 0, 0, sx, sy, sz); GFX.draw(boxMesh, m, tint, null, { alpha: 0.6, shadow: false }); };
     if (ed.t === 'v') box(Base.X0 + ed.i * Base.CS, 0.7, Base.Z0 + (ed.j + 0.5) * Base.CS, 0.35, 1.4, Base.CS);
     else box(Base.X0 + (ed.i + 0.5) * Base.CS, 0.7, Base.Z0 + ed.j * Base.CS, Base.CS, 1.4, 0.35);
   }

@@ -327,7 +327,7 @@ const Chars = (() => {
   function writeBones(T, row, hide) {
     const out = GFX.boneRowData(row);
     for (let k = 0; k < T.nj; k++) {
-      if (hide && hide[k]) { const c = hide === T.fpHide ? (k === T.j.spine2 || T.parent[k] === T.j.spine2 ? T.j.spine2 : T.j.neck) : T.j.neck; out.fill(0, k * 12, k * 12 + 12); out[k * 12 + 3] = P[c * 3]; out[k * 12 + 7] = P[c * 3 + 1]; out[k * 12 + 11] = P[c * 3 + 2]; continue; }
+      if (hide && hide[k]) { const c = hide === T.fpHide ? (T.fpTo && T.fpTo[k] >= 0 ? T.fpTo[k] : (k === T.j.spine2 || T.parent[k] === T.j.spine2 ? T.j.spine2 : T.j.neck)) : T.j.neck; out.fill(0, k * 12, k * 12 + 12); out[k * 12 + 3] = P[c * 3]; out[k * 12 + 7] = P[c * 3 + 1]; out[k * 12 + 11] = P[c * 3 + 2]; continue; }
       const hr = T.handScale && T.handRoot ? T.handRoot[k] : -1;
       if (hr >= 0) {   // esimese isiku vaates käed ja sõrmed väiksemaks (randme ümber), et need ei paistaks kohmakad
         const s = T.handScale;
@@ -422,7 +422,15 @@ const Chars = (() => {
     M4.compose(eyeT, -ex, -ey, -ez);
     M4.mul(outM, camM, eyeT);
     // peida kõik peale käte (õlast alates)
-    if (!T.fpHide) { T.fpHide = new Uint8Array(T.nj).fill(1); for (const n of ['LeftArm', 'RightArm']) if (T.idxOf[n] !== undefined) for (const j of T.desc[T.idxOf[n]]) T.fpHide[j] = 0; }
+    // ainult küünarvarred ja käed (õlg ja õlavars peidetakse, muidu paistab õlg kaamera ees)
+    if (!T.fpHide) {
+      T.fpHide = new Uint8Array(T.nj).fill(1);
+      for (const n of ['LeftForeArm', 'RightForeArm']) if (T.idxOf[n] !== undefined) { T.fpHide[T.idxOf[n]] = 0; for (const j of T.desc[T.idxOf[n]]) T.fpHide[j] = 0; }
+      // peidetud õlavars ja õlg tõmmatakse küünarnukki kokku (mitte kaela juurde -> pole venitatud riba)
+      T.fpTo = new Int16Array(T.nj).fill(-1);
+      const sideTo = (names, fore) => { for (const n of names) if (T.idxOf[n] !== undefined && fore >= 0) T.fpTo[T.idxOf[n]] = fore; };
+      sideTo(['LeftArm', 'LeftShoulder'], T.j.foreL); sideTo(['RightArm', 'RightShoulder'], T.j.foreR);
+    }
     if (!T.handRoot) {
       T.handRoot = new Int16Array(T.nj).fill(-1);
       for (const h of [T.j.handR, T.j.handL]) if (h >= 0) { T.handRoot[h] = h; for (const d of T.desc[h] || []) T.handRoot[d] = h; }

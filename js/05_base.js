@@ -82,6 +82,8 @@ function createBase(opt) {
   const cellObjUp = new Int16Array(N * N);   // teise korruse esemed
   const upper = new Set();                    // teise korrusega rakud 'i:j'
   const tall = new Set();                     // kahekorruselise kõrgusega (läbi kahe korruse) toa rakud 'i:j'
+  const upWalls = new Set();                  // ainult teise korruse seinad (vaheseinad üleval)
+  const upOpen = new Map();                   // teise korruse seinte avad: 'door' | 'window' | 'wall' (sulgeb vaikimisi akna)
   const cellStyle = new Uint8Array(N * N).fill(255);
   const cellRust = new Uint8Array(N * N);
   const walls = new Set();
@@ -118,6 +120,44 @@ function createBase(opt) {
   const upAt = (i, j) => roomAt(i, j) > 0 && upper.has(i + ':' + j);
   const tallAt = (i, j) => roomAt(i, j) > 0 && tall.has(i + ':' + j);
   const hiAt = (i, j) => upAt(i, j) || tallAt(i, j);   // seinad ja katus kahe korruse kõrgusel
+  // teise korruse sein servas: alumise seina jätk (kui kummalgi pool on kõrge osa) või ainult üleval ehitatud sein
+  function upWallAt(t, i, j) {
+    const k = t + ':' + i + ':' + j;
+    if (upWalls.has(k)) return true;
+    if (!walls.has(k)) return false;
+    const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
+    return hiAt(ai, aj) || hiAt(bi, bj);
+  }
+  function upOpening(t, i, j) {
+    const k = t + ':' + i + ':' + j;
+    if (!upWallAt(t, i, j)) return null;
+    if (upOpen.has(k)) { const v = upOpen.get(k); return v === 'wall' ? null : v; }
+    if (upWalls.has(k)) return null;
+    const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
+    const uA = hiAt(ai, aj), uB = hiAt(bi, bj), bothUp = upAt(ai, aj) && upAt(bi, bj), lowerOp = openings.get(k);
+    return uA && uB ? (lowerOp === 'door' && bothUp ? 'door' : null) : (lowerOp === 'window' || ((i + j) % 2 === 0 && lowerOp !== 'door' && lowerOp !== 'garage') ? 'window' : null);
+  }
+  function canPlaceUpWall(t, i, j) {
+    const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
+    if (!inGrid(ai, aj) || !inGrid(bi, bj)) return { ok: false, why: 'Outside the build area.' };
+    if (upWallAt(t, i, j)) return { ok: false, why: 'There\'s already a wall here.' };
+    if (!upAt(ai, aj) || !upAt(bi, bj)) return { ok: false, why: 'Upper-floor walls go between upper-floor tiles (the outer walls come from floor 1).' };
+    if (holeAt(ai, aj) || holeAt(bi, bj)) return { ok: false, why: 'The stairwell is in the way.' };
+    for (const c of [[ai, aj], [bi, bj]]) if (objUpAt(c[0], c[1])) { const o = objs.get(objUpAt(c[0], c[1])); if (o && o.w * o.h > 1 && cellsOf(o.i, o.j, o.w, o.h).some(([x, y]) => (x === ai && y === aj)) && cellsOf(o.i, o.j, o.w, o.h).some(([x, y]) => (x === bi && y === bj))) return { ok: false, why: 'An item is in the way.' }; }
+    return { ok: true };
+  }
+  function addUpWalls(edges) { const out = []; for (const [t, i, j] of edges) if (canPlaceUpWall(t, i, j).ok) { upWalls.add(t + ':' + i + ':' + j); out.push([t, i, j]); } if (out.length) dirty = true; return out; }
+  function removeUpWalls(edges) { const out = []; for (const [t, i, j] of edges) { const k = t + ':' + i + ':' + j; if (upWalls.delete(k)) { upOpen.delete(k); out.push([t, i, j]); } } if (out.length) dirty = true; return out; }
+  function isUpWallCustom(t, i, j) { return upWalls.has(t + ':' + i + ':' + j); }
+  function canSetUpOpening(t, i, j, type) {
+    if (!upWallAt(t, i, j)) return { ok: false, why: 'There\'s no upper-floor wall here.' };
+    const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
+    const inA = upAt(ai, aj), inB = upAt(bi, bj);
+    if (type === 'window' && inA && inB) return { ok: false, why: 'Windows only go in outer walls.' };
+    if (type === 'door' && !(inA && inB)) return { ok: false, why: 'An upstairs door has to lead into another upstairs room (no balconies yet).' };
+    return { ok: true };
+  }
+  function setUpOpening(t, i, j, type) { upOpen.set(t + ':' + i + ':' + j, type || 'wall'); dirty = true; }
   // trepiava teisel korrusel (siseterepi rakud)
   const holeAt = (i, j) => { const id = objAt(i, j); return !!id && objs.get(id) && objs.get(id).type === 'sisetrepp'; };
   const cellCenter = (i, j) => ({ x: X0 + (i + 0.5) * CS, z: Z0 + (j + 0.5) * CS });
@@ -267,6 +307,7 @@ function createBase(opt) {
     for (const r of rooms.values()) { let n = 0; for (const [i, j] of r.cells) if (upper.has(i + ':' + j)) n++; byRoom.set(r.id, n * 2 >= r.cells.length && n > 0); }
     for (const k of [...upper]) { const [i, j] = k.split(':').map(Number); if (!roomAt(i, j)) upper.delete(k); }
     for (const r of rooms.values()) for (const [i, j] of r.cells) { if (byRoom.get(r.id)) upper.add(i + ':' + j); else upper.delete(i + ':' + j); }
+    for (const k of [...upWalls]) { const [t, a, b] = k.split(':'); const i = +a, j = +b; const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]]; if (!(roomAt(ai, aj) && roomAt(bi, bj) && upper.has(ai + ':' + aj) && upper.has(bi + ':' + bj))) { upWalls.delete(k); upOpen.delete(k); } }
     const byRoomT = new Map();
     for (const r of rooms.values()) { let n = 0; for (const [i, j] of r.cells) if (tall.has(i + ':' + j)) n++; byRoomT.set(r.id, n * 2 >= r.cells.length && n > 0 && !byRoom.get(r.id)); }
     for (const k of [...tall]) { const [i, j] = k.split(':').map(Number); if (!roomAt(i, j)) tall.delete(k); }
@@ -406,8 +447,8 @@ function createBase(opt) {
         for (const so of objs.values()) if (so.type === 'sisetrepp') { const ex = stairExit(so); if (ex && ex.i === ii && ex.j === jj) return { ok: false, why: 'Keep the top of the stairs free.' }; }
       }
       for (const [ii, jj] of cellsOf(i, j, w, h)) {
-        if (ii + 1 < i + w && isWall('v', ii + 1, jj)) return { ok: false, why: 'A wall is in the way.' };
-        if (jj + 1 < j + h && isWall('h', ii, jj + 1)) return { ok: false, why: 'A wall is in the way.' };
+        if (ii + 1 < i + w && upWallAt('v', ii + 1, jj)) return { ok: false, why: 'A wall is in the way.' };
+        if (jj + 1 < j + h && upWallAt('h', ii, jj + 1)) return { ok: false, why: 'A wall is in the way.' };
       }
       return { ok: true };
     }
@@ -860,7 +901,7 @@ function createBase(opt) {
     }
     // ---------- teise korruse seinad (alumise korruse seinte peal) ----------
     const upPosts = new Set();
-    for (const key of walls) {
+    for (const key of new Set([...walls, ...upWalls])) {
       const [t, si, sj] = key.split(':'); const i = +si, j = +sj;
       const [[ai, aj], [bi, bj]] = edgeCells(t, i, j);
       const uA = hiAt(ai, aj), uB = hiAt(bi, bj);
@@ -874,7 +915,7 @@ function createBase(opt) {
       upPosts.add(i + ':' + j); upPosts.add(t === 'v' ? i + ':' + (j + 1) : (i + 1) + ':' + j);
       const sA = uB ? sideStyle(rb) : sideStyle(0), sB = uA ? sideStyle(ra) : sideStyle(0);
       const lowerOp = openings.get(key);
-      const op = uA && uB ? (lowerOp === 'door' && bothUp ? 'door' : null) : (lowerOp === 'window' || ((i + j) % 2 === 0 && lowerOp !== 'door' && lowerOp !== 'garage') ? 'window' : null);
+      const op = upOpening(t, i, j);
       const L = CS, ux = (bx - ax) / L, uz = (bz - az) / L;
       const P = (s_) => [ax + ux * s_, az + uz * s_];
       const useg = (s0, s1, y0, y1) => {
@@ -1271,7 +1312,7 @@ function createBase(opt) {
     return r;
   }
   function reset() {
-    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); tall.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
+    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); tall.clear(); upWalls.clear(); upOpen.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
     nextRoomId = 1; nextObjId = 1; dirty = true;
   }
   function isInside(x, z) { const c = toCell(x, z); return roomAt(c.i, c.j) > 0; }
@@ -1326,7 +1367,7 @@ function createBase(opt) {
         const ni = i + di, nj = j + dj, nk = nj * N + ni;
         if (prev.has(nk) || !ok(ni, nj)) continue;
         const t = di ? 'v' : 'h', ei = di > 0 ? i + 1 : di < 0 ? i : i, ej = dj > 0 ? j + 1 : dj < 0 ? j : j;
-        if (isWall(t, ei, ej) && openings.get(ekey(t, ei, ej)) !== 'door') continue;
+        if (upWallAt(t, ei, ej) && upOpening(t, ei, ej) !== 'door') continue;
         prev.set(nk, k); q.push(nk);
       }
     }
@@ -1354,7 +1395,7 @@ function createBase(opt) {
   function serialize() {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
-    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, upper: [...upper], tall: [...tall], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
+    return { v: 2, walls: [...walls], openings: [...openings.entries()], styles, upper: [...upper], tall: [...tall], upWalls: [...upWalls], upOpen: [...upOpen.entries()], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
@@ -1369,13 +1410,15 @@ function createBase(opt) {
     for (const [k, v] of d.openings) if (walls.has(k)) openings.set(k, v);
     for (const k of d.upper || []) upper.add(k);
     for (const k of d.tall || []) tall.add(k);
+    for (const k of d.upWalls || []) upWalls.add(k);
+    for (const [k, v] of d.upOpen || []) upOpen.set(k, v);
     for (const o of d.objs) addObj(o.type, o.i, o.j, o.rot, { hp: o.hp, broken: o.broken, data: o.data || {}, lv: o.lv || 0 }, o.id);
     computeRooms();
     dirty = true;
   }
   return {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
-    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
+    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
