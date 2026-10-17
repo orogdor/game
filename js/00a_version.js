@@ -1,2 +1,2 @@
 // Mängu versioon (näidatakse peaekraani nurgas). Uuenda iga väljalaskega.
-const K73_VERSION = 'v49';
+const K73_VERSION = 'v50';

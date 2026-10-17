@@ -106,7 +106,7 @@ const Rivals = (() => {
   function hireTick(r, dt) {
     r.hireT = (r.hireT || 0) - dt * (G.dk.rival || 1);
     if (r.hireT > 0) return;
-    r.hireT = DAY_LEN * rand(0.3, 0.5);
+    r.hireT = DAY_LEN * ((r.men || 0) < 4 ? rand(0.12, 0.2) : rand(0.25, 0.4));
     if ((r.men || 0) >= menCap(r)) return;
     r.men = (r.men || 0) + 1;
     topUpGuards(r);
@@ -217,6 +217,8 @@ const Rivals = (() => {
   }
   function unitAI(e, dt) {
     if (e.cool > 0) e.cool -= dt;
+    // haavatud korjaja/ründaja taandub koju (palgatud inimesi on vähe)
+    if ((e.mission === 'scav' || e.mission === 'raid') && e.hp < e.maxHp * 0.4) { e.mission = 'flee'; e.path = null; }
     e.scanT -= dt;
     if (e.scanT <= 0) {
       e.scanT = 0.4 + Math.random() * 0.3;
@@ -337,7 +339,8 @@ const Rivals = (() => {
       if (!r.alive) continue;
       pending.push({ t: G.time.total + rand(16, 38), fn: () => {
         if (!r.alive || Comets.siteTotal(site) <= 0) return;
-        const n = takeMen(r, randi(2, 3), 1); if (!n) return;
+        if ((r.men || 0) < 4) return;   // väike seltskond ei saada mehi kaugele komeedile
+        const n = takeMen(r, randi(2, 3), 2); if (n < 2) return;
         const p = towardSpawn(r, site.x, site.z, 130);
         for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-4, 4), p.z + rand(-4, 4), 'scav', { site });
         if (Math.random() < 0.6) UI.msg('Radio: ' + r.short + ' collectors are driving toward the comet.', 'warn');
@@ -346,7 +349,7 @@ const Rivals = (() => {
   }
   function launchRaid(r) {
     const want = Math.min(7, Math.round((2 + G.time.day * 0.45) * G.dk.raid));
-    if (freeMen(r) + Math.max(0, unitsOf(r).filter((u) => u.mission === 'guard').length - 1) < 2) { r.raidT = DAY_LEN * rand(0.4, 0.7); return; }   // liiga vähe mehi
+    if (freeMen(r) + Math.max(0, unitsOf(r).filter((u) => u.mission === 'guard').length - 1) < 3) { r.raidT = DAY_LEN * rand(0.4, 0.7); return; }   // liiga vähe mehi
     const n = takeMen(r, want, 1);
     const p = towardSpawn(r, 0, 0, 150);
     for (let k = 0; k < n; k++) spawnUnit(r, p.x + rand(-6, 6), p.z + rand(-6, 6), 'raid');
