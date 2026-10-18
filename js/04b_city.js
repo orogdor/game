@@ -36,7 +36,8 @@ const City = (() => {
       World.addCol({ t: 's', ax: x0, az: z0, bx: x1, bz: z1, r: (t || 0.4) / 2 + 0.05, y0: opts && opts.raised ? y0 : y0 - 1, y1: y0 + h, kind: 'struct' });
     }
     // ---- hoone: ristkülik, avad (uks/aknad), sisu, katus; sisse saab minna ----
-    function hab(cx, cz, w, d, floors, doorSide, rng) {
+    function hab(cx, cz, w, d, floors, doorSide, rng, opts) {
+      const hall = opts && opts.hall;
       const y0 = Y(cx, cz) + 0.05, FH = 4.2, T = 0.4, col = PAN[Math.floor(rng() * PAN.length)], acc = ACC[Math.floor(rng() * ACC.length)];
       const ruin = rng();   // > 0.6: osa seinast varisenud
       // põrand
@@ -54,6 +55,11 @@ const City = (() => {
           if (k === doorAt) {   // uks: ava + raam + ülal paneel
             wallSeg(p0x, p0z, p1x, p1z, y0 + 2.7, FH * floors - 2.7, T, col, { raised: true });
             gl.color(acc, MAT.GLOW).push().tf((p0x + p1x) / 2, y0, (p0z + p1z) / 2, Math.atan2(ux, uz), 0, 0).box(0, 2.75, 0, T + 0.1, 0.08, L / n * 0.8).pop();
+            // lüüsiraam: hoiatustriibulised postid ja päis (tööstuslik koloonia)
+            b.push().tf((p0x + p1x) / 2, y0, (p0z + p1z) / 2, Math.atan2(ux, uz), 0, 0);
+            for (const sg of [-1, 1]) for (let q = 0; q < 4; q++) b.color(q & 1 ? HB : HY, MAT.MATTE).boxB(0, q * 0.675, sg * (L / n / 2), T + 0.24, 0.675, 0.32);
+            hazardZ(0, 2.62, 0, T + 0.26, 0.34, L / n + 0.3);
+            b.pop();
             continue;
           }
           if (gone) { wallSeg(p0x, p0z, p1x, p1z, y0, R(0.6, 1.6), T, col); continue; }   // varisenud: madal jupp
@@ -67,9 +73,23 @@ const City = (() => {
         }
       }
       // nurgasambad (ümarad)
-      for (const [qx, qz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.color(FRAME, MAT.METAL).cyl(cx + qx * w / 2, y0, cz + qz * d / 2, 0.45, 0.45, FH * floors + 0.3, 10, true);
+      for (const [qx, qz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        const px = cx + qx * w / 2, pz = cz + qz * d / 2;
+        b.color(FRAME, MAT.METAL).push().tf(px, y0, pz, Math.PI / 4, 0, 0).boxB(0, 0, 0, 0.95, FH * floors + 0.3, 0.95).boxB(0, FH * floors + 0.3, 0, 0.7, 0.4, 0.7);
+        for (let q = 0; q < 3; q++) b.color(q & 1 ? HB : HY, MAT.MATTE).boxB(0, q * 0.4, 0, 1.02, 0.4, 1.02);
+        b.pop();
+        if ((qx + qz) === 0) beacon(px, y0 + FH * floors + 0.7, pz);
+      }
+      // välised torud tagaseinal (ukse vastas) + püstitoru maani
+      { const bs = (doorSide + 2) % 4, py = y0 + FH * floors - 0.7, o = T / 2 + 0.35, PC = [0.42, 0.4, 0.36];
+        const L0 = bs === 0 || bs === 2;
+        const zz = bs === 0 ? cz + d / 2 + o : bs === 2 ? cz - d / 2 - o : 0, xx = bs === 1 ? cx + w / 2 + o : bs === 3 ? cx - w / 2 - o : 0;
+        if (L0) { pipe(cx - w / 2 + 0.6, py, zz, cx + w / 2 - 0.6, py, zz, 0.22, PC); pipe(cx - w / 2 + 0.6, py - 0.55, zz, cx + w / 2 - 0.6, py - 0.55, zz, 0.14, [0.5, 0.3, 0.16]); b.color(PC, MAT.METAL).cyl(cx - w / 2 + 0.6, y0, zz, 0.22, 0.22, py - y0, 8, false); }
+        else { pipe(xx, py, cz - d / 2 + 0.6, xx, py, cz + d / 2 - 0.6, 0.22, PC); pipe(xx, py - 0.55, cz - d / 2 + 0.6, xx, py - 0.55, cz + d / 2 - 0.6, 0.14, [0.5, 0.3, 0.16]); b.color(PC, MAT.METAL).cyl(xx, y0, cz - d / 2 + 0.6, 0.22, 0.22, py - y0, 8, false); }
+      }
       // vahelaed + katus (osaliselt sisse kukkunud)
       for (let f = 1; f <= floors; f++) {
+        if (hall && f < floors) continue;
         const fy = y0 + f * FH;
         if (f === floors && ruin > 0.45) {   // katuses auk
           b.color(col, MAT.WORN).boxB(cx - w / 4, fy, cz, w / 2, 0.35, d);
@@ -77,7 +97,14 @@ const City = (() => {
         } else b.color(f === floors ? FRAME : [0.36, 0.36, 0.37], MAT.METAL).boxB(cx, fy, cz, w + 0.5, 0.35, d + 0.5);
       }
       // katusel: kuppel / antenn / päikesepaneelid
-      const top = y0 + floors * FH + 0.35, deco = rng();
+      const top = y0 + floors * FH + 0.35, deco = hall ? 2 : rng();
+      // katuseventilaatorid (tumedad restid)
+      for (let k = 0; k < (w * d > 120 ? 2 : 1); k++) { const vx = cx + R(-w / 3, w / 3), vz = cz + R(-d / 3, d / 3); b.color([0.34, 0.34, 0.33], MAT.METAL).boxB(vx, top, vz, 2.0, 0.9, 2.0); b.color(DARK, MAT.MATTE).cyl(vx, top + 0.9, vz, 0.75, 0.75, 0.05, 10, true); for (let q = -1; q <= 1; q++) b.color(FRAME, MAT.METAL).box(vx, top + 0.98, vz + q * 0.4, 1.6, 0.08, 0.1); }
+      if (hall) for (let k = 0; k < Math.floor(w / 4.5); k++) {   // saehamba katus + katuseaknad
+        const sx = cx - w / 2 + 2.2 + k * 4.5;
+        b.color(PAN[1], MAT.WORN).push().tf(sx, top + 0.9, cz, 0, 0, 0.42).box(0, 0, 0, 4.4, 0.25, d * 0.9).pop();
+        gl.color(ACC[0], MAT.GLOW).box(sx + 1.9, top + 1.0, cz, 0.12, 1.6, d * 0.85);
+      }
       if (deco < 0.4) { dm.color([0.55, 0.62, 0.66], MAT.METAL).sphere(cx, top, cz, Math.min(w, d) * 0.3, 14, 7, 0.6); }
       else if (deco < 0.7) { b.color(FRAME, MAT.METAL).cyl(cx + w * 0.25, top, cz - d * 0.25, 0.06, 0.03, 6, 6, true); gl.color(ACC[0], MAT.GLOW).sphere(cx + w * 0.25, top + 6, cz - d * 0.25, 0.15, 6, 4, 1); }
       else for (let k = 0; k < 3; k++) b.color([0.12, 0.16, 0.28], MAT.METAL).push().tf(cx - w * 0.3 + k * w * 0.3, top + 0.5, cz, 0, 0.35, 0).box(0, 0, 0, w * 0.26, 0.06, d * 0.5).pop();
@@ -121,6 +148,147 @@ const City = (() => {
       return { x, z, y: y0, h };
     }
     const BURN2 = [0.12, 0.1, 0.1];
+    // ---- tööstuslik sci-fi (Alien / Quake / Tiberian Sun): hoiatustriibud, märgutuled, torud, talad ----
+    const HY = [0.86, 0.66, 0.12], HB = [0.07, 0.07, 0.07], RED = [1.0, 0.16, 0.08], RUSTC = [0.46, 0.27, 0.15], STEEL = [0.4, 0.41, 0.42];
+    function hazardZ(x, y, z, t, h, L) {   // kohalikus raamis: triibud piki z-telge
+      const n = Math.max(2, Math.round(L / 0.7));
+      for (let k = 0; k < n; k++) b.color(k & 1 ? HB : HY, MAT.MATTE).boxB(x, y, z - L / 2 + (k + 0.5) * L / n, t, h, L / n);
+    }
+    function beacon(x, y, z) { b.color(FRAME, MAT.METAL).cyl(x, y - 0.2, z, 0.2, 0.2, 0.22, 8, true); gl.color(RED, MAT.GLOW).sphere(x, y + 0.14, z, 0.17, 6, 4, 1); }
+    // tala kahe 3D-punkti vahel (ristlõige w×h)
+    function beam(x0, y0, z0, x1, y1, z1, w, h, col, mat) {
+      const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, L = Math.hypot(dx, dy, dz); if (L < 0.05) return;
+      b.color(col, mat == null ? MAT.METAL : mat).push().tf((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.atan2(dx, dz), -Math.asin(dy / L), 0).box(0, 0, 0, w, h, L).pop();
+    }
+    // toru kahe punkti vahel, äärikutega
+    function pipe(x0, y0, z0, x1, y1, z1, r, col) {
+      const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, L = Math.hypot(dx, dy, dz); if (L < 0.05) return;
+      b.color(col, MAT.METAL).push().tf((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.atan2(dx, dz), -Math.asin(dy / L), 0).push().tf(0, 0, 0, 0, Math.PI / 2, 0);
+      b.cyl(0, -L / 2, 0, r, r, L, 8, false);
+      const nf = Math.max(1, Math.floor(L / 3.2));
+      for (let k = 0; k <= nf; k++) b.color(FRAME, MAT.METAL).cyl(0, -L / 2 + k * L / nf - 0.07, 0, r * 1.35, r * 1.35, 0.14, 8, true);
+      b.pop().pop();
+    }
+    // ---- atmosfääriprotsessor: hiiglaslik kaheksanurkne torn, tugipiilarid, korstnad, oranž hõõgus ----
+    function atmo(x, z, s) {
+      const y0 = Y(x, z) - 0.3, P8 = Math.PI / 8;
+      b.color(FRAME, MAT.METAL).cyl(x, y0, z, 15 * s, 14 * s, 3.2, 8, true, P8);
+      for (let k = 0; k < 16; k++) { const a = k / 16 * TAU; b.color(k & 1 ? HB : HY, MAT.MATTE).push().tf(x + Math.cos(a) * 14.2 * s, y0 + 2.9, z + Math.sin(a) * 14.2 * s, -a + Math.PI / 2, 0, 0).boxB(0, 0, 0, 5.6 * s, 0.35, 0.5).pop(); }
+      const H1 = 30 * s, yb = y0 + 3.2;
+      b.color(PAN[1], MAT.WORN).cyl(x, yb, z, 9 * s, 8 * s, H1, 8, true, P8);
+      for (let k = 1; k < H1 / 5; k++) { b.color(FRAME, MAT.METAL).cyl(x, yb + k * 5, z, (9 - k * 5 / H1) * s + 0.35, (9 - k * 5 / H1) * s + 0.35, 0.7, 8, false, P8); gl.color(ACC[0], MAT.GLOW).cyl(x, yb + k * 5 - 1.4, z, (9 - k * 5 / H1) * s + 0.05, (9 - k * 5 / H1) * s + 0.05, 0.12, 8, false, P8); }
+      // ülemine masinaplokk
+      const yu = yb + H1;
+      b.color(PAN[2], MAT.WORN).cyl(x, yu, z, 12 * s, 12 * s, 9 * s, 8, true, P8);
+      b.color(FRAME, MAT.METAL).cyl(x, yu - 0.6, z, 12.5 * s, 12.5 * s, 0.9, 8, true, P8).cyl(x, yu + 9 * s, z, 12.6 * s, 11 * s, 1.2, 8, true, P8);
+      gl.color(ACC[0], MAT.GLOW).cyl(x, yu + 4 * s, z, 12.05 * s, 12.05 * s, 0.9, 8, false, P8);
+      for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; beacon(x + Math.cos(a) * 11.6 * s, yu + 9 * s + 1.5, z + Math.sin(a) * 11.6 * s); }
+      // korstnad + tipu hõõgus
+      const yt = yu + 9 * s + 1.2;
+      b.color([0.3, 0.3, 0.31], MAT.METAL).cyl(x, yt, z, 5 * s, 3.4 * s, 16 * s, 8, true, P8);
+      gl.color([1.0, 0.5, 0.15], MAT.GLOW).cyl(x, yt + 16 * s, z, 3.3 * s, 3.3 * s, 0.2, 8, true, P8);
+      for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + 0.4, px = x + Math.cos(a) * 8 * s, pz = z + Math.sin(a) * 8 * s; b.color(STEEL, MAT.METAL).cyl(px, yt, pz, 1.3 * s, 1.1 * s, 10 * s, 8, true); b.color(HB, MAT.MATTE).cyl(px, yt + 10 * s - 1, pz, 1.15 * s, 1.15 * s, 1, 8, false); }
+      // tugipiilarid ja suured torud maani
+      for (let k = 0; k < 4; k++) {
+        const a = k / 4 * TAU + Math.PI / 4, fx = Math.cos(a), fz = Math.sin(a);
+        beam(x + fx * 20 * s, y0, z + fz * 20 * s, x + fx * 9 * s, yb + H1 * 0.65, z + fz * 9 * s, 2.2 * s, 2.6 * s, PAN[0], MAT.WORN);
+        b.color(FRAME, MAT.METAL).boxB(x + fx * 20 * s, y0, z + fz * 20 * s, 4 * s, 2.4, 4 * s);
+        World.addCol({ t: 'c', x: x + fx * 19 * s, z: z + fz * 19 * s, r: 2.4 * s, y0: y0 - 1, y1: y0 + 6, kind: 'struct' });
+        const b2 = a + Math.PI / 4, gx = Math.cos(b2), gz = Math.sin(b2);
+        pipe(x + gx * 9 * s, y0 + 10, z + gz * 9 * s, x + gx * 22 * s, y0 + 1.6, z + gz * 22 * s, 0.9 * s, RUSTC);
+        b.color(STEEL, MAT.METAL).boxB(x + gx * 23 * s, y0, z + gz * 23 * s, 3, 2.8, 3); beacon(x + gx * 23 * s, y0 + 3.2, z + gz * 23 * s);
+        World.addCol({ t: 'c', x: x + gx * 23 * s, z: z + gz * 23 * s, r: 2.1, y0: y0 - 1, y1: y0 + 3, kind: 'struct' });
+      }
+      World.addCol({ t: 'c', x, z, r: 14.5 * s, y0: y0 - 2, y1: yt + 16 * s, kind: 'struct' });
+      return { y: yu + 4 * s };
+    }
+    // ---- mahutipark: püstmahutid, kuppelkaaned, triibuline jalam, torusild ----
+    function tanks(x, z, rr) {
+      const n = 2 + Math.floor(rng() * 3), pts = [];
+      for (let k = 0; k < n; k++) {
+        const a = k / n * TAU + rng(), d = n === 2 ? rr * 0.45 : rr * 0.55, px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d, r = R(2.6, 3.6), h = R(6, 10), y0 = Y(px, pz) - 0.2;
+        const col = rng() < 0.5 ? [0.66, 0.64, 0.6] : [0.52, 0.5, 0.46];
+        b.color(col, MAT.WORN).cyl(px, y0, pz, r, r, h, 14, true);
+        for (let q = 0; q < 4; q++) b.color(q & 1 ? HB : HY, MAT.MATTE).cyl(px, y0 + q * 0.35, pz, r + 0.04, r + 0.04, 0.35, 14, false);
+        b.color(FRAME, MAT.METAL).cyl(px, y0 + h * 0.5, pz, r + 0.08, r + 0.08, 0.3, 14, false).cyl(px, y0 + h, pz, r + 0.12, r + 0.12, 0.3, 14, true);
+        b.color(col, MAT.WORN).sphere(px, y0 + h + 0.3, pz, r * 0.96, 12, 5, 0.3);
+        if (rng() < 0.4) b.color(RUSTC, MAT.RUST).push().tf(px, y0 + h * 0.6, pz, rng() * TAU, 0, 0).box(r * 0.98, 0, 0, 0.1, h * 0.5, r * 0.8).pop();   // roostetriip
+        // redel
+        const la = rng() * TAU, lx = px + Math.cos(la) * (r + 0.3), lz = pz + Math.sin(la) * (r + 0.3);
+        b.color(FRAME, MAT.METAL).push().tf(lx, y0, lz, -la + Math.PI / 2, 0, 0).boxB(-0.3, 0, 0, 0.06, h + 1, 0.06).boxB(0.3, 0, 0, 0.06, h + 1, 0.06).pop();
+        beacon(px, y0 + h + 0.3 + r * 0.3 + 0.2, pz);
+        World.addCol({ t: 'c', x: px, z: pz, r: r + 0.2, y0: y0 - 1, y1: y0 + h + r * 0.3, kind: 'struct' });
+        pts.push([px, pz, y0 + h * 0.7]);
+      }
+      for (let k = 1; k < pts.length; k++) { const [ax, az, ay] = pts[k - 1], [bx, bz] = pts[k]; pipe(ax, ay, az, bx, ay, bz, 0.35, RUSTC); pipe(ax, ay - 0.8, az, bx, ay - 0.8, bz, 0.22, STEEL); }
+      return pts.length;
+    }
+    // ---- konteinerite virnad ----
+    function containers(x, z, rr) {
+      const yaw = rng() * Math.PI, fx = Math.sin(yaw), fz = Math.cos(yaw), sxv = Math.cos(yaw), szv = -Math.sin(yaw);
+      const CC = [[0.62, 0.3, 0.14], [0.22, 0.36, 0.5], [0.55, 0.55, 0.52], [0.3, 0.4, 0.26], [0.7, 0.55, 0.16]];
+      const cols = Math.max(1, Math.floor(rr * 2 / 3.2));
+      for (let i = 0; i < cols; i++) for (let j = 0; j < 2; j++) {
+        if (rng() < 0.2) continue;
+        const off = (i - (cols - 1) / 2) * 3.0, along = (j - 0.5) * 7.2;
+        const px = x + sxv * off + fx * along, pz = z + szv * off + fz * along, y0 = Y(px, pz) - 0.05;
+        const hN = 1 + Math.floor(rng() * 3);
+        for (let q = 0; q < hN; q++) {
+          const cc = CC[Math.floor(rng() * CC.length)], tw = q > 0 ? R(-0.12, 0.12) : 0;
+          b.color(cc, MAT.WORN).push().tf(px, y0 + q * 2.62, pz, yaw + tw, 0, 0).boxB(0, 0, 0, 2.45, 2.6, 6.1);
+          for (let r2 = -2; r2 <= 2; r2++) b.color(cc.map((v) => v * 0.8), MAT.WORN).boxB(0, 0.15, r2 * 1.2, 2.55, 2.3, 0.14);
+          b.color(FRAME, MAT.METAL).boxB(0, 0, 3.0, 2.5, 2.62, 0.14).boxB(0, 0, -3.0, 2.5, 2.62, 0.14);
+          b.pop();
+        }
+        World.addCol({ t: 's', ax: px - fx * 3, az: pz - fz * 3, bx: px + fx * 3, bz: pz + fz * 3, r: 1.3, y0: y0 - 1, y1: y0 + hN * 2.62, kind: 'struct' });
+      }
+      if (rng() < 0.6) {   // ümberkukkunud konteiner
+        const px = x + R(-3, 3), pz = z + R(-3, 3), a = rng() * TAU;
+        b.color(CC[Math.floor(rng() * CC.length)], MAT.WORN).push().tf(px, Y(px, pz) + 1.2, pz, a, 0, 1.35).box(0, 0, 0, 2.45, 2.6, 6.1).pop();
+        World.addCol({ t: 's', ax: px - Math.sin(a) * 3, az: pz - Math.cos(a) * 3, bx: px + Math.sin(a) * 3, bz: pz + Math.cos(a) * 3, r: 1.4, y0: Y(px, pz) - 1, y1: Y(px, pz) + 2.6, kind: 'struct' });
+      }
+    }
+    // ---- sidetaldrik: sõrestikalus, kallutatud taldrik ----
+    function dish(x, z) {
+      const y0 = Y(x, z) - 0.2, yaw = rng() * TAU;
+      b.color(STEEL, MAT.METAL).boxB(x, y0, z, 5, 2.4, 5);
+      hazardZ(x + 2.55, y0 + 1.9, z, 0.1, 0.4, 5);
+      b.color(FRAME, MAT.METAL).cyl(x, y0 + 2.4, z, 0.9, 0.7, 5, 8, true);
+      for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + 0.78; beam(x + Math.cos(a) * 2.4, y0 + 2.4, z + Math.sin(a) * 2.4, x, y0 + 6.5, z, 0.25, 0.25, FRAME); }
+      dm.color([0.7, 0.7, 0.68], MAT.METAL).push().tf(x, y0 + 8.2, z, yaw, -0.85, 0).sphere(0, 0, 0, 5.5, 18, 7, 0.22).pop();
+      b.push().tf(x, y0 + 8.2, z, yaw, -0.85, 0);
+      b.color(FRAME, MAT.METAL).box(0, 2.6, 0, 0.15, 5, 0.15);
+      b.pop();
+      gl.push().tf(x, y0 + 8.2, z, yaw, -0.85, 0).color(RED, MAT.GLOW).sphere(0, 5.2, 0, 0.3, 6, 4, 1).pop();
+      World.addCol({ t: 'c', x, z, r: 3.4, y0: y0 - 1, y1: y0 + 8, kind: 'struct' });
+    }
+    // ---- tornkraana: sõrestikmast, nool, vastukaal, rippuv konks ----
+    function crane(x, z) {
+      const y0 = Y(x, z) - 0.2, H = R(24, 32), yaw = rng() * TAU, fx = Math.sin(yaw), fz = Math.cos(yaw), M = 1.1;
+      b.color(FRAME, MAT.METAL).boxB(x, y0, z, 4, 1.2, 4);
+      const MC = [0.8, 0.6, 0.12];
+      for (const [qx, qz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.color(MC, MAT.METAL).boxB(x + qx * M, y0 + 1.2, z + qz * M, 0.22, H, 0.22);
+      for (let k = 0; k < H / 2.4; k++) {
+        const ya = y0 + 1.2 + k * 2.4, yb2 = ya + 2.4;
+        beam(x - M, ya, z - M, x + M, yb2, z - M, 0.1, 0.1, MC); beam(x + M, ya, z + M, x - M, yb2, z + M, 0.1, 0.1, MC);
+        beam(x - M, ya, z + M, x - M, yb2, z - M, 0.1, 0.1, MC); beam(x + M, ya, z - M, x + M, yb2, z + M, 0.1, 0.1, MC);
+      }
+      const yt = y0 + 1.2 + H;
+      // kabiin
+      b.color(PAN[0], MAT.WORN).boxB(x + fz * 1.8, yt - 2.6, z - fx * 1.8, 2, 2.2, 2.2); gl.color(ACC[1], MAT.GLOW).boxB(x + fz * 1.8 + fx * 1.12, yt - 1.9, z - fx * 1.8 + fz * 1.12, 1.2, 0.8, 0.05);
+      // nool ja vastunool (kolmnurkne sõrestik lihtsustatult)
+      beam(x - fx * 10, yt + 0.5, z - fz * 10, x + fx * 30, yt + 0.5, z + fz * 30, 1.2, 1.0, MC);
+      beam(x - fx * 10, yt + 0.5, z - fz * 10, x, yt + 6, z, 0.18, 0.18, FRAME); beam(x, yt + 6, z, x + fx * 30, yt + 1, z + fz * 30, 0.12, 0.12, FRAME);
+      b.color(MC, MAT.METAL).boxB(x, yt, z, 2.2, 6.2, 2.2);
+      b.color([0.42, 0.42, 0.4], MAT.WORN).push().tf(x - fx * 8.5, yt - 1.6, z - fz * 8.5, yaw, 0, 0).boxB(0, 0, 0, 2.6, 2.2, 3).pop();
+      b.push().tf(x - fx * 8.5, yt - 1.6, z - fz * 8.5, yaw, 0, 0); hazardZ(1.32, 0.6, 0, 0.06, 0.7, 3); hazardZ(-1.32, 0.6, 0, 0.06, 0.7, 3); b.pop();
+      beacon(x, yt + 6.4, z); beacon(x + fx * 30, yt + 1.2, z + fz * 30);
+      // konks
+      const hd = R(14, 26), hx = x + fx * hd, hz = z + fz * hd, hy = R(Y(hx, hz) + 4, yt - 4);
+      b.color(DARK, MAT.METAL).boxB(hx, hy, hz, 0.06, yt - hy, 0.06);
+      b.color(HY, MAT.METAL).boxB(hx, hy - 0.9, hz, 1.0, 0.9, 0.6);
+      World.addCol({ t: 'c', x, z, r: 2.2, y0: y0 - 1, y1: yt + 6, kind: 'struct' });
+    }
     // ---- kuppelkasvuhoone: suur klaaskuppel ribidega, sisse saab ukse kaudu ----
     function greenhouse(x, z, r) {
       const y0 = Y(x, z) + 0.02, n = 18, doorK = Math.floor(rng() * n);
@@ -176,41 +344,112 @@ const City = (() => {
       } else rubble(b, (x0 + x1) / 2, (z0 + z1) / 2, 2.5, rng, Y(x0, z0));
       if (k % 7 === 3) { const x = x0, z = z0, y = Y(x, z) - 0.3; b.color(PAN[0], MAT.WORN).cyl(x, y, z, 3.6, 3.2, 11, 18, true); b.color(FRAME, MAT.METAL).cyl(x, y + 11, z, 4, 4, 0.8, 18, true); gl.color(ACC[0], MAT.GLOW).cyl(x, y + 9, z, 3.3, 3.3, 0.1, 18, false); World.addCol({ t: 'c', x, z, r: 3.7, y0: y - 2, y1: y + 12, kind: 'struct' }); }   // bastion
     }
-    // keskväljak: maandumisplats, juhtimistorn, monument
+    // ---- hoonete paigutus: tihe kvartalivõrk ringteede ja radiaalteede vahel ----
+    const RINGS = c.rings || [60, 100, 140, 176, 212], RW = 5.5;
+    const occ = [];
+    const free = (x, z, r) => occ.every((o) => Math.hypot(o.x - x, o.z - z) > o.r + r + 1.5);
+    const take = (x, z, r) => occ.push({ x, z, r });
+    const nearRadial = (x, z, m) => { const ang = Math.atan2(z - c.z, x - c.x) - c.roadA, sec = TAU / RAD, ra = ((ang % sec) + sec * 1.5) % sec - sec / 2; return Math.abs(Math.sin(ra) * Math.hypot(x - c.x, z - c.z)) < m; };
+    const nearRing = (x, z, m) => { const d = Math.hypot(x - c.x, z - c.z); return RINGS.some((rr) => Math.abs(d - rr) < m); };
+    const doorTo = (hx, hz) => { const gx = c.x - hx, gz = c.z - hz; return Math.abs(gx) > Math.abs(gz) ? (gx > 0 ? 1 : 3) : (gz > 0 ? 0 : 2); };
+    // keskväljak: maandumisplats, atmosfääriprotsessor, juhtimistorn ja skybridge
     { const y0 = Y(c.x, c.z);
       b.color([0.26, 0.27, 0.28], MAT.METAL).cyl(c.x, y0 - 0.25, c.z, 14, 14, 0.35, 32, true);
       gl.color(ACC[0], MAT.GLOW).cyl(c.x, y0 + 0.11, c.z, 13, 13, 0.02, 32, false);
       b.color([0.24, 0.25, 0.26], MAT.METAL).cyl(c.x, y0 - 0.24, c.z, 12.6, 12.6, 0.36, 32, true);
       for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; gl.color(ACC[1], MAT.GLOW).box(c.x + Math.cos(a) * 9, y0 + 0.13, c.z + Math.sin(a) * 9, 1.6, 0.02, 1.6); }
-      spire(c.x + 24, c.z - 8, 4.2, 40);
-      // skybridge tornist maandumisplatsi servas oleva hooneni
-      hab(c.x - 26, c.z + 14, 14, 11, 2, 1, rng);
-      const ax = c.x + 24, az = c.z - 8, bx = c.x - 26, bz = c.z + 14, L = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(bx - ax, bz - az);
-      b.color(PAN[0], MAT.WORN).push().tf((ax + bx) / 2, y0 + 8.6, (az + bz) / 2, yaw, 0, 0).rbox(0, 0, 0, 2.6, 2.6, L - 8, 1.1).pop();
-      gl.color(ACC[1], MAT.GLOW).push().tf((ax + bx) / 2, y0 + 8.6, (az + bz) / 2, yaw, 0, 0).box(1.33, 0, 0, 0.04, 0.4, L - 9).box(-1.33, 0, 0, 0.04, 0.4, L - 9).pop();
+      for (let k = 0; k < 24; k++) { const a = k / 24 * TAU; b.color(k & 1 ? HB : HY, MAT.MATTE).push().tf(c.x + Math.cos(a) * 14.1, y0 - 0.2, c.z + Math.sin(a) * 14.1, -a + Math.PI / 2, 0, 0).boxB(0, 0, 0, 3.7, 0.4, 0.5).pop(); }
+      take(c.x, c.z, 15);
+      const ax = c.x - 30, az = c.z + 16; const ap = atmo(ax, az, 0.85); take(ax, az, 22);
+      const sp = spire(c.x + 26, c.z - 12, 4.2, 44); take(c.x + 26, c.z - 12, 6);
+      const L = Math.hypot(ax - sp.x, az - sp.z), yaw = Math.atan2(ax - sp.x, az - sp.z), yy = Math.min(ap.y, y0 + 22);
+      b.color(PAN[0], MAT.WORN).push().tf((ax + sp.x) / 2, yy, (az + sp.z) / 2, yaw, 0, 0).rbox(0, 0, 0, 2.8, 2.8, L - 16, 1.1).pop();
+      gl.color(ACC[1], MAT.GLOW).push().tf((ax + sp.x) / 2, yy, (az + sp.z) / 2, yaw, 0, 0).box(1.43, 0, 0, 0.04, 0.4, L - 17).box(-1.43, 0, 0, 0.04, 0.4, L - 17).pop();
+      for (const t of [0.35, 0.65]) { const px = sp.x + (ax - sp.x) * t, pz = sp.z + (az - sp.z) * t; b.color(FRAME, MAT.METAL).push().tf(px, Y(px, pz) - 0.3, pz, yaw, 0, 0).boxB(0, 0, 0, 1.4, yy - Y(px, pz) - 1.1, 1.4).pop(); World.addCol({ t: 'c', x: px, z: pz, r: 1.0, y0: y0 - 1, y1: yy, kind: 'struct' }); take(px, pz, 1.2); }
     }
     monorail(140, 40);
-    // kvartalid radiaalteede vahel: igas sektoris tornid, elamud, kasvuhooned
-    for (let sct = 0; sct < RAD; sct++) {
-      const am = (sct + 0.5) / RAD * TAU + c.roadA;
-      for (const [rr, kind] of [[96, 'inner'], [180, 'outer']]) {
-        const x = c.x + Math.cos(am) * rr, z = c.z + Math.sin(am) * rr;
-        const roll = rng();
-        if (kind === 'inner' && roll < 0.4) spire(x, z, R(3, 4.2), R(26, 44));
-        else if (roll < 0.62) greenhouse(x, z, R(10, 14));
-        else {
-          // 2–3 elamut sektoris, uks raadiusega risti (tänava poole)
-          const n = kind === 'outer' ? 3 : 2;
-          for (let q = 0; q < n; q++) {
-            const aq = am + (q - (n - 1) / 2) * (kind === 'outer' ? 0.14 : 0.2), rq = rr + R(-8, 8);
-            const hx = c.x + Math.cos(aq) * rq, hz = c.z + Math.sin(aq) * rq;
-            const gx = c.x - hx, gz = c.z - hz;
-            const doorSide = Math.abs(gx) > Math.abs(gz) ? (gx > 0 ? 1 : 3) : (gz > 0 ? 0 : 2);
-            hab(hx, hz, R(10, 15), R(8, 12), rng() < 0.45 ? 2 : 1, doorSide, rng);
-          }
-          if (rng() < 0.5) spire(x + R(-14, 14), z + R(-14, 14), R(1.8, 2.6), R(14, 22));
-        }
-        spots.push({ x: c.x + Math.cos(am + 0.39) * rr, z: c.z + Math.sin(am + 0.39) * rr });   // radiaaltee ääres
+    // kvartali tüübid: elamud, tööstus, tornid, kasvuhooned
+    const THEMES = { res: [['hab', 6], ['hab2', 3], ['spire_s', 1], ['dish', 0.6]], ind: [['tanks', 3], ['cont', 3], ['hall', 3], ['crane', 1.2], ['hab', 1.5]],
+      tower: [['spire', 2], ['hab2', 3], ['hab', 2], ['dish', 0.8]], park: [['green', 2], ['hab', 3], ['cont', 0.6]] };
+    const pickW = (list) => { let s2 = 0; for (const [, w2] of list) s2 += w2; let u = rng() * s2; for (const [t, w2] of list) { u -= w2; if (u <= 0) return t; } return list[0][0]; };
+    // pinnad: [ringide vahe 0, 1, 2, 3] ja plats
+    const bands = [];
+    for (let i = 0; i < RINGS.length - 1; i++) bands.push([RINGS[i] + RW, RINGS[i + 1] - RW, i]);
+    const sizeOf = (t) => {
+      if (t === 'hab') { const w = R(9, 14), d = R(7, 11); return { w, d, fr: Math.hypot(w, d) / 2 }; }
+      if (t === 'hab2') { const w = R(10, 15), d = R(8, 12); return { w, d, fr: Math.hypot(w, d) / 2 }; }
+      if (t === 'hall') { const w = R(16, 20), d = R(10, 13); return { w, d, fr: Math.hypot(w, d) / 2 }; }
+      return { fr: { tanks: 9, cont: 8.5, crane: 4, dish: 4, spire: 6, spire_s: 3.5, green: 11 }[t] || 6 };
+    };
+    for (const [r0, r1, bi] of bands) for (let sct = 0; sct < RAD; sct++) {
+      const aS = sct / RAD * TAU + c.roadA, sec = TAU / RAD;
+      const tr = rng();
+      const theme = bi === 0 ? (tr < 0.45 ? 'tower' : tr < 0.8 ? 'res' : 'park') : bi === 1 ? (tr < 0.3 ? 'tower' : tr < 0.65 ? 'res' : tr < 0.85 ? 'park' : 'ind') : (tr < 0.55 ? 'ind' : tr < 0.85 ? 'res' : 'park');
+      const list = THEMES[theme];
+      let fails = 0, placed = 0;
+      while (fails < 26 && placed < 9) {
+        const t = pickW(list), S = sizeOf(t);
+        if (S.fr * 2 > r1 - r0) { fails++; continue; }
+        const rr = R(r0 + S.fr, r1 - S.fr), marg = (RW + S.fr) / rr;
+        if (sec - 2 * marg <= 0) { fails++; continue; }
+        const a = aS + marg + rng() * (sec - 2 * marg);
+        const x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr;
+        if (!free(x, z, S.fr)) { fails++; continue; }
+        take(x, z, S.fr); placed++;
+        if (t === 'hab') hab(x, z, S.w, S.d, 1, doorTo(x, z), rng);
+        else if (t === 'hab2') hab(x, z, S.w, S.d, 2 + (rng() < 0.25 ? 1 : 0), doorTo(x, z), rng);
+        else if (t === 'hall') hab(x, z, S.w, S.d, 2, doorTo(x, z), rng, { hall: true });
+        else if (t === 'tanks') tanks(x, z, S.fr);
+        else if (t === 'cont') containers(x, z, S.fr);
+        else if (t === 'crane') crane(x, z);
+        else if (t === 'dish') dish(x, z);
+        else if (t === 'spire') spire(x, z, R(3, 4.4), R(26, 46));
+        else if (t === 'spire_s') spire(x, z, R(1.8, 2.6), R(14, 22));
+        else if (t === 'green') greenhouse(x, z, R(8.5, 10.5));
+      }
+      for (const rr of [r0 - RW, r1 + RW]) spots.push({ x: c.x + Math.cos(aS + sec / 2) * rr, z: c.z + Math.sin(aS + sec / 2) * rr });   // ringteel
+    }
+    // plats: väiksemad hooned keskväljaku ääres
+    for (let k = 0, f = 0; k < 6 && f < 30;) {
+      const S = sizeOf('hab'), a = rng() * TAU, rr = R(22, RINGS[0] - RW - S.fr), x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr;
+      if (!free(x, z, S.fr) || nearRadial(x, z, RW + S.fr)) { f++; continue; }
+      take(x, z, S.fr); k++; hab(x, z, S.w, S.d, 1 + (rng() < 0.4 ? 1 : 0), doorTo(x, z), rng);
+    }
+    // ---- kõvakattega teed: asfaltplaadid, äärekivid, teekattemärgistus; kohati lõhutud või liiva all ----
+    const sandAt = (x, z) => smoothstep(0.15, 0.65, Noise.n2(x * 0.03 + 11, z * 0.03 - 5));
+    function slab(B, x0, z0, x1, z1, w, o) {
+      const L = Math.hypot(x1 - x0, z1 - z0); if (L < 0.3) return;
+      const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      if (sandAt(mx, mz) > (o.sand || 0.62)) return;   // liiva all
+      const yA = Y(x0, z0), yB = Y(x1, z1), yaw = Math.atan2(x1 - x0, z1 - z0), pitch = -Math.atan2(yB - yA, L), my = (yA + yB) / 2;
+      if (rng() < (o.broken || 0.07)) {   // lõhutud: kallutatud tükid
+        for (let k = 0; k < 3; k++) B.color([0.2, 0.2, 0.21], MAT.WORN).push().tf(mx + R(-w / 3, w / 3), my + 0.05, mz + R(-w / 3, w / 3), rng() * TAU, R(-0.25, 0.25), R(-0.25, 0.25)).box(0, 0, 0, R(1.4, 2.6), 0.3, R(1.4, 2.6)).pop();
+        return;
+      }
+      const v = R(0.85, 1.12), patch = rng() < 0.12;
+      const col = patch ? [0.36 * v, 0.35 * v, 0.33 * v] : [0.17 * v, 0.17 * v, 0.18 * v];
+      B.push().tf(mx, my + (o.lift || 0), mz, yaw, pitch, 0);
+      B.color(col, MAT.WORN).box(0, -0.18, 0, w, 0.52, L + 0.06);
+      if (o.dash && (o.i & 1) === 0) B.color([0.62, 0.55, 0.3], MAT.MATTE).box(0, 0.085, 0, 0.18, 0.012, L * 0.55);
+      if (o.edge) for (const sg of [-1, 1]) if (rng() < 0.75) B.color([0.55, 0.54, 0.5], MAT.MATTE).box(sg * (w / 2 - 0.45), 0.085, 0, 0.14, 0.012, L);
+      if (o.curb && !o.curbSkip) for (const sg of [-1, 1]) if (rng() < 0.85) B.color([0.44, 0.43, 0.41], MAT.WORN).boxB(sg * (w / 2 + 0.2), -0.3, 0, 0.4, 0.55, L + 0.02);
+      B.pop();
+    }
+    RINGS.forEach((rr, ri) => {
+      const n = Math.round(TAU * rr / 6);
+      for (let k = 0; k < n; k++) {
+        const a0 = k / n * TAU, a1 = (k + 1) / n * TAU;
+        const x0 = c.x + Math.cos(a0) * rr, z0 = c.z + Math.sin(a0) * rr, x1 = c.x + Math.cos(a1) * rr, z1 = c.z + Math.sin(a1) * rr;
+        slab(b, x0, z0, x1, z1, 9, { dash: true, edge: ri !== 2, curb: true, curbSkip: nearRadial((x0 + x1) / 2, (z0 + z1) / 2, 7), i: k, lift: 0 });
+      }
+    });
+    for (let k = 0; k < RAD; k++) {
+      const a = k / RAD * TAU + c.roadA, ca = Math.cos(a), sa = Math.sin(a);
+      for (let d = 16, i = 0; d < c.r + 90; d += 6, i++) {
+        const x0 = c.x + ca * d, z0 = c.z + sa * d, x1 = c.x + ca * (d + 6), z1 = c.z + sa * (d + 6);
+        const inRing = nearRing((x0 + x1) / 2, (z0 + z1) / 2, 5);
+        if (d < RINGS[0] && !free((x0 + x1) / 2, (z0 + z1) / 2, 3)) continue;   // väljaku hooned
+        slab(b, x0, z0, x1, z1, 9, { dash: !inRing, edge: !inRing, curb: d < c.r - 10, curbSkip: nearRing((x0 + x1) / 2, (z0 + z1) / 2, 7), i, lift: inRing ? 0.015 : 0, broken: d > c.r ? 0.16 : 0.07 });
       }
     }
     // vallilõik valitud kõrgusega (kõrgus maapinnast)
@@ -224,6 +463,8 @@ const City = (() => {
     for (let k = 0; k < 18; k++) {
       const s = spots[Math.floor(rng() * spots.length)]; if (!s) break;
       const x = s.x + R(-10, 10), z = s.z + R(-10, 10), y = Y(x, z), yaw = R(0, TAU);
+      if (!free(x, z, 2.6)) continue;
+      take(x, z, 2.6);
       b.push().tf(x, y, z, yaw, 0, R(-0.15, 0.15));
       b.color(rng() < 0.5 ? [0.66, 0.64, 0.6] : [0.3, 0.42, 0.5], MAT.WORN).boxB(0, 0.45, 0, 2.0, 0.9, 4.4).boxB(0, 1.35, -0.4, 1.8, 0.75, 2.4);
       b.color(DARK, MAT.MATTE).boxB(0, 1.4, 0.82, 1.7, 0.6, 0.05);
@@ -291,6 +532,18 @@ const City = (() => {
       World.wrecks.push(w);
       v.name = vNames[vi % vNames.length];
     });
+    // maanteed asulate vahel: asfaltplaadid järgivad maastikku, suur osa lagunenud või liiva all
+    for (const r of World.sites.roads || []) {
+      const n = Math.floor(r.L / 6);
+      for (let k = 0; k < n; k++) {
+        const x0 = r.ax + r.dx * k / n, z0 = r.az + r.dz * k / n, x1 = r.ax + r.dx * (k + 1) / n, z1 = r.az + r.dz * (k + 1) / n, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+        if (Math.hypot(mx - c.x, mz - c.z) < c.r + 92) continue;
+        if ((World.sites.villages || []).some((v) => Math.hypot(mx - v.x, mz - v.z) < v.r)) continue;
+        if (Math.hypot(mx, mz) < 90 || World.sites.rivals.some((q) => Math.hypot(mx - q.x, mz - q.z) < 90) || Math.hypot(mx - World.sites.nest.x, mz - World.sites.nest.z) < 80) continue;
+        if (Noise.n2(mx * 0.012 + 40, mz * 0.012 - 7) > 0.42) continue;
+        slab(b, x0, z0, x1, z1, 8, { dash: true, edge: true, i: k, broken: 0.14, sand: 0.5 });
+      }
+    }
     vmesh = b.build(); vglow = gl.build(); vdomes = dm.build();
     MB.detail = detail0;
   }

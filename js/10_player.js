@@ -48,7 +48,7 @@ const Player = {
     // sõidukis: eraldi juhtimine
     if (this.vehicle) { Vehicles.playerUpdate(this, dt, inp); return; }
     // taastumine
-    if (this.lastHurt > 6 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + dt * 4 * Inv.regenMul());
+    if (this.lastHurt > 4 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + dt * 6 * Inv.regenMul());
     Inv.update(dt);
     // vaatamine
     this.yaw -= inp.lookX; this.pitch = clamp(this.pitch - inp.lookY, -1.45, 1.45);
@@ -248,7 +248,7 @@ const Player = {
   hurt(amt, src) {
     if (this.dead || G.mode !== 'play' && G.mode !== 'build') return;
     if (G.mode === 'build') return;
-    amt *= Inv.dmgMul();
+    amt *= Inv.dmgMul() * 0.65;   // mängija on vastupidavam (varem suri liiga kergelt)
     if (this.vehicle && !this.vehicle.dead) { this.vehicle.hp -= amt * 0.55; this.vehicle.hurtT = 0.25; amt *= this.seat === 1 ? 0.6 : 0.4; }   // sõiduk võtab osa löögist
     this.hp -= amt;
     this.hurtT = 0.4; this.lastHurt = 0;

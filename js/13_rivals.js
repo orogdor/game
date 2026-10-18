@@ -308,8 +308,8 @@ const Rivals = (() => {
         e.aimLock = undefined;
       }
       if (e.cool <= 0 && Math.abs(angDiff(e.yaw, Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z))) < 0.35) {
-        fireAt(e, t, e.dmg, e.acc, 'enemy');
-        e.cool = rand(0.45, 0.6);
+        fireAt(e, t, e.dmg, e.acc * (t === Player ? 0.8 : 1), 'enemy');
+        e.cool = t === Player ? rand(0.75, 1.1) : rand(0.45, 0.6);
       }
       return;
     }

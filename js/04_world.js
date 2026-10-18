@@ -157,6 +157,7 @@ const World = (() => {
     // lagunenud teed: pragunenud asfalt, kohati liiva all
     for (const r of sites.roads || []) {
       if (x < r.x0 || x > r.x1 || z < r.z0 || z > r.z1) continue;
+      if (Math.hypot(x - sites.city.x, z - sites.city.z) < sites.city.r + 20) continue;   // linnas on oma teed
       const t = clamp(((x - r.ax) * r.dx + (z - r.az) * r.dz) / r.L2, 0, 1), px = r.ax + r.dx * t, pz = r.az + r.dz * t;
       const dd = Math.hypot(x - px, z - pz) + Noise.n2(x * 0.15, z * 0.15) * 0.8;
       if (dd > 7) continue;
@@ -171,7 +172,7 @@ const World = (() => {
       const ang = Math.atan2(z - sites.city.z, x - sites.city.x) - (sites.city.roadA || 0);
       const sec = TAU / 8, ra = ((ang % sec) + sec * 1.5) % sec - sec / 2;   // nurk lähima radiaaltee suhtes
       const dRad = Math.abs(Math.sin(ra) * cd);
-      const dRing = Math.min(Math.abs(cd - 60), Math.abs(cd - 140), Math.abs(cd - 212));
+      let dRing = 1e9; for (const rr of sites.city.rings || CITY_RINGS) dRing = Math.min(dRing, Math.abs(cd - rr));
       const road = (dRad < 4.5 && cd > 16 && cd < sites.city.r + 110) || (dRing < 4.5 && cd < sites.city.r);
       const sandOver = smoothstep(0.15, 0.65, Noise.n2(x * 0.03 + 11, z * 0.03 - 5));
       const crack = Noise.n2(x * 0.5, z * 0.5) > 0.42 ? 0.65 : 1;
@@ -183,6 +184,7 @@ const World = (() => {
     return c;
   }
 
+  const CITY_RINGS = [60, 100, 140, 176, 212];   // linna ringteede raadiused
   function roadSeg(a, b) { const dx = b.x - a.x, dz = b.z - a.z; return { ax: a.x, az: a.z, dx, dz, L2: dx * dx + dz * dz || 1, L: Math.hypot(dx, dz), x0: Math.min(a.x, b.x) - 8, x1: Math.max(a.x, b.x) + 8, z0: Math.min(a.z, b.z) - 8, z1: Math.max(a.z, b.z) + 8 }; }
   function generate(s) {
     seed = s;
@@ -211,7 +213,7 @@ const World = (() => {
         const sc = Math.min(...sites.rivals.map((q) => Math.hypot(q.x - x, q.z - z)), Math.hypot(sites.nest.x - x, sites.nest.z - z) * 0.8);
         if (sc > bs) { bs = sc; bc = { x, z }; }
       }
-      sites.city = Object.assign({ level: 0, r: 230 }, bc || { x: 1600, z: 0 }); }
+      sites.city = Object.assign({ level: 0, r: 230, rings: CITY_RINGS }, bc || { x: 1600, z: 0 }); }
     sites.city.roadA = 0;
     // väikesed mahajäetud asulad (2–4 maja) ja lagunenud teed nende vahel
     sites.villages = [];
