@@ -4,7 +4,7 @@
 //  Palju vanarauda (rusud), mahajäänud varustust ja palju tulnukaid.
 // ============================================================
 const City = (() => {
-  let mesh = null, glow = null;
+  let mesh = null, glow = null, domes = null;
   const ID = M4.create();
   const spots = [];      // tänavapunktid (tulnukate pesad, varustus)
   const lootSpots = [];  // majade ees, kuhu jäi varustust
@@ -13,70 +13,158 @@ const City = (() => {
     const c = World.sites.city;
     spots.length = 0; lootSpots.length = 0;
     const detail0 = MB.detail; MB.detail = false;   // palju kaste: lihtne geomeetria
-    const b = new MB(); b.jit = 0;
-    const gl = new MB(); gl.jit = 0;
+    const b = new MB(); b.jit = 0;      // kõik tahked osad
+    const gl = new MB(); gl.jit = 0;    // helendavad osad
+    const dm = new MB(); dm.jit = 0;    // kuplid (joonistatakse kahepoolselt, et ka seest näha)
     const R = (a, z) => a + rng() * (z - a);
-    const CON = [[0.56, 0.52, 0.47], [0.5, 0.47, 0.44], [0.62, 0.56, 0.48], [0.45, 0.43, 0.42]];
-    const WIN = [0.06, 0.06, 0.07], BURN = [0.16, 0.13, 0.12], RUST = [0.45, 0.24, 0.13], STEEL = [0.36, 0.37, 0.39];
     const Y = (x, z) => World.heightAt(x, z);
-    const G = 46;
-    for (let gx = -5; gx <= 5; gx++) for (let gz = -5; gz <= 5; gz++) {
-      const bx = c.x + gx * G, bz = c.z + gz * G;
-      const dc = Math.hypot(bx - c.x, bz - c.z);
-      if (dc > c.r - 18) continue;
-      spots.push({ x: bx + G / 2, z: bz });   // tänavaristmik
-      if (rng() < 0.16) {   // tühi krunt: rusuhunnik
-        rubble(b, bx, bz, R(6, 11), rng, Y(bx, bz));
-        lootSpots.push({ x: bx, z: bz });
-        continue;
-      }
-      const w = R(14, 30), d = R(14, 30), floors = Math.max(1, Math.round(R(2, 7) * (1 - dc / (c.r * 1.6)))), FH = 3.4;
-      const y0 = Y(bx, bz) - 0.6, col = CON[Math.floor(rng() * CON.length)];
-      const yaw = (rng() < 0.5 ? 0 : 0.02) * (rng() - 0.5);
-      // hoone korrused: ülemised varisenud (osaliselt)
-      for (let f = 0; f < floors; f++) {
-        const top = f >= floors - 2 && floors > 2;
-        const fy = y0 + f * FH;
-        let x0 = bx - w / 2, x1 = bx + w / 2, z0 = bz - d / 2, z1 = bz + d / 2;
-        if (top && rng() < 0.7) { if (rng() < 0.5) x1 -= w * R(0.3, 0.6); else z0 += d * R(0.3, 0.6); }
-        const cw = x1 - x0, cd = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-        b.color(f === floors - 1 && rng() < 0.5 ? BURN : col, MAT.WORN).boxB(cx, fy, cz, cw, FH - 0.25, cd);
-        b.color([0.3, 0.29, 0.28], MAT.WORN).boxB(cx, fy + FH - 0.25, cz, cw + 0.4, 0.25, cd + 0.4);   // vahelagi
-        // aknad (tumedad avad) – mõned helendavad hõõguva tulnukalimaga
-        for (const [sx, sz, len, alongX] of [[0, -1, cw, true], [0, 1, cw, true], [-1, 0, cd, false], [1, 0, cd, false]]) {
-          const nWin = Math.floor(len / 3.2);
-          for (let k = 0; k < nWin; k++) {
-            if (rng() < 0.12) continue;
-            const t = -len / 2 + 1.6 + k * (len - 3.2) / Math.max(1, nWin - 1);
-            const wx = alongX ? cx + t : cx + sx * (cw / 2 + 0.03), wz = alongX ? cz + sz * (cd / 2 + 0.03) : cz + t;
-            const lit = rng() < 0.025;
-            (lit ? gl : b).color(lit ? [0.5, 1.0, 0.25] : WIN, lit ? MAT.GLOW : MAT.MATTE).box(wx, fy + 1.55, wz, alongX ? 1.5 : 0.08, 1.5, alongX ? 0.08 : 1.5);
+    // koloonia arhitektuur: heledad komposiitpaneelid, tumedad raamid, oranžid/sinised märgutuled
+    const PAN = [[0.72, 0.7, 0.66], [0.64, 0.63, 0.6], [0.7, 0.66, 0.58]], FRAME = [0.22, 0.23, 0.25], DARK = [0.08, 0.08, 0.09], DIRT = [0.48, 0.38, 0.3];
+    const ACC = [[1.0, 0.55, 0.15], [0.3, 0.75, 1.0], [0.55, 1.0, 0.3]];
+    const wallCol = (x0, z0, x1, z1, y0, h, t) => World.addCol({ t: 's', ax: x0, az: z0, bx: x1, bz: z1, r: (t || 0.4) / 2 + 0.05, y0: y0 - 1, y1: y0 + h, kind: 'struct' });
+    // ---- sirge seinalõik kahe punkti vahel (paks kast: näha mõlemalt poolt) ----
+    function wallSeg(x0, z0, x1, z1, y0, h, t, col, opts) {
+      const L = Math.hypot(x1 - x0, z1 - z0); if (L < 0.2) return;
+      const yaw = Math.atan2(x1 - x0, z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      b.push().tf(mx, y0, mz, yaw, 0, 0);
+      b.color(col, MAT.WORN).boxB(0, 0, 0, t, h, L);
+      b.color(FRAME, MAT.METAL).boxB(0, h - 0.18, 0, t + 0.12, 0.22, L + 0.02);           // ülaserv
+      b.color(DIRT, MAT.WORN).boxB(0, 0, 0, t + 0.04, 0.5, L + 0.02);                       // tolmune jalam
+      if (opts && opts.stripe) gl.push().tf(mx, y0, mz, yaw, 0, 0).color(opts.stripe, MAT.GLOW).boxB(0, h * 0.62, 0, t + 0.03, 0.06, L * 0.9).pop();
+      b.pop();
+      World.addCol({ t: 's', ax: x0, az: z0, bx: x1, bz: z1, r: (t || 0.4) / 2 + 0.05, y0: opts && opts.raised ? y0 : y0 - 1, y1: y0 + h, kind: 'struct' });
+    }
+    // ---- hoone: ristkülik, avad (uks/aknad), sisu, katus; sisse saab minna ----
+    function hab(cx, cz, w, d, floors, doorSide, rng) {
+      const y0 = Y(cx, cz) + 0.05, FH = 4.2, T = 0.4, col = PAN[Math.floor(rng() * PAN.length)], acc = ACC[Math.floor(rng() * ACC.length)];
+      const ruin = rng();   // > 0.6: osa seinast varisenud
+      // põrand
+      b.color([0.3, 0.3, 0.31], MAT.METAL).boxB(cx, y0 - 0.3, cz, w + 0.6, 0.35, d + 0.6);
+      for (let k = -1; k <= 1; k++) gl.color(acc, MAT.GLOW).box(cx + k * w * 0.3, y0 + 0.07, cz, 0.12, 0.02, d * 0.85);   // põrandatuled
+      // seinad: iga külg jagatud 2.4 m lõikudeks; uksel ava, osadel aknaribad
+      const sides = [[cx - w / 2, cz + d / 2, cx + w / 2, cz + d / 2, 0], [cx + w / 2, cz - d / 2, cx - w / 2, cz - d / 2, 2], [cx + w / 2, cz + d / 2, cx + w / 2, cz - d / 2, 1], [cx - w / 2, cz - d / 2, cx - w / 2, cz + d / 2, 3]];
+      for (const [ax, az, bx, bz, side] of sides) {
+        const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 2.6)), ux = (bx - ax) / L, uz = (bz - az) / L;
+        const doorAt = side === doorSide ? Math.floor(n / 2) : side === (doorSide + 2) % 4 && rng() < 0.4 ? Math.floor(n / 3) : -1;
+        for (let k = 0; k < n; k++) {
+          const s0 = k * L / n, s1 = (k + 1) * L / n;
+          const p0x = ax + ux * s0, p0z = az + uz * s0, p1x = ax + ux * s1, p1z = az + uz * s1;
+          const gone = ruin > 0.6 && k > 0 && k < n - 1 && rng() < 0.18 && k !== doorAt;
+          if (k === doorAt) {   // uks: ava + raam + ülal paneel
+            wallSeg(p0x, p0z, p1x, p1z, y0 + 2.7, FH * floors - 2.7, T, col, { raised: true });
+            gl.color(acc, MAT.GLOW).push().tf((p0x + p1x) / 2, y0, (p0z + p1z) / 2, Math.atan2(ux, uz), 0, 0).box(0, 2.75, 0, T + 0.1, 0.08, L / n * 0.8).pop();
+            continue;
+          }
+          if (gone) { wallSeg(p0x, p0z, p1x, p1z, y0, R(0.6, 1.6), T, col); continue; }   // varisenud: madal jupp
+          // akendega lõik: sein alla, klaasita ava keskel, sein üles (iga korrus)
+          for (let f = 0; f < floors; f++) {
+            const fy = y0 + f * FH;
+            if (rng() < 0.55) { wallSeg(p0x, p0z, p1x, p1z, fy, 1.1, T, col); wallSeg(p0x, p0z, p1x, p1z, fy + 2.3, FH - 2.3, T, col, f === 0 ? { stripe: acc } : null);
+              b.color(FRAME, MAT.METAL).push().tf((p0x + p1x) / 2, fy, (p0z + p1z) / 2, Math.atan2(ux, uz), 0, 0).boxB(0, 1.1, 0, T + 0.06, 1.2, 0.18).pop(); }
+            else wallSeg(p0x, p0z, p1x, p1z, fy, FH, T, col, f === 0 ? { stripe: acc } : null);
           }
         }
-        if (top && rng() < 0.6) for (let k = 0; k < 4; k++) b.color(RUST, MAT.RUST).push().tf(cx + R(-cw / 2, cw / 2), fy + FH, cz + R(-cd / 2, cd / 2), R(0, TAU), R(-0.6, 0.6), 0).cyl(0, 0, 0, 0.04, 0.04, R(1, 3), 5, true).pop();   // armatuur
       }
-      // sissepääs ja rusud jalamil
-      b.color(WIN, MAT.MATTE).boxB(bx, y0, bz + d / 2 + 0.02, 2.4, 3.2, 0.1);
-      rubble(b, bx + R(-w / 2, w / 2), bz + d / 2 + R(1.5, 3.5), R(2, 4), rng, Y(bx, bz + d / 2 + 2));
-      World.addCol({ t: 'b', x0: bx - w / 2, z0: bz - d / 2, x1: bx + w / 2, z1: bz + d / 2, y0: y0 - 2, y1: y0 + floors * FH, kind: 'struct' });
-      lootSpots.push({ x: bx + R(-w / 3, w / 3), z: bz + d / 2 + 2.2 });
-      // tänavalamp
-      if (rng() < 0.55) {
-        const lx = bx + w / 2 + 3, lz = bz + d / 2 + 3, ly = Y(lx, lz);
-        const lean = R(-0.25, 0.25);
-        b.color(STEEL, MAT.METAL).push().tf(lx, ly, lz, 0, 0, lean).cyl(0, 0, 0, 0.09, 0.07, 6.5, 6, true).box(0.6, 6.5, 0, 1.4, 0.12, 0.2).pop();
+      // nurgasambad (ümarad)
+      for (const [qx, qz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) b.color(FRAME, MAT.METAL).cyl(cx + qx * w / 2, y0, cz + qz * d / 2, 0.45, 0.45, FH * floors + 0.3, 10, true);
+      // vahelaed + katus (osaliselt sisse kukkunud)
+      for (let f = 1; f <= floors; f++) {
+        const fy = y0 + f * FH;
+        if (f === floors && ruin > 0.45) {   // katuses auk
+          b.color(col, MAT.WORN).boxB(cx - w / 4, fy, cz, w / 2, 0.35, d);
+          b.color(col, MAT.WORN).push().tf(cx + w / 4, fy - 1.4, cz, 0, 0, 0.35).boxB(0, 0, 0, w / 2, 0.3, d * 0.8).pop();   // kokkukukkunud plaat
+        } else b.color(f === floors ? FRAME : [0.36, 0.36, 0.37], MAT.METAL).boxB(cx, fy, cz, w + 0.5, 0.35, d + 0.5);
       }
+      // katusel: kuppel / antenn / päikesepaneelid
+      const top = y0 + floors * FH + 0.35, deco = rng();
+      if (deco < 0.4) { dm.color([0.55, 0.62, 0.66], MAT.METAL).sphere(cx, top, cz, Math.min(w, d) * 0.3, 14, 7, 0.6); }
+      else if (deco < 0.7) { b.color(FRAME, MAT.METAL).cyl(cx + w * 0.25, top, cz - d * 0.25, 0.06, 0.03, 6, 6, true); gl.color(ACC[0], MAT.GLOW).sphere(cx + w * 0.25, top + 6, cz - d * 0.25, 0.15, 6, 4, 1); }
+      else for (let k = 0; k < 3; k++) b.color([0.12, 0.16, 0.28], MAT.METAL).push().tf(cx - w * 0.3 + k * w * 0.3, top + 0.5, cz, 0, 0.35, 0).box(0, 0, 0, w * 0.26, 0.06, d * 0.5).pop();
+      // sisustus: konsoolid, kastid, ümberkukkunud kapid, kusagil helendab ekraan
+      for (let k = 0; k < Math.round(w * d / 40); k++) {
+        const ix = cx + R(-w / 2 + 1.5, w / 2 - 1.5), iz = cz + R(-d / 2 + 1.5, d / 2 - 1.5), it = rng();
+        if (Math.abs(ix - cx) < 1.6 && side2(doorSide) && Math.abs(iz - cz) > d / 2 - 3) continue;
+        if (it < 0.35) { b.color(FRAME, MAT.METAL).boxB(ix, y0, iz, 1.4, 1.0, 0.7); gl.color(rng() < 0.5 ? ACC[1] : ACC[2], MAT.GLOW).push().tf(ix, y0 + 1.25, iz, 0, -0.5, 0).box(0, 0, 0, 1.1, 0.5, 0.04).pop(); }
+        else if (it < 0.7) { b.color([0.36, 0.3, 0.22], MAT.WORN).boxB(ix, y0, iz, R(0.8, 1.3), R(0.6, 1.1), R(0.8, 1.3)); }
+        else b.color([0.4, 0.42, 0.45], MAT.METAL).push().tf(ix, y0 + 0.35, iz, rng() * TAU, 0, Math.PI / 2).box(0, 0, 0, 0.7, 2.0, 0.6).pop();
+      }
+      lootSpots.push({ x: cx + R(-w / 4, w / 4), z: cz + R(-d / 4, d / 4) });
+      spots.inside = (spots.inside || 0) + 1;
     }
-    // tänavatel mahajäetud autod ja barrikaadid
-    for (let k = 0; k < 26; k++) {
+    function side2() { return true; }
+    // ---- silindriline torn (maamärk, sisse ei pääse) ----
+    function tower(x, z, r, h) {
+      const y0 = Y(x, z) - 0.3;
+      b.color(PAN[0], MAT.WORN).cyl(x, y0, z, r, r * 0.85, h, 16, true);
+      for (let k = 1; k < h / 5; k++) b.color(FRAME, MAT.METAL).cyl(x, y0 + k * 5, z, r * 1.04 - k * 0.01, r * 1.04 - k * 0.01, 0.35, 16, false);
+      for (let k = 1; k < h / 5; k++) gl.color(ACC[0], MAT.GLOW).cyl(x, y0 + k * 5 - 1.2, z, r * 0.95, r * 0.95, 0.06, 16, false);
+      b.color(FRAME, MAT.METAL).cyl(x, y0 + h, z, r * 1.25, r * 1.25, 1.2, 16, true);
+      dm.color([0.55, 0.62, 0.66], MAT.METAL).sphere(x, y0 + h + 1.2, z, r * 1.1, 14, 7, 0.55);
+      World.addCol({ t: 'c', x, z, r: r + 0.2, y0: y0 - 2, y1: y0 + h + 4, kind: 'struct' });
+    }
+    // ---- linn: kompleksid kahes ringis, iga kompleksi ümber lagunenud vall ----
+    const comps = [];
+    comps.push({ x: c.x, z: c.z, r: 30, center: true });
+    for (let ring = 1; ring <= 2; ring++) {
+      const n = ring === 1 ? 6 : 11, rr = ring === 1 ? 82 : 160;
+      for (let k = 0; k < n; k++) { const a = k / n * TAU + ring * 0.4 + R(-0.12, 0.12); comps.push({ x: c.x + Math.cos(a) * rr * R(0.92, 1.08), z: c.z + Math.sin(a) * rr * R(0.92, 1.08), r: R(24, 32) }); }
+    }
+    for (const cp of comps) {
+      const y0 = Y(cp.x, cp.z);
+      // vall: hulknurk, sissepääs linna keskuse poole, varisenud lõigud
+      const nW = 14, gateK = cp.center ? -1 : Math.round(((Math.atan2(c.z - cp.z, c.x - cp.x) + TAU) % TAU) / TAU * nW) % nW;
+      for (let k = 0; k < nW; k++) {
+        if (k === gateK || (cp.center && k % 7 === 0)) continue;   // värav / avad
+        const a0 = k / nW * TAU, a1 = (k + 1) / nW * TAU;
+        const x0 = cp.x + Math.cos(a0) * cp.r, z0 = cp.z + Math.sin(a0) * cp.r, x1 = cp.x + Math.cos(a1) * cp.r, z1 = cp.z + Math.sin(a1) * cp.r;
+        const br = rng();
+        if (br < 0.15) continue;                                                    // täiesti läbi murtud
+        const h = br < 0.35 ? R(0.8, 2.0) : R(3.4, 4.2);                            // osaliselt varisenud
+        wallSegH(x0, z0, x1, z1, h, br < 0.35);
+        b.color(FRAME, MAT.METAL).cyl(x0, Y(x0, z0) - 0.3, z0, 0.55, 0.5, h + 0.6, 10, true);   // vallipost
+        if (h > 3) gl.color(ACC[0], MAT.GLOW).sphere(x0, Y(x0, z0) + h + 0.4, z0, 0.18, 6, 4, 1);
+      }
+      if (cp.center) {   // keskväljak: maandumisplats + juhtimistorn
+        b.color([0.26, 0.27, 0.28], MAT.METAL).cyl(cp.x, y0 - 0.25, cp.z, 12, 12, 0.35, 24, true);
+        gl.color(ACC[0], MAT.GLOW).cyl(cp.x, y0 + 0.11, cp.z, 11, 11, 0.02, 24, false);
+        b.color([0.26, 0.27, 0.28], MAT.METAL).cyl(cp.x, y0 - 0.24, cp.z, 10.6, 10.6, 0.36, 24, true);
+        tower(cp.x + 20, cp.z - 4, 3.2, 26);
+        continue;
+      }
+      // hooned kompleksi sees (1–3), uks kompleksi värava poole
+      const nB = 1 + Math.floor(rng() * 3);
+      const ga = gateK / nW * TAU;
+      for (let q = 0; q < nB; q++) {
+        const w = R(9, 15), d = R(8, 13), floors = rng() < 0.35 ? 2 : 1;
+        const off = nB === 1 ? 0 : (q - (nB - 1) / 2) * 13;
+        const bx = cp.x + Math.cos(ga + Math.PI / 2) * off - Math.cos(ga) * 4, bz = cp.z + Math.sin(ga + Math.PI / 2) * off - Math.sin(ga) * 4;
+        // uks: külg, mis on värava poole
+        const gx = Math.cos(ga), gz = Math.sin(ga);
+        const doorSide = Math.abs(gx) > Math.abs(gz) ? (gx > 0 ? 1 : 3) : (gz > 0 ? 0 : 2);
+        hab(bx, bz, w, d, floors, doorSide, rng);
+      }
+      if (rng() < 0.4) tower(cp.x - Math.cos(ga) * (cp.r - 6), cp.z - Math.sin(ga) * (cp.r - 6), 1.6, R(10, 16));
+      spots.push({ x: cp.x + Math.cos(ga) * (cp.r + 8), z: cp.z + Math.sin(ga) * (cp.r + 8) });   // värava ees
+      rubble(b, cp.x + Math.cos(ga) * (cp.r - 4), cp.z + Math.sin(ga) * (cp.r - 4), R(2, 3.5), rng, Y(cp.x, cp.z));
+    }
+    // vallilõik valitud kõrgusega (kõrgus maapinnast)
+    function wallSegH(x0, z0, x1, z1, h, broken) {
+      const yA = Y(x0, z0), yB = Y(x1, z1), y0 = Math.min(yA, yB) - 0.3;
+      wallSeg(x0, z0, x1, z1, y0, h + 0.3, 0.7, PAN[1], h > 3 ? { stripe: ACC[0] } : null);
+      if (broken) rubble(b, (x0 + x1) / 2, (z0 + z1) / 2, 2.2, rng, y0 + 0.3);
+    }
+    // tänavad komplekside vahel (tulnukate kogunemiskohad)
+    for (let k = 0; k < 16; k++) { const a = k / 16 * TAU, rr = k % 2 ? 120 : 200; spots.push({ x: c.x + Math.cos(a) * rr, z: c.z + Math.sin(a) * rr }); }
+    // tänavatel mahajäetud koloonia sõidukid
+    for (let k = 0; k < 18; k++) {
       const s = spots[Math.floor(rng() * spots.length)]; if (!s) break;
-      const x = s.x + R(-14, 14), z = s.z + R(-3, 3), y = Y(x, z), yaw = R(0, TAU);
-      b.push().tf(x, y, z, yaw, 0, R(-0.1, 0.1));
-      b.color(rng() < 0.5 ? [0.35, 0.18, 0.1] : [0.28, 0.3, 0.33], MAT.RUST).boxB(0, 0.3, 0, 1.9, 0.8, 4.2).boxB(0, 1.1, -0.3, 1.7, 0.7, 2.2);
-      b.color(WIN, MAT.MATTE).boxB(0, 1.15, 0.82, 1.6, 0.55, 0.05);
-      for (const [wx, wz] of [[0.95, 1.3], [-0.95, 1.3], [0.95, -1.3], [-0.95, -1.3]]) b.color([0.08, 0.08, 0.08], MAT.MATTE).push().tf(wx, 0.38, wz, 0, 0, Math.PI / 2).cyl(0, -0.12, 0, 0.38, 0.38, 0.24, 8, true).pop();
+      const x = s.x + R(-10, 10), z = s.z + R(-10, 10), y = Y(x, z), yaw = R(0, TAU);
+      b.push().tf(x, y, z, yaw, 0, R(-0.15, 0.15));
+      b.color(rng() < 0.5 ? [0.66, 0.64, 0.6] : [0.3, 0.42, 0.5], MAT.WORN).boxB(0, 0.45, 0, 2.0, 0.9, 4.4).boxB(0, 1.35, -0.4, 1.8, 0.75, 2.4);
+      b.color(DARK, MAT.MATTE).boxB(0, 1.4, 0.82, 1.7, 0.6, 0.05);
+      for (const [wx, wz] of [[1.05, 1.4], [-1.05, 1.4], [1.05, -1.4], [-1.05, -1.4]]) b.color([0.1, 0.1, 0.1], MAT.MATTE).push().tf(wx, 0.42, wz, 0, 0, Math.PI / 2).cyl(0, -0.15, 0, 0.42, 0.42, 0.3, 8, true).pop();
       b.pop();
-      World.addCol({ t: 'c', x, z, r: 1.9, y0: y - 1, y1: y + 1.8, kind: 'wreck' });
+      World.addCol({ t: 'c', x, z, r: 2.0, y0: y - 1, y1: y + 2, kind: 'wreck' });
     }
     // alla kukkunud kolooniate laev linna välisservas: hiiglaslik vrakk
     {
@@ -106,7 +194,7 @@ const City = (() => {
       w.col = World.addCol({ t: 'c', x, z, r: 2.0, y0: y - 2, y1: y + 2, kind: 'wreck' });
       World.wrecks.push(w);
     }
-    mesh = b.build(); glow = gl.build();
+    mesh = b.build(); glow = gl.build(); domes = dm.build();
     MB.detail = detail0;
   }
   function rubble(b, x, z, r, rng, y, local) {
@@ -123,6 +211,7 @@ const City = (() => {
     if (Math.hypot(cam.x - c.x, cam.z - c.z) > 1400) return;
     GFX.draw(mesh, ID, null, null, { rust: 1.1 });
     if (glow) GFX.draw(glow, ID, null, null, { shadow: false });
+    if (domes) GFX.draw(domes, ID, null, null, { rust: 0.6, cull: false });
   }
   // uus mäng: mahajäänud varustus majade ette (kotid; kaardil alles siis, kui oled näinud)
   const LOOT = [['ammo_r', 60, 120], ['ammo_p', 40, 80], ['ammo_s', 12, 24], ['medkit', 1, 3], ['trauma', 1, 1], ['grenade', 1, 3], ['ration', 2, 4], ['stim', 1, 2], ['scrap', 15, 35],
