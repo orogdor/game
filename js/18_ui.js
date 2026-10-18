@@ -571,7 +571,7 @@ const UI = (() => {
       for (const c of G.candidates) {
         const ch = Crew.canHire(c);
         h += `<div class="card"><div class="chead">${ava(c.look)}<div><div class="role">${ROLES[c.role].name}</div><h4>${esc(c.name)}</h4><div class="stars">${'★'.repeat(c.skill)}${'☆'.repeat(3 - c.skill)}</div></div></div>
-          <div class="trait"><b>${TRAITS[c.trait].name}.</b> ${TRAITS[c.trait].desc}</div><div class="story">„${esc(c.story)}“</div>
+          <div class="trait"><b>${TRAITS[c.trait].name}.</b> ${TRAITS[c.trait].desc} <span style="color:var(--muted)">Courage: ${fearName(fearOf(c))}</span></div><div class="story">„${esc(c.story)}“</div>
           <div class="s" style="font-size:12.5px;color:var(--muted)">${ROLES[c.role].desc}</div>
           <div class="money">${c.wage} ₵ per day · income ${c.fee} ₵</div>
           ${ch.ok ? btn('hire:' + c.id, 'Hire', { primary: true }) : `<button class="pbtn" disabled>${ch.why}</button>`}</div>`;
@@ -652,7 +652,7 @@ const UI = (() => {
       h += `<div class="card"><div class="chead">${ava(c.look)}<div><div class="role">${ROLES[c.role].name}</div><h4>${esc(c.name)}</h4><div class="stars">${'★'.repeat(c.skill)}${'☆'.repeat(3 - c.skill)}</div></div></div>
         <div class="act">Now: ${esc(c.act || '—')}</div>
         <div class="bars"><span>Health</span>${bar((m.hp / m.maxHp) * 100)}<span>Hunger</span>${bar(c.hunger)}<span>Thirst</span>${bar(c.thirst === undefined ? 90 : c.thirst)}<span>Hygiene</span>${bar(c.hygiene === undefined ? 80 : c.hygiene)}<span>Sleep</span>${bar(c.energy)}<span>Morale</span>${bar(c.morale)}</div>
-        <div class="trait"><b>${TRAITS[c.trait].name}.</b> ${TRAITS[c.trait].desc}</div>
+        <div class="trait"><b>${TRAITS[c.trait].name}.</b> ${TRAITS[c.trait].desc} <span style="color:var(--muted)">Courage: ${fearName(fearOf(c))}</span></div>
         <div class="money">${c.wage} ₵ per day${c.bed ? '' : ' · <span style="color:var(--danger)">no bed</span>'}</div>
         ${crewGear(m)}
         <div class="row">${btn('fol:' + m.id, c.follow ? 'Send back to work' : 'Ask to follow', c.follow ? { primary: true } : {})}${btn('fire:' + m.id, fireConfirm === m.id ? 'Kinnita: vallanda' : 'Dismiss')}</div></div>`;

@@ -260,7 +260,7 @@ const Rivals = (() => {
   function spawnUnit(r, x, z, mission, extra) {
     const e = Ents.spawn('human', r.team, x, z, Object.assign({
       maxHp: HUMAN_HP, radius: 0.38, ai: unitAI, mission, home: { x: r.base.x, z: r.base.z },
-      dmg: UNIT.dmg, acc: UNIT.acc, speedU: UNIT.speed, skill: randi(1, 3), scanT: rand(0, 0.5), cool: rand(0, 1), carry: 0, rival: r,
+      dmg: UNIT.dmg, acc: UNIT.acc, speedU: UNIT.speed, skill: randi(1, 3), fear: (extra && extra.commander) ? 0.3 : rand(0.1, 0.85), scanT: rand(0, 0.5), cool: rand(0, 1), carry: 0, rival: r,
     }, extra || {}));
     return e;
   }
@@ -280,7 +280,7 @@ const Rivals = (() => {
     if (e.inVehicle) return;   // sõidab (Vehicles juhib)
     if (e.cool > 0) e.cool -= dt;
     // haavatud korjaja/ründaja taandub koju (palgatud inimesi on vähe)
-    if ((e.mission === 'scav' || e.mission === 'raid' || e.mission === 'hunt') && e.hp < e.maxHp * 0.4) { e.mission = 'flee'; e.path = null; }
+    if ((e.mission === 'scav' || e.mission === 'raid' || e.mission === 'hunt' || e.mission === 'salvage') && e.hp < e.maxHp * (0.12 + (e.fear === undefined ? 0.5 : e.fear) * 0.55)) { e.mission = 'flee'; e.path = null; }
     e.scanT -= dt;
     if (e.scanT <= 0) {
       e.scanT = 0.4 + Math.random() * 0.3;
@@ -291,6 +291,7 @@ const Rivals = (() => {
     }
     const t = e.threat;
     const sp = e.speedU || 4;
+    if (e.mission === 'flee') e.speedFlee = sp * (1.1 + (e.fear || 0.5) * 0.6);
     if (t && targetAlive(t) && e.mission !== 'flee') {
       const tp = targetPoint(t), d = Math.hypot(tp.x - e.pos.x, tp.z - e.pos.z);
       Ents.face(e, tp.x, tp.z, dt, 9);
@@ -354,7 +355,7 @@ const Rivals = (() => {
       }
       case 'return': case 'flee': {
         if (!e.path) Ents.goTo(e, e.home.x, e.home.z);
-        if (Ents.stepMove(e, dt, sp) || Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) < 8) {
+        if (Ents.stepMove(e, dt, e.mission === 'flee' ? e.speedFlee || sp : sp) || Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) < 8) {
           const rv = e.rival;
           if (rv.alive) {
             if (e.carryKris) rv.res.kris += e.carry;

@@ -101,6 +101,13 @@ const TRAITS = {
   laisk: { name: 'Lazy', desc: 'Works slowly, but is cheap.' },
   veteran: { name: 'Former mercenary', desc: 'Tough in a fight, expensive to pay.' },
 };
+// hirm 0 (kartmatu) … 1 (väga arg): mõjutab riske, taandumist ja põgenemiskiirust
+function rollFear(trait) {
+  const base = { argpyks: 0.88, veteran: 0.12, tapne: 0.3, tugev: 0.32, vintske: 0.35, roomus: 0.4 }[trait];
+  return clamp(base !== undefined ? base + rand(-0.08, 0.08) : rand(0.2, 0.75), 0, 1);
+}
+function fearOf(c) { if (c.fear === undefined) c.fear = rollFear(c.trait); return c.fear; }
+function fearName(f) { return f < 0.22 ? 'Fearless' : f < 0.42 ? 'Brave' : f < 0.62 ? 'Steady' : f < 0.8 ? 'Nervous' : 'Easily scared'; }
 const STORIES = [
   'Left two kids and a debt at home. Just like you.', 'Once mined on Titan and talks about it far too much.', 'Can\'t remember the last time they saw the sun.',
   'Sent their last wages to their mother. Needs work right now.', 'Former banker. Won\'t say why former.', 'Sings while working. Badly.', 'Lost their ship in a card game.',
@@ -276,7 +283,7 @@ const Econ = (() => {
       let name;
       name = Names.random(null, used); used.add(name);
       const story = spy && Math.random() < 0.6 ? pick(SPY_STORIES) : pick(STORIES);
-      out.push({ id: Math.random().toString(36).slice(2, 8), look: Look.clean(Look.forName(name)), name, role, skill, trait, wage, fee: wage * 2, story, spy, spyFor: pick(['krell', 'klann']) });
+      out.push({ id: Math.random().toString(36).slice(2, 8), look: Look.clean(Look.forName(name)), name, role, skill, trait, fear: rollFear(trait), wage, fee: wage * 2, story, spy, spyFor: pick(['krell', 'klann']) });
     }
     G.candidates = out;
   }

@@ -120,7 +120,7 @@ const Crew = (() => {
     const hp = 70 * (tr === 'vintske' ? 1.5 : 1) * (tr === 'veteran' ? 1.3 : 1);
     const e = Ents.spawn('human', 'crew', x, z, {
       maxHp: hp, radius: 0.38, ai: crewAI, tint: null,
-      crew: { name: cand.name, look: cand.look || Look.clean(Look.forName(cand.name)), role: cand.role, skill: cand.skill, trait: tr, wage: cand.wage, story: cand.story, spy: cand.spy, spyFor: cand.spyFor,
+      crew: { name: cand.name, look: cand.look || Look.clean(Look.forName(cand.name)), role: cand.role, skill: cand.skill, trait: tr, fear: cand.fear !== undefined ? cand.fear : rollFear(tr), wage: cand.wage, story: cand.story, spy: cand.spy, spyFor: cand.spyFor,
         hunger: 85, thirst: 90, hygiene: 80, bladder: 80, energy: 90, morale: 70, rel: {}, bed: null, task: null, act: 'Arriving', carry: 0, carryKind: null, thefts: 0, stoleTonight: false, hiredDay: G.time.day, unpaid: 0 },
       scanT: 0, cool: 0,
     });
@@ -560,7 +560,7 @@ const Crew = (() => {
   function canJoin(m) {
     const c = m.crew, k = c.task;
     if (m.downed || c.follow || c.carry > 0 || m.hp < m.maxHp * 0.6 || c.energy < 25 || c.hunger < 35 || c.thirst < 35) return false;
-    if (c.role === 'valvur' || c.role === 'arst' || c.trait === 'argpyks') return false;
+    if (c.role === 'valvur' || c.role === 'arst' || c.trait === 'argpyks' || fearOf(c) > 0.78) return false;
     return !k || k.done || !!IDLE_TYPES[k.type];
   }
   // e alustab väljasõitu: kutsu 1–2 vaba kaaslast kaasa (eelistatult sama ameti omad)
@@ -643,9 +643,9 @@ const Crew = (() => {
         const need = (G.res.food + G.res.meat) < count() * 4 + 8;
         { const o = outingOf(e, 'hunt', (g) => g.alive && Math.hypot(g.pos.x, g.pos.z) < 420); if (o) return { type: 'hunt', step: 0, target: o.crew.task.target, t: 0, buddy: o, goal: o.crew.task.target }; }
         // tulnukajaht: happenäärmed on hea raha (kui toitu on piisavalt)
-        if (!need && Math.random() < 0.55) {
+        if (!need && Math.random() < 0.8 * (1 - fearOf(c))) {
           const al = Aliens.nearestPack(0, 0, 420);
-          if (al && Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack).length <= 2) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
+          if (al && Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack).length <= (fearOf(c) < 0.3 ? 3 : 2)) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
         }
         if (need || Math.random() < 0.4) {
           let best = null, bd = 240;
@@ -722,7 +722,7 @@ const Crew = (() => {
     // päikeseloojang
     if (h > 17.2 && h < 19.6 && r < 0.35 && c.trait !== 'argpyks') return { type: 'sunset', step: 0, t: rand(14, 26) };
     // seiklemine: uurib ümbrust (päeval, hea tujuga)
-    if (!night && c.morale > 35 && r < 0.7 && c.trait !== 'argpyks' && !Ents.list.some((q) => q.alive && q.kind === 'human' && q.team !== 'crew' && q.team !== 'neutral' && Math.hypot(q.pos.x, q.pos.z) < 140)) return { type: 'explore', step: 0, t: rand(8, 14) };
+    if (!night && c.morale > 35 && r < 0.7 && c.trait !== 'argpyks' && fearOf(c) < 0.65 && !Ents.list.some((q) => q.alive && q.kind === 'human' && q.team !== 'crew' && q.team !== 'neutral' && Math.hypot(q.pos.x, q.pos.z) < 140)) return { type: 'explore', step: 0, t: rand(8, 14) };
     // vaba aeg: teler õhtuti, trenn, muusika, diivan
     if (hr > 18.5 && Math.random() < 0.45) { const tv = nearestObj(e, 'teler', (o) => o.on); if (tv) return { type: 'leisure', step: 0, obj: tv, t: rand(20, 40) }; }
     if ((c.role === 'valvur' || c.role === 'jahimees' || c.trait === 'tugev') && Math.random() < 0.35) { const g = nearestObj(e, 'trenn'); if (g) return { type: 'leisure', step: 0, obj: g, t: rand(15, 25) }; }
@@ -804,9 +804,12 @@ const Crew = (() => {
     if (t && targetAlive(t) && !e.leaving) {
       if (sleeping) wakeUp(e);
       e.gesture = null; if (e.pose === 'sit') e.pose = 'stand';
-      if ((c.trait === 'argpyks' && c.role !== 'valvur') || (e.hp < e.maxHp * 0.3 && c.role !== 'valvur')) {
-        setAct(e, 'Running to hide');
-        if (!Base.isInside(e.pos.x, e.pos.z)) { const h = homeTarget(e); if (h && (!e.path || Ents.arrived(e))) goObj(e, h); Ents.stepMove(e, dt, speedOf(e) * 1.4); }
+      // hirm: arg taandub juba kergelt haavatuna ja jookseb kiiremini, julge võitleb peaaegu lõpuni
+      const f = fearOf(c), quitAt = (0.12 + f * 0.5) * (c.role === 'valvur' ? 0.6 : 1);
+      if ((c.trait === 'argpyks' && c.role !== 'valvur') || e.hp < e.maxHp * quitAt) {
+        if (!e._fled) { e._fled = true; say(e, f > 0.6 ? pick(['I\'m out of here!', 'Nope, nope, nope!', 'Cover me, I\'m running!']) : pick(['Falling back!', 'I\'m hit, pulling back!']), 0); }
+        setAct(e, f > 0.6 ? 'Fleeing in panic' : 'Running to hide');
+        if (!Base.isInside(e.pos.x, e.pos.z)) { const h = homeTarget(e); if (h && (!e.path || Ents.arrived(e))) goObj(e, h); Ents.stepMove(e, dt, speedOf(e) * (1.15 + f * 0.6)); }
         e.aim = Math.max(0, e.aim - dt * 3);
         return;
       }
@@ -829,10 +832,11 @@ const Crew = (() => {
       return;
     }
     e.aim = Math.max(0, e.aim - dt * 2.5);
+    e._fled = false;
     if (e._lastThreat) { e._lastThreat = null; e.coverPt = null; e.panicT = 0; e.reloadT = 0; if (Math.random() < 0.5) say(e, pick(['Clear!', 'Area clear.', 'Got it.']), 4); }
     e.crouch = Math.max(0, (e.crouch || 0) - dt * 2);
     if (e.ammo !== undefined && e.ammo < 8) e.ammo = undefined;
-    if (e.hp < e.maxHp * 0.3 && !Base.isInside(e.pos.x, e.pos.z) && (!c.task || c.task.type !== 'home')) {
+    if (e.hp < e.maxHp * (0.12 + fearOf(c) * 0.5) && !Base.isInside(e.pos.x, e.pos.z) && (!c.task || c.task.type !== 'home')) {
       c.task = { type: 'home', step: 0 }; UI.toast(c.name.split(' ')[0] + ' is wounded and falling back to the base');
     }
     { const wi = Waves.info(); if (wi && !wi.none && !wi.done && wi.warned && c.task && !['post', 'vgun', 'shelter', 'follow', 'home'].includes(c.task.type)) { if (sleeping) wakeUp(e); e.gesture = null; c.task.done = true; } }
