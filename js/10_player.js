@@ -365,6 +365,7 @@ const Player = {
     // korjatavad
     for (const p of Ents.pickups) {
       if (p.gone) continue;
+      if (p.city && !p.seen && Math.abs(p.x - px) < 45 && Math.abs(p.z - pz) < 45) p.seen = true;
       if (!p.id) p.id = Math.floor(Math.random() * 1e9);
       consider({ key: 'p' + p.id, label: p.kind === 'stones' ? 'Take the heartstones' : 'Pick up bag', hold: p.kind === 'stones' ? 1.5 : 0.6, act: () => pickupBag(p) }, p.x, p.z, 2.4);
     }

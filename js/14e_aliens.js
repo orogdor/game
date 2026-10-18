@@ -193,7 +193,7 @@ const Aliens = (() => {
     const al = nearestPack(core.pos.x, core.pos.z, 900); if (!al) return false;
     const n = Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack);
     for (const o of n) { o.raid = { core, t: 0 }; o.home = { x: core.pos.x, z: core.pos.z }; o.state = 'roam'; o.path = null; }
-    if (core.playerCore) { UI.msg('Acid mantises are heading for your base core! (' + n.length + ')', 'danger'); Audio2.alarm && Audio2.alarm(); }
+    if (core.playerCore) { UI.msg('The Stoneheart\'s workers are marching on your base heart! (' + n.length + ' acid mantises)', 'danger'); Audio2.alarm && Audio2.alarm(); }
     return true;
   }
   function nearestPack(x, z, r) { return Ents.list.filter((e) => e.kind === 'alien' && e.alive && !e.raid && Math.hypot(e.pos.x - x, e.pos.z - z) < r).sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z))[0] || null; }
@@ -201,7 +201,14 @@ const Aliens = (() => {
     raidT -= dt;
     if (raidT <= 0) { raidT = DAY_LEN * rand(0.9, 1.6); if (G.time.day >= 2) launchRaid(); }
     spawnT -= dt;
-    if (spawnT <= 0) { spawnT = 45; populate(packs() === 0); }
+    if (spawnT <= 0) {
+      spawnT = 45; populate(packs() === 0);
+      // vana linn meelitab tulnukaid: seal on alati mitu karja
+      if (typeof City !== 'undefined') {
+        const inCity = new Set(); for (const e of Ents.list) if (e.kind === 'alien' && e.alive && City.near(e.home.x, e.home.z)) inCity.add(e.pack);
+        for (let k = inCity.size; k < 5; k++) { const sp = City.randomSpot(); if (sp && Math.hypot(sp.x - Player.pos.x, sp.z - Player.pos.z) > 70) spawnPack(sp.x, sp.z); }
+      }
+    }
     // happeklombi pritsmed: maandudes kahjustab lähedal olijaid veidi
     for (const e of Ents.list) if (e.kind === 'alien' && !e.alive && e.deathT > 300) { e.remove = true; e.harvestable = false; }
   }

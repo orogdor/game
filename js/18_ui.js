@@ -189,7 +189,8 @@ const UI = (() => {
     if (!G.flags.nestKnown && Boss.e && Boss.e.alive) out.push({ x: World.sites.nest.x, z: World.sites.nest.z, icon: 'heart', col: '#c58bff', label: 'Pillar of light?', kind: 'nest' });
     if (G.flags.nestKnown && !G.flags.stonesHome) out.push({ x: World.sites.nest.x, z: World.sites.nest.z, icon: 'heart', col: '#ff8fd0', label: 'Stoneheart', kind: 'nest' });
     for (const r of Rivals.list) if (r.base) out.push({ x: r.base.x, z: r.base.z, icon: 'flag', col: r.alive ? (r.id === 'krell' ? '#ff6d55' : '#b796ff') : '#6f604f', label: r.short, kind: 'rival' });
-    for (const p of Ents.pickups) if (!p.gone) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : 'Items', kind: 'bag' });
+    if (World.sites.city && World.sites.city.x < 1e4) out.push({ x: World.sites.city.x, z: World.sites.city.z, icon: 'house', col: '#a9a39a', label: 'Old colony city', kind: 'city' });
+    for (const p of Ents.pickups) if (!p.gone && !(p.city && !p.seen)) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : 'Items', kind: 'bag' });
     const cur = Objectives.current();
     if (cur && cur.id === 'salv') {
       const w = World.wrecks.filter((q) => q.scrap > 0).sort((a, b) => Math.hypot(a.x - Player.pos.x, a.z - Player.pos.z) - Math.hypot(b.x - Player.pos.x, b.z - Player.pos.z))[0];
@@ -689,7 +690,7 @@ const UI = (() => {
   function renderMap(body) {
     $('pTitle').textContent = 'Map'; $('pTabs').innerHTML = '';
     body.innerHTML = `<canvas id="mapCv" width="640" height="640"></canvas>
-      <div class="legend"><span><i style="background:#eedfc6"></i>Base</span><span><i style="background:#92d9ff"></i>Comet</span><span><i style="background:#ff6d55"></i>Krell-Varga</span><span><i style="background:#b796ff"></i>Clan</span><span><i style="background:#ff8fd0"></i>Stoneheart</span><span><i style="background:#ddb45c"></i>Waypoint / items</span><span><i style="background:#9a8f80"></i>Wreck</span></div>
+      <div class="legend"><span><i style="background:#eedfc6"></i>Base</span><span><i style="background:#92d9ff"></i>Comet</span><span><i style="background:#ff6d55"></i>Krell-Varga</span><span><i style="background:#a9a39a"></i>Old city</span><span><i style="background:#b796ff"></i>Clan</span><span><i style="background:#ff8fd0"></i>Stoneheart</span><span><i style="background:#ddb45c"></i>Waypoint / items</span><span><i style="background:#9a8f80"></i>Wreck</span></div>
       <div class="row"><div class="grow note">Tap the map to mark a waypoint on the compass.</div>${btn('clear', 'Remove waypoint', { disabled: !waypoint })}</div>`;
     const cv = $('mapCv');
     drawBigMap(cv);
@@ -915,12 +916,15 @@ const UI = (() => {
   function renderHelp(body) {
     $('pTitle').textContent = 'How to play'; $('pTabs').innerHTML = '';
     body.innerHTML = `<div class="help">
-      <h4>Objective</h4><p>Keep the station alive, pay the bank its instalments and find the Stoneheart. Its heartstones wipe out the whole debt. Two rivals are hunting the same thing.</p>
+      <h4>The story</h4><p>This was a colony world getting rich fast. Then a huge ship that was refuelling in orbit came down in the desert – and out of the wreck crawled the <b>Stoneheart</b>, a giant alien. Its workers, the acid mantises and the bug swarms, took the planet over. The colonists fled and left everything behind.</p>
+      <p>Now someone has invented the <b>base heart</b>: a device whose hum keeps the sandworms away from buildings. People can settle here again. Whoever brings in the Stoneheart's heartstones – the proof that it is dead – gets the colonisation rights to the whole planet. That proof is worth a fortune.</p>
+      <p>The ruins of the <b>old colony city</b> lie at the edge of the map, farther out than any camp. The noise and the lights draw aliens there, but the city is full of scrap and abandoned gear.</p>
+      <h4>Objective</h4><p>Keep the station and its heart alive, pay the bank its instalments and kill the Stoneheart. Its heartstones prove the kill and wipe out the whole debt. Two rivals are hunting the same thing.</p>
       <h4>Phone controls</h4><ul><li>Left thumb: move. Push all the way to run.</li><li>Right side: look around. Slide your finger on the fire button to aim at the same time.</li><li>The action button appears when there's something to do. Some actions must be held.</li><li>The hammer opens building, the minimap opens the big map.</li></ul>
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>
       <h4>Building</h4><p>Drag out a room on the floor like in The Sims. A door appears by itself; you can add more doors and windows. Put items in rooms: beds, table, stove, workbench, scanner. Cannons, solar panels, radar and floodlights go outside. Every device needs power. Give rooms a <b>Room job</b> (barracks, canteen, workshop, lab …): when only the right items are inside, the room gives a bonus. Build the <b>Ore works</b> and buy an ore drill there to mine the reddish iron ore rocks in the desert; smelt the ore into steel scrap or sell it.</p>
       <h4>Money and food</h4><p>Comets bring raw diamonds. Collect them before the rivals and take them to the base; storage fills when you step inside. Sell them at the terminal. Desert goats give meat, which the stove turns into food. Every hire eats and wants wages every morning.</p>
-      <h4>Threats</h4><p>Sand stalkers come out at night. Spineshields won't attack if you keep your distance, but diamonds grow on their backs. Rivals raid your storage and compete for the comets. Their camp core can be blown up.</p>
+      <h4>Threats</h4><p>Sand stalkers come out at night. Spineshields won't attack if you keep your distance, but diamonds grow on their backs. Acid mantises – the Stoneheart's workers – roam in packs and now and then march on a base heart. Rival raiders go for your base heart too. Doors are locked to strangers: they must hack a lock (30 s) or shoot the door in – and so must you at their camps. <b>If a base heart is destroyed, its hum stops and a sandworm swallows the whole base.</b></p>
       <h4>Stoneheart</h4><p>Build the deep scanner to find the nest. The giant's armour stops bullets: aim for the glowing crystal nodes on its back, then the exposed heart. Jump over the shockwave.</p></div>`;
   }
 

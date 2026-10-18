@@ -575,7 +575,9 @@ const Rivals = (() => {
   function coreDestroyed(e) {
     if (e.playerCore) {
       FX.explosion(e.pos.x, e.pos.y + 3, e.pos.z, [1, 0.6, 0.3], 4); Audio2.explode(e.pos.x, e.pos.z, true); UI.shake(0.8);
-      setTimeout(() => Game.over('core'), 2500);
+      UI.msg('The base heart is silent. The sand starts to tremble…', 'danger');
+      // südame heli vaikib -> liivauss neelab baasi, siis mäng läbi
+      Sandworm.devour(Base.OX, Base.OZ, { R: 60, onBite: () => { Base.power.lightsOn = false; }, onDone: () => Game.over('core') });
       return;
     }
     const r = e.rival; if (!r) return;
@@ -583,8 +585,8 @@ const Rivals = (() => {
     FX.explosion(e.pos.x, e.pos.y + 3, e.pos.z, [1, 0.6, 0.3], 4);
     Audio2.explode(e.pos.x, e.pos.z, true);
     UI.shake(0.8);
-    UI.msg(r.name + ' camp has been destroyed! Their search is over.', 'good');
-    UI.banner('Camp destroyed', r.short + ' is out of the game', 'good');
+    UI.msg(r.name + ' camp heart has been destroyed! Its hum fell silent – a sandworm is coming for their camp.', 'good');
+    if (r.bb) Sandworm.devour(r.base.x, r.base.z, { R: 55, onBite: () => { r.bb.reset(); r.bb.rebuildNow(); UI.banner('Camp swallowed', r.short + ' is out of the game', 'good'); } });
     for (const u of Ents.list) if (u.alive && u.team === r.team && u.kind === 'human') { u.mission = 'flee'; u.path = null; }
     for (const u of Ents.list) if (u.alive && u.kind === 'rturret' && u.rival === r) Ents.kill(u, null);
     Ents.pickups.push({ kind: 'bag', x: e.pos.x + 3, y: Ents.groundY(e.pos.x + 3, e.pos.z), z: e.pos.z, data: { items: [['kris', 25], ['scrap', 40], ['ammo_r', 90], ['medkit', 2], ['grenade', 2]] }, id: Math.random() });

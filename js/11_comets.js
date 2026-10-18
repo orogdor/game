@@ -175,12 +175,12 @@ const Spawner = (() => {
     return Ents.spawn('crab', 'wild', x, z, { radius: 1.3, state: 'idle', home: { x, z }, maxHp: 170 });
   }
   function jelly() {
-    const x = rand(-World.HALF + 80, World.HALF - 80), z = rand(-World.HALF + 80, World.HALF - 80);
+    const LIM = Math.min(World.HALF - 80, 1700), x = rand(-LIM, LIM), z = rand(-LIM, LIM);
     return Ents.spawn('jelly', 'wild', x, z, { alt: rand(9, 20), radius: 0.8, maxHp: 15 });
   }
   function rockySpot() {
     for (let t = 0; t < 200; t++) {
-      const a = rand(0, TAU), r = rand(110, World.HALF - 80);
+      const a = rand(0, TAU), r = rand(110, Math.min(World.HALF - 80, 1700));
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (!World.okSpot(x, z, 100) || World.slopeAt(x, z) > 0.15) continue;
       // lähedal kaljud

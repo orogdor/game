@@ -17,7 +17,7 @@ const Save = (() => {
       player: { x: Player.pos.x, z: Player.pos.z, yaw: Player.yaw, hp: Player.hp },
       base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(), pcore: Rivals.playerCoreHp(), vehicles: Vehicles.serialize(),
       wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), ores: World.ores.map((o) => [o.amount, o.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
-      pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data })),
+      pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data, city: p.city || undefined, seen: p.seen || undefined })),
       look: Look.clean(G.look), pname: G.pname, inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
     };
   }
@@ -215,7 +215,7 @@ const Game = (() => {
     if (!ok) { const L = document.getElementById('loading'); L.style.cssText += ';font-size:14px;letter-spacing:0;padding:20px;text-align:center'; L.textContent = initErr ? 'Graphics failed to start: ' + initErr : 'This device doesn\'t support WebGL2 graphics. Try a newer browser.'; return; }
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.getElementById('loading').hidden = false; document.getElementById('loading').textContent = 'Graphics reset. Reload the page.'; });
     buildModels();
-    Vehicles.initMeshes(); Aliens.initMeshes();
+    Vehicles.initMeshes(); Aliens.initMeshes(); Sandworm.initMeshes();
     Gadgets.initMeshes();
     Chars.init();
     Input.init(canvas);
@@ -268,7 +268,7 @@ const Game = (() => {
     World.generate(seed);
     GFX.setTerrain(null, false); World.setTerrainShadow(Q[qKey].terrainShadow);
     UI.buildMapCanvas();
-    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Aliens.reset(); Objectives.reset(); Vehicles.reset();
+    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Aliens.reset(); Sandworm.reset(); Objectives.reset(); Vehicles.reset();
     Ents.list.push(Player);
   }
   function newGame() {
@@ -279,6 +279,7 @@ const Game = (() => {
     Base.setupStart();
     Base.rebuildNow();
     Spawner.init();
+    City.spawnLoot();
     Rivals.init(false);
     Rivals.spawnPlayerCore();
     Boss.spawn();
@@ -288,6 +289,8 @@ const Game = (() => {
     Player.yaw = Math.PI;
     startPlay();
     UI.banner('Day 1', 'Mining station K-7 is yours. Bring it back to life.');
+    setTimeout(() => { if (G.mode === 'play') UI.msg('This planet was abandoned when the Stoneheart\'s aliens took it over. The base heart\'s hum keeps the sandworms away – guard it.', 'warn'); }, 3000);
+    setTimeout(() => { if (G.mode === 'play') UI.msg('Whoever brings in the Stoneheart\'s heartstones – proof of the kill – gets the colonisation rights. And your debt is gone.', 'good'); }, 9000);
     UI.msg('The main building is dark and rusty. The generator is broken, but there are 40 scrap in storage.', 'warn');
     setTimeout(() => { if (G.mode === 'play') UI.msg('Bank: first debt payment ' + fmtInt(G.debt.amount) + ' ₵ is due on the morning of day 4.', 'money'); }, 6000);
     Objectives.check();
@@ -319,7 +322,7 @@ const Game = (() => {
     Vehicles.deserialize(d.vehicles || []);
     Comets.deserialize(d.comets || {});
     Crew.deserialize(d.crew);
-    for (const p of d.pickups || []) Ents.pickups.push({ kind: p.kind, x: p.x, y: Ents.groundY(p.x, p.z), z: p.z, data: p.data });
+    for (const p of d.pickups || []) Ents.pickups.push({ kind: p.kind, x: p.x, y: Ents.groundY(p.x, p.z), z: p.z, data: p.data, city: p.city, seen: p.seen });
     Objectives.deserialize(d.obj);
     Player.reset(d.player.x, d.player.z, d.player.yaw);
     Player.hp = d.player.hp || Player.maxHp;
@@ -390,7 +393,7 @@ const Game = (() => {
     Save.clear();
     const texts = {
       pankrot: 'The bank didn\'t wait. The creditors took station K-7 and everything in it. Your family\'s debt stays in the dark.',
-      core: 'Your base core was destroyed. Without it station K-7 is just a heap of scrap – the bank takes what is left.',
+      core: 'Your base heart was destroyed. Its hum fell silent – and a sandworm rose from the dunes and swallowed station K-7 whole. Nothing is left for the bank, or for you.',
       rival: (r ? r.name : 'Rival') + ' reached the Stoneheart before you. The heartstones left the planet on their ship and your debt remains.',
     };
     UI.end(kind, texts[kind] || '', endStats());
@@ -456,6 +459,7 @@ const Game = (() => {
     Rivals.updateBases(dt, humans);
     Herds.update(dt);
     Aliens.tick(dt);
+    Sandworm.update(dt);
     Ents.update(dt);
     Crew.update(dt);
     Waves.update(dt);
@@ -550,7 +554,7 @@ const Game = (() => {
     World.draw();
     if (G.mode === 'title') { Base.power.lightsOn = true; if (preview) GFX.addLight(preview.gx, World.heightAt(preview.gx, preview.gz) + 3, preview.gz + 2.5, 11, 1, 0.75, 0.45, 2.2); else GFX.addLight(-1, 2.6, 6.2, 9, 1, 0.75, 0.45, 2.2); }
     Base.draw(G.mode === 'build', GFX.env.night > 0.5 || G.mode === 'title', G.time.total);
-    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Aliens.drawProjs(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else { Ents.drawTitleFigure(preview && preview.figs); if (preview) Vehicles.draw(); }
+    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Aliens.drawProjs(); Sandworm.draw(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else { Ents.drawTitleFigure(preview && preview.figs); if (preview) Vehicles.draw(); }
     Build.draw();
     if (G.mode === 'play') Player.drawViewmodel(dt);
     GFX.render(sc);

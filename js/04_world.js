@@ -2,10 +2,11 @@
 //  MAAILM: maastik, kaljud, taimed, vrakid, põrked, kiirtekontroll
 // ============================================================
 const World = (() => {
-  const HALF = 1800, SIZE = 3600, RES = 768, STEP = SIZE / RES, N1 = RES + 1, CHK = 64, NCH = RES / CHK;
+  const HALF = 2300, SIZE = 4600, RES = 960,   // kaart laiendatud: ühes servas vana koloonia linn
+   STEP = SIZE / RES, N1 = RES + 1, CHK = 64, NCH = RES / CHK;
   const H = new Float32Array(N1 * N1);
   const mapRGB = new Uint8Array(N1 * N1 * 3);
-  const sites = { base: { x: 0, z: 0 }, rivals: [], nest: { x: 0, z: 0 }, ribs: [], campLevel: [0, 0], nestLevel: 0 };
+  const sites = { base: { x: 0, z: 0 }, rivals: [], nest: { x: 0, z: 0 }, ribs: [], campLevel: [0, 0], nestLevel: 0, city: { x: 1e5, z: 1e5, level: 0, r: 230 } };
   const wrecks = [];
   const ores = [];   // rauamaagi kivid (kaevandamiseks on vaja maagipuuri)
   const groves = [];
@@ -76,6 +77,7 @@ const World = (() => {
     let k = smoothstep(95, 155, Math.hypot(x - sites.base.x, z - sites.base.z));
     for (const r of sites.rivals) k *= smoothstep(80, 130, Math.hypot(x - r.x, z - r.z));
     k *= smoothstep(70, 115, Math.hypot(x - sites.nest.x, z - sites.nest.z));
+    k *= smoothstep(260, 340, Math.hypot(x - sites.city.x, z - sites.city.z));
     return k;
   }
   function rawH(x, z) {
@@ -108,6 +110,9 @@ const World = (() => {
     const nl = sites.nestLevel;
     h = lerp(nl, h, smoothstep(40, 85, rn));
     h += -6 * (1 - smoothstep(4, 40, rn)) + 3.2 * Math.exp(-Math.pow((rn - 45) / 7, 2));
+    // vana koloonia linn: tasandatud ala
+    const rcity = Math.hypot(x - sites.city.x, z - sites.city.z);
+    h = lerp(sites.city.level, h, smoothstep(sites.city.r, sites.city.r + 90, rcity));
     return h;
   }
   function heightAt(x, z) {
@@ -148,6 +153,16 @@ const World = (() => {
     if (!forMap) c = mixRgb([0.22, 0.15, 0.17], c, smoothstep(20, 50, rn));
     const d = Math.max(Math.abs(x), Math.abs(z));
     c = mixRgb(c, [0.40, 0.25, 0.19], smoothstep(HALF * 0.82, HALF * 0.96, d) * 0.6);
+    // linn: tolmune asfalt, tänavavõrk
+    const cd = Math.hypot(x - sites.city.x, z - sites.city.z);
+    if (cd < sites.city.r + 60) {
+      const k = 1 - smoothstep(sites.city.r - 20, sites.city.r + 60, cd);
+      const gx = ((x - sites.city.x) % 46 + 46 + 23) % 46, gz = ((z - sites.city.z) % 46 + 46 + 23) % 46;
+      const road = Math.min(gx, 46 - gx) < 5 || Math.min(gz, 46 - gz) < 5;
+      const sandOver = smoothstep(0.1, 0.6, Noise.n2(x * 0.03 + 11, z * 0.03 - 5));
+      const base = road ? mixRgb([0.2, 0.19, 0.19], [0.24, 0.22, 0.21], n2 * 0.5 + 0.5) : [0.42, 0.37, 0.33];
+      c = mixRgb(c, mixRgb(base, c, sandOver * 0.55), k);
+    }
     return c;
   }
 
@@ -170,13 +185,24 @@ const World = (() => {
       if (sc > bestScore) { bestScore = sc; best = { x, z }; }
     }
     sites.nest = best || { x: -200, z: 200 };
+    // vana koloonia linn kaardi ühes servas: rivaalidest ja pesast võimalikult kaugel
+    { let bc = null, bs = -1;
+      for (let k = 0; k < 48; k++) {
+        const a = k / 48 * TAU, x = Math.cos(a) * 1650, z = Math.sin(a) * 1650;
+        if (Math.max(Math.abs(x), Math.abs(z)) > HALF * 0.74) continue;
+        const sc = Math.min(...sites.rivals.map((q) => Math.hypot(q.x - x, q.z - z)), Math.hypot(sites.nest.x - x, sites.nest.z - z) * 0.8);
+        if (sc > bs) { bs = sc; bc = { x, z }; }
+      }
+      sites.city = Object.assign({ level: 0, r: 230 }, bc || { x: 1600, z: 0 }); }
     sites.campLevel = [0, 0];
     sites.nestLevel = 0;
     sites.campLevel = sites.rivals.map((r) => rawH(r.x, r.z));
     sites.nestLevel = rawH(sites.nest.x, sites.nest.z) * 0.5;
+    sites.city.level = rawH(sites.city.x, sites.city.z) * 0.4;
     for (let j = 0; j < N1; j++) for (let i = 0; i < N1; i++) H[j * N1 + i] = heightFn(-HALF + i * STEP, -HALF + j * STEP);
     buildTerrainMesh();
     scatter(rng);
+    if (typeof City !== 'undefined') City.build(mulberry32(s * 13 + 7));
   }
 
   let tPos = null, tNor = null, tCol = null;
@@ -269,6 +295,7 @@ const World = (() => {
     if (Math.hypot(x, z) < rBase) return false;
     for (const r of sites.rivals) if (Math.hypot(x - r.x, z - r.z) < 64) return false;
     if (Math.hypot(x - sites.nest.x, z - sites.nest.z) < 50) return false;
+    if (Math.hypot(x - sites.city.x, z - sites.city.z) < sites.city.r + 40) return false;
     return true;
   }
 
@@ -571,6 +598,7 @@ const World = (() => {
     const cx = GFX.cam.pos.x, cz = GFX.cam.pos.z, WL = MODELS.wrecksLo;
     for (const w of wrecks) {
       if (w.scrap <= 0) { if (!w.gone) clearWreck(w); continue; }
+      if (w.type < 0) { if (w.mesh) GFX.draw(w.mesh, w.m, null, null, { rust: 1.0 }); continue; }
       GFX.draw(WL && Math.hypot(w.x - cx, w.z - cz) > 70 + w.rad * 6 ? WL[w.type] : MODELS.wrecks[w.type], w.m, null, null, { rust: 1.2 });
     }
     if (MODELS.oreRocks) for (const o of ores) {
@@ -580,6 +608,7 @@ const World = (() => {
     }
     for (const r of sites.ribs) GFX.draw(MODELS.ribcage, r.m, null, null, { rust: 0 });
     for (const d of sites.decor || []) GFX.draw(d.mesh, d.m, null, null, { rust: 1.1 });
+    if (typeof City !== 'undefined') City.draw();
   }
 
   return {

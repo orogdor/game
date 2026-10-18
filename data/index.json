@@ -1,5 +1,5 @@
 {
- "version": "v66",
+ "version": "v67",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -88,6 +88,7 @@
   "js/03c_look.js",
   "js/03g_gunsinit.js",
   "js/04_world.js",
+  "js/04b_city.js",
   "js/05_base.js",
   "js/06_audio.js",
   "js/07_ents.js",
@@ -105,6 +106,7 @@
   "js/14c_vehicles.js",
   "js/14d_gadgets.js",
   "js/14e_aliens.js",
+  "js/14f_sandworm.js",
   "js/15_objectives.js",
   "js/16_input.js",
   "js/17_build.js",

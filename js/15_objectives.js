@@ -14,7 +14,7 @@ const Objectives = (() => {
     { id: 'scan', text: 'Build the deep scanner', hint: 'Items → Work. Needs 4 power and 15 diamonds.', done: () => Base.objsOfType('skanner').length > 0 || G.scan.found },
     { id: 'nest', text: 'Find the Stoneheart\'s nest', hint: 'The scanner searches for days. The rivals are searching at the same time.', done: () => G.flags.nestKnown, prog: () => Math.floor(G.scan.p) + ' %' },
     { id: 'boss', text: 'Kill the Stoneheart', hint: 'Shoot the glowing crystal nodes on its back, then the exposed heart. Jump over the shockwave.', done: () => G.flags.bossDead },
-    { id: 'stones', text: 'Bring the heartstones to the base', hint: 'The stones will save your family. The rivals want them too.', done: () => G.flags.stonesHome },
+    { id: 'stones', text: 'Bring the heartstones to the base', hint: 'They prove the kill: colonisation rights and a fortune. The rivals want them too.', done: () => G.flags.stonesHome },
   ];
   const doneSet = new Set();
   function current() { return L.find((o) => !doneSet.has(o.id)); }
