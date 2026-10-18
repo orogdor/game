@@ -4,7 +4,8 @@
 //  Palju vanarauda (rusud), mahajäänud varustust ja palju tulnukaid.
 // ============================================================
 const City = (() => {
-  let mesh = null, glow = null, domes = null;
+  let mesh = null, glow = null, domes = null, vmesh = null, vglow = null, vdomes = null;
+  const vLoot = [];
   const ID = M4.create();
   const spots = [];      // tänavapunktid (tulnukate pesad, varustus)
   const lootSpots = [];  // majade ees, kuhu jäi varustust
@@ -13,9 +14,9 @@ const City = (() => {
     const c = World.sites.city;
     spots.length = 0; lootSpots.length = 0;
     const detail0 = MB.detail; MB.detail = false;   // palju kaste: lihtne geomeetria
-    const b = new MB(); b.jit = 0;      // kõik tahked osad
-    const gl = new MB(); gl.jit = 0;    // helendavad osad
-    const dm = new MB(); dm.jit = 0;    // kuplid (joonistatakse kahepoolselt, et ka seest näha)
+    let b = new MB(); b.jit = 0;      // kõik tahked osad
+    let gl = new MB(); gl.jit = 0;    // helendavad osad
+    let dm = new MB(); dm.jit = 0;    // kuplid (joonistatakse kahepoolselt, et ka seest näha)
     const R = (a, z) => a + rng() * (z - a);
     const Y = (x, z) => World.heightAt(x, z);
     // koloonia arhitektuur: heledad komposiitpaneelid, tumedad raamid, oranžid/sinised märgutuled
@@ -195,6 +196,38 @@ const City = (() => {
       World.wrecks.push(w);
     }
     mesh = b.build(); glow = gl.build(); domes = dm.build();
+    // ---- väikesed mahajäetud asulad: 2–4 koloonia maja, vallijupid, vanaraud, veidi varustust ----
+    b = new MB(); b.jit = 0; gl = new MB(); gl.jit = 0; dm = new MB(); dm.jit = 0;
+    vLoot.length = 0;
+    const vNames = ['Abandoned outpost', 'Deserted farmstead', 'Empty relay station', 'Dead settlement'];
+    (World.sites.villages || []).forEach((v, vi) => {
+      const nH = 2 + Math.floor(rng() * 3), a0 = rng() * TAU;
+      const before = lootSpots.length;
+      for (let q = 0; q < nH; q++) {
+        const a = a0 + q / nH * TAU + R(-0.3, 0.3), rr = nH === 2 ? 9 : R(10, 15);
+        const hx = v.x + Math.cos(a) * rr, hz = v.z + Math.sin(a) * rr;
+        const gx = v.x - hx, gz = v.z - hz;   // uks küla keskpaiga poole
+        const doorSide = Math.abs(gx) > Math.abs(gz) ? (gx > 0 ? 1 : 3) : (gz > 0 ? 0 : 2);
+        hab(hx, hz, R(7, 11), R(6, 9), 1, doorSide, rng);
+      }
+      for (let k = before; k < lootSpots.length; k++) vLoot.push(lootSpots[k]);
+      lootSpots.length = before;
+      // lagunenud piirdevalli jupid
+      for (let k = 0; k < 6; k++) {
+        if (rng() < 0.45) continue;
+        const a1 = k / 6 * TAU + a0, a2 = a1 + 0.6, r2 = v.r - 4;
+        wallSegH(v.x + Math.cos(a1) * r2, v.z + Math.sin(a1) * r2, v.x + Math.cos(a2) * r2, v.z + Math.sin(a2) * r2, R(1, 3.2), rng() < 0.5);
+      }
+      if (rng() < 0.6) tower(v.x + R(-4, 4), v.z + R(-4, 4), 1.2, R(7, 11));
+      // vanaraua hunnik
+      const x = v.x + R(-6, 6), z = v.z + R(-6, 6), y = Y(x, z);
+      const pb = new MB(); pb.jit = 0; rubble(pb, 0, 0, R(2.2, 3), rng, 0, true);
+      const w = { id: 1100 + vi, x, z, y, yaw: 0, type: -1, m: M4.compose(M4.create(), x, y, z, R(0, TAU)), rad: 2.4, scrap: Math.floor(R(40, 75)), name: vNames[vi % vNames.length], known: false, mesh: pb.build(), city: true };
+      w.col = World.addCol({ t: 'c', x, z, r: 2.0, y0: y - 2, y1: y + 2, kind: 'wreck' });
+      World.wrecks.push(w);
+      v.name = vNames[vi % vNames.length];
+    });
+    vmesh = b.build(); vglow = gl.build(); vdomes = dm.build();
     MB.detail = detail0;
   }
   function rubble(b, x, z, r, rng, y, local) {
@@ -206,6 +239,7 @@ const City = (() => {
     for (let k = 0; k < 3; k++) { const a = rng() * TAU; b.color([0.45, 0.24, 0.13], MAT.RUST).push().tf(x + Math.cos(a) * r * 0.4, (local ? 0 : y) + 0.5, z + Math.sin(a) * r * 0.4, rng() * TAU, rng() - 0.5, 0.6).cyl(0, 0, 0, 0.03, 0.03, 1.5 + rng() * 2, 5, true).pop(); }
   }
   function draw() {
+    if (vmesh) { GFX.draw(vmesh, ID, null, null, { rust: 1.1 }); GFX.draw(vglow, ID, null, null, { shadow: false }); GFX.draw(vdomes, ID, null, null, { rust: 0.6, cull: false }); }
     if (!mesh) return;
     const c = World.sites.city, cam = GFX.cam.pos;
     if (Math.hypot(cam.x - c.x, cam.z - c.z) > 1400) return;
@@ -217,6 +251,7 @@ const City = (() => {
   const LOOT = [['ammo_r', 60, 120], ['ammo_p', 40, 80], ['ammo_s', 12, 24], ['medkit', 1, 3], ['trauma', 1, 1], ['grenade', 1, 3], ['ration', 2, 4], ['stim', 1, 2], ['scrap', 15, 35],
     ['smg', 1, 1], ['shotgun', 1, 1], ['dmr', 1, 1], ['revolver', 1, 1], ['vest', 1, 1], ['helmet2', 1, 1], ['boots', 1, 1], ['pack_m', 1, 1], ['ammo_sn', 10, 20], ['ashot', 1, 1], ['plasma', 1, 1]];
   function spawnLoot() {
+    for (const s of vLoot) if (Math.random() < 0.6) { const items = []; for (let q = 0; q < randi(1, 3); q++) { const [id, a, bb] = LOOT[Math.floor(Math.random() * 9)]; if (ITEMS[id]) items.push([id, randi(a, bb)]); } Ents.pickups.push({ kind: 'bag', x: s.x, y: Ents.groundY(s.x, s.z), z: s.z, data: { items }, id: Math.random(), city: true }); }
     const used = new Set();
     for (let k = 0; k < 18 && lootSpots.length; k++) {
       let s, t = 0; do { s = lootSpots[Math.floor(Math.random() * lootSpots.length)]; } while (used.has(s) && t++ < 20);

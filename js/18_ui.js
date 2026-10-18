@@ -190,6 +190,7 @@ const UI = (() => {
     if (G.flags.nestKnown && !G.flags.stonesHome) out.push({ x: World.sites.nest.x, z: World.sites.nest.z, icon: 'heart', col: '#ff8fd0', label: 'Stoneheart', kind: 'nest' });
     for (const r of Rivals.list) if (r.base) out.push({ x: r.base.x, z: r.base.z, icon: 'flag', col: r.alive ? (r.id === 'krell' ? '#ff6d55' : '#b796ff') : '#6f604f', label: r.short, kind: 'rival' });
     if (World.sites.city && World.sites.city.x < 1e4) out.push({ x: World.sites.city.x, z: World.sites.city.z, icon: 'house', col: '#a9a39a', label: 'Old colony city', kind: 'city' });
+    for (const v of World.sites.villages || []) out.push({ x: v.x, z: v.z, icon: 'house', col: '#8f877c', label: v.name || 'Abandoned settlement', kind: 'city' });
     for (const p of Ents.pickups) if (!p.gone && !(p.city && !p.seen)) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : 'Items', kind: 'bag' });
     const cur = Objectives.current();
     if (cur && cur.id === 'salv') {
