@@ -67,6 +67,7 @@ const Ents = (() => {
   function arrived(e) { return !e.path || e.pathI >= e.path.length; }
   function freeSpot(x, z, r) { const q = { x, z }; World.collideCircle(q, r, 0.3, 1.7, true); return Math.hypot(q.x - x, q.z - z) < 0.05; }
   function stepMove(e, dt, speed) {
+    if (e.toVeh && typeof Vehicles !== 'undefined') return Vehicles.walkStep(e, dt, speed);
     if (!e.path || e.pathI >= e.path.length) { e.moveAmt = Math.max(0, e.moveAmt - dt * 4); return true; }
     let tgt = e.detour || e.path[e.pathI];
     const dx = tgt.x - e.pos.x, dz = tgt.z - e.pos.z, d = Math.hypot(dx, dz);

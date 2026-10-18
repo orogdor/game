@@ -9,7 +9,7 @@ const Vehicles = (() => {
       wheels: [[0.86, 0.45, 1.18], [-0.86, 0.45, 1.18], [0.86, 0.45, -1.12], [-0.86, 0.45, -1.12]], wheelS: 1, mesh: 'body', len: 0.9 },
     hauler: { name: 'Hauler truck', desc: 'Slow and tough: big cargo bed for hauling diamonds, ore and scrap. Two seats, no gun.', hp: 800, maxSpeed: 14, rev: 5, accel: 6, brake: 16, wheelBase: 3.3, cargoCap: 600, cost: { c: 1400, s: 220 },
       gun: null, seats: [{ x: 0.45, y: 1.0, z: 1.25, sit: true }, { x: -0.45, y: 1.0, z: 1.25, sit: true }],
-      wheels: [[1.0, 0.55, 1.55], [-1.0, 0.55, 1.55], [1.0, 0.55, -1.45], [-1.0, 0.55, -1.45]], wheelS: 1.22, mesh: 'hauler', len: 1.3 },
+      wheels: [[1.0, 0.55, 1.55], [-1.0, 0.55, 1.55], [1.0, 0.55, -0.9], [-1.0, 0.55, -0.9], [1.0, 0.55, -1.85], [-1.0, 0.55, -1.85]], wheelS: 1.22, mesh: 'hauler', len: 1.3 },
   };
   const DEFAULT_TYPE = 'buggy';
   const seatsOf = (v) => DEF[v.type].seats;
@@ -22,70 +22,193 @@ const Vehicles = (() => {
   function initMeshes() {
     if (M) return M;
     M = {};
-    const PAINT = [0.78, 0.46, 0.12], PAINT2 = [0.62, 0.34, 0.08], DARK = [0.08, 0.08, 0.09], STEEL = [0.32, 0.33, 0.35], SEAT = [0.16, 0.15, 0.14];
-    // keha
+    const PAINT = [0.86, 0.44, 0.09], PAINT2 = [0.58, 0.28, 0.06], STRIPE = [0.93, 0.9, 0.84], DARK = [0.07, 0.07, 0.08], GUNM = [0.15, 0.155, 0.165];
+    const STEEL = [0.45, 0.46, 0.48], CHROME = [0.78, 0.78, 0.8], SEAT = [0.17, 0.15, 0.13], RED = [0.72, 0.1, 0.06], YEL = [0.95, 0.72, 0.1], GLASS = [0.2, 0.3, 0.36];
+    const detail0 = MB.detail; MB.detail = true;
     let b = new MB(); b.jit = 0;
-    b.color(DARK, MAT.WORN).boxB(0, 0.42, 0, 1.5, 0.16, 3.2);                         // raam
-    b.color(PAINT, MAT.RUST).boxB(0, 0.56, 0.2, 1.62, 0.18, 2.2);                      // põhi / küljed
-    b.color(PAINT2, MAT.RUST).boxB(0.78, 0.56, 0.2, 0.06, 0.42, 2.2); b.color(PAINT2, MAT.RUST).boxB(-0.78, 0.56, 0.2, 0.06, 0.42, 2.2);
-    b.push().tf(0, 0.74, 1.45, 0, 0.32, 0).color(PAINT, MAT.RUST).box(0, 0, 0, 1.5, 0.16, 0.95).pop();   // kapott
-    b.color(DARK, MAT.WORN).boxB(0, 0.32, 1.85, 1.6, 0.3, 0.16);                        // esistange
-    for (const x of [-0.55, 0.55]) b.color([1, 0.95, 0.75], MAT.GLOW).box(x, 0.68, 1.9, 0.26, 0.14, 0.05);   // tuled
-    b.color([1, 0.12, 0.06], MAT.GLOW).box(0.62, 0.72, -1.58, 0.16, 0.08, 0.04); b.color([1, 0.12, 0.06], MAT.GLOW).box(-0.62, 0.72, -1.58, 0.16, 0.08, 0.04);
-    // turvaraam (torud)
-    const tube = (x0, y0, z0, x1, y1, z1, r = 0.045) => {
+    const tube = (x0, y0, z0, x1, y1, z1, r = 0.045, col = DARK, mat = MAT.METAL) => {
       const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, L = Math.hypot(dx, dy, dz);
       const yaw = Math.atan2(dx, dz), pitch = -Math.asin(dy / L);
-      b.push().tf((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, yaw, pitch, 0).color(DARK, MAT.WORN).box(0, 0, 0, r * 2, r * 2, L).pop();
+      b.push().tf((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, yaw, pitch, 0).tf(0, 0, 0, 0, Math.PI / 2, 0).color(col, mat).cyl(0, -L / 2, 0, r, r, L, 8, true).pop();
     };
+    // ümar "ketas" x-telje suunas (tuled, embleemid, rattad)
+    const discX = (x, y, z, r, h, col, mat) => { b.push().tf(x, y, z, 0, 0, Math.PI / 2).color(col, mat).cyl(0, -h / 2, 0, r, r, h, 16, true).pop(); };
+    const discZ = (x, y, z, r, h, col, mat) => { b.push().tf(x, y, z, 0, Math.PI / 2, 0).color(col, mat).cyl(0, -h / 2, 0, r, r, h, 16, true).pop(); };
+    // poritiib: kaar ratta kohal (kolm kaldus plaati)
+    const fender = (wx, wy, wz, R, w, col) => {
+      for (const a of [-0.95, -0.42, 0.1, 0.62]) {
+        const a1 = a + 0.26;
+        b.push().tf(wx, wy + Math.cos(a1) * R, wz + Math.sin(a1) * R, 0, a1, 0).color(col, MAT.PAINTED).box(0, 0, 0, w, 0.045, R * 0.56).pop();
+      }
+    };
+
+    // ===================== BAGI =====================
+    b.color(DARK, MAT.METAL).boxB(0, 0.34, 0.1, 1.1, 0.12, 3.5);                                // raam
+    b.color(PAINT2, MAT.PAINTED).boxB(0, 0.44, 0.15, 1.44, 0.1, 2.05);                           // põhi
+    for (const sx of [1, -1]) {
+      b.color(PAINT, MAT.PAINTED).boxB(sx * 0.73, 0.44, 0.12, 0.14, 0.44, 1.75);               // külgkast
+      b.color(STRIPE, MAT.PAINTED).box(sx * 0.805, 0.8, 0.12, 0.012, 0.06, 1.75);               // triip
+      b.color(DARK).box(sx * 0.805, 0.71, 0.12, 0.012, 0.025, 1.75);
+      discX(sx * 0.806, 0.6, -0.1, 0.15, 0.012, STRIPE, MAT.PAINTED);                            // võistlusnumbri ring
+      b.color(DARK).box(sx * 0.814, 0.6, -0.1, 0.006, 0.17, 0.05); b.color(DARK).box(sx * 0.814, 0.67, -0.07, 0.006, 0.04, 0.05);
+      for (let k = 0; k < 4; k++) b.color(DARK).box(sx * 0.806, 0.58, 0.45 + k * 0.09, 0.012, 0.16, 0.04);   // õhuavad
+      b.color(DARK, MAT.METAL).boxB(sx * 0.62, 0.3, 0.12, 0.3, 0.08, 1.2);                       // astmelaud
+    }
+    // kapott + nina
+    b.push().tf(0, 0.74, 1.42, 0, 0.26, 0);
+    b.color(PAINT, MAT.PAINTED).box(0, 0, 0, 1.38, 0.13, 1.0);
+    for (const x of [0.17, -0.17]) b.color(STRIPE, MAT.PAINTED).box(x, 0.068, 0, 0.13, 0.008, 1.0);
+    b.color(PAINT2, MAT.PAINTED).box(0, 0.11, -0.1, 0.42, 0.1, 0.42);                           // õhuvõtuava
+    b.color(DARK).box(0, 0.11, 0.115, 0.36, 0.06, 0.012);
+    b.pop();
+    b.color(PAINT2, MAT.PAINTED).boxB(0, 0.36, 1.82, 1.3, 0.34, 0.2);
+    b.push().tf(0, 0.3, 1.98, 0, -0.5, 0).color(GUNM, MAT.METAL).box(0, 0, 0, 1.2, 0.04, 0.42).pop();   // põhjakaitse
+    for (let k = -3; k <= 3; k++) b.color(DARK).box(k * 0.13, 0.55, 1.93, 0.05, 0.2, 0.02);       // iluvõre
+    // torustange
+    tube(-0.72, 0.44, 2.0, 0.72, 0.44, 2.0, 0.05, GUNM); tube(-0.72, 0.44, 2.0, -0.72, 0.44, 1.7, 0.045, GUNM); tube(0.72, 0.44, 2.0, 0.72, 0.44, 1.7, 0.045, GUNM);
+    for (const x of [0.38, -0.38]) tube(x, 0.44, 2.0, x * 0.9, 0.86, 1.82, 0.04, GUNM);
+    // esituled (ümarad, korpusega)
+    for (const x of [0.5, -0.5]) { discZ(x, 0.66, 1.9, 0.12, 0.14, DARK, MAT.METAL); discZ(x, 0.66, 1.91, 0.09, 0.14, [1, 0.96, 0.8], MAT.GLOW); }
+    for (const x of [0.25, -0.25]) { discZ(x, 0.9, 1.82, 0.075, 0.1, DARK, MAT.METAL); discZ(x, 0.9, 1.83, 0.055, 0.1, [1, 0.85, 0.5], MAT.GLOW); }
+    // vedrustus: õlad + vedrud (kollased)
+    for (const [wx, wy, wz] of [[0.86, 0.45, 1.18], [-0.86, 0.45, 1.18], [0.86, 0.45, -1.12], [-0.86, 0.45, -1.12]]) {
+      const sx = Math.sign(wx);
+      tube(sx * 0.45, 0.42, wz + 0.28, sx * 0.66, 0.45, wz, 0.035, STEEL); tube(sx * 0.45, 0.42, wz - 0.28, sx * 0.66, 0.45, wz, 0.035, STEEL);
+      tube(sx * 0.62, 0.52, wz, sx * 0.48, 1.0, wz - 0.12, 0.075, YEL, MAT.PAINTED);
+      tube(sx * 0.62, 0.48, wz, sx * 0.47, 1.06, wz - 0.13, 0.03, CHROME);
+      fender(wx * 1.0, wy, wz, 0.6, 0.42, PAINT);
+      b.color(DARK).boxB(wx, 0.08, wz - (wz > 0 ? 0.62 : 0.58), 0.36, 0.34, 0.02);              // porilapp
+    }
+    // turvaraam
     for (const x of [0.72, -0.72]) {
-      tube(x, 0.65, 0.95, x * 0.92, 1.72, 0.45); tube(x * 0.92, 1.72, 0.45, x * 0.92, 1.72, -0.35); tube(x * 0.92, 1.72, -0.35, x, 0.65, -0.55);
-      tube(x, 0.65, -0.55, x, 0.65, -1.55);
+      tube(x, 0.62, 0.95, x * 0.92, 1.72, 0.45); tube(x * 0.92, 1.72, 0.45, x * 0.92, 1.72, -0.35); tube(x * 0.92, 1.72, -0.35, x, 0.62, -0.55);
+      tube(x, 0.62, -0.55, x, 0.66, -1.55); tube(x * 0.92, 1.72, -0.35, x, 0.66, -1.5, 0.035);   // tagumised toed
+      tube(x, 0.62, 0.95, x, 0.62, -0.55, 0.04); tube(x, 0.62, 0.95, x * 0.92, 1.72, -0.35, 0.03);   // külgdiagonaal
     }
     tube(0.66, 1.72, 0.45, -0.66, 1.72, 0.45); tube(0.66, 1.72, -0.35, -0.66, 1.72, -0.35); tube(0.66, 1.72, 0.45, -0.66, 1.72, -0.35, 0.03);
-    // istmed + rool
+    b.color(GUNM, MAT.METAL).boxB(0, 1.74, 0.05, 1.28, 0.03, 0.78);                              // katuseplaat
+    for (let k = 0; k < 5; k++) b.color(DARK).box(0, 1.775, -0.25 + k * 0.15, 1.2, 0.012, 0.05);
+    // tulederivi katusel
+    b.color(DARK, MAT.METAL).box(0, 1.84, 0.46, 1.1, 0.1, 0.12);
+    for (let k = 0; k < 4; k++) { const x = -0.42 + k * 0.28; discZ(x, 1.86, 0.52, 0.06, 0.04, [1, 0.97, 0.85], MAT.GLOW); }
+    // peeglid, antenn + lipp
+    for (const sx of [1, -1]) { tube(sx * 0.68, 1.12, 0.78, sx * 0.86, 1.18, 0.72, 0.02); b.color(DARK, MAT.METAL).box(sx * 0.9, 1.2, 0.72, 0.1, 0.12, 0.05); b.color([0.5, 0.6, 0.65], MAT.METAL).box(sx * 0.9, 1.2, 0.69, 0.08, 0.1, 0.01); }
+    b.color(DARK).cyl(-0.62, 1.72, -0.35, 0.012, 0.008, 1.25, 6, true);
+    b.color(RED, MAT.PAINTED).box(-0.62, 2.85, -0.47, 0.01, 0.16, 0.24); b.color(YEL, MAT.PAINTED).box(-0.622, 2.85, -0.47, 0.012, 0.05, 0.24);
+    // istmed (kopp-istmed) + rihmad
     for (const x of [0.42, -0.42]) {
-      b.color(SEAT, MAT.WORN).boxB(x, 0.62, 0.05, 0.52, 0.14, 0.55);
-      b.push().tf(x, 0.95, -0.24, 0, -0.18, 0).color(SEAT, MAT.WORN).box(0, 0, 0, 0.5, 0.7, 0.12).pop();
+      b.color(SEAT, MAT.MATTE).boxB(x, 0.54, 0.08, 0.5, 0.12, 0.52);
+      b.push().tf(x, 0.95, -0.22, 0, -0.16, 0);
+      b.color(SEAT, MAT.MATTE).box(0, 0, 0, 0.46, 0.72, 0.1);
+      for (const sx of [1, -1]) b.color(SEAT, MAT.MATTE).box(sx * 0.25, -0.05, 0.06, 0.07, 0.6, 0.16);
+      b.color(SEAT, MAT.MATTE).box(0, 0.45, 0, 0.3, 0.2, 0.12);
+      for (const sx of [1, -1]) b.color(RED, MAT.MATTE).box(sx * 0.1, 0.05, 0.065, 0.05, 0.62, 0.01);
+      b.pop();
     }
-    b.push().tf(0.42, 1.05, 0.62, 0, -0.9, 0).color(DARK).cyl(0, -0.02, 0, 0.19, 0.19, 0.04, 12, true).pop();
-    b.color(DARK).box(0.42, 0.9, 0.78, 0.05, 0.05, 0.4);
-    // tagumine kast (veoplats) + kuulipilduja alus
-    b.color(PAINT2, MAT.RUST).boxB(0, 0.62, -1.08, 1.5, 0.08, 1.0);
-    for (const x of [0.74, -0.74]) b.color(PAINT, MAT.RUST).boxB(x, 0.7, -1.08, 0.05, 0.36, 1.0);
-    b.color(PAINT, MAT.RUST).boxB(0, 0.7, -1.57, 1.5, 0.36, 0.05);
-    b.color([0.36, 0.3, 0.2], MAT.WORN).boxB(0.42, 0.7, -1.2, 0.5, 0.36, 0.5);     // puidust kast
-    b.color(STEEL, MAT.WORN).cyl(0, 0.66, -0.75, 0.08, 0.06, 1.12, 10, true);          // kuulipilduja post
-    b.color(DARK).cyl(0, -0.15, -1.68, 0.4, 0.4, 0, 14, true);
-    b.push().tf(0, 0.86, -1.66, 0, Math.PI / 2, 0).color(DARK, MAT.WORN).cyl(0, -0.12, 0, 0.36, 0.36, 0.24, 14, true).pop();   // varuratas
+    // armatuur + rool
+    b.color(DARK, MAT.MATTE).box(0, 0.98, 0.86, 1.3, 0.16, 0.22);
+    for (const x of [0.32, 0.5]) discZ(x, 1.02, 0.75, 0.04, 0.02, [0.4, 1.0, 0.6], MAT.GLOW);
+    b.push().tf(0.42, 1.06, 0.62, 0, -0.95, 0).color(DARK).cyl(0, -0.02, 0, 0.19, 0.19, 0.04, 16, true).color(GUNM, MAT.METAL).cyl(0, -0.03, 0, 0.04, 0.04, 0.06, 8, true).pop();
+    tube(0.42, 0.98, 0.85, 0.42, 1.06, 0.64, 0.025);
+    // tagumine veokast + mootor + väljalasketorud
+    b.color(GUNM, MAT.METAL).boxB(0, 0.6, -1.08, 1.46, 0.06, 1.0);
+    for (let k = 0; k < 5; k++) b.color(DARK).box(0, 0.665, -1.5 + k * 0.2, 1.4, 0.01, 0.04);
+    for (const x of [0.74, -0.74]) b.color(PAINT, MAT.PAINTED).boxB(x, 0.66, -1.08, 0.05, 0.3, 1.0);
+    b.color(PAINT, MAT.PAINTED).boxB(0, 0.66, -1.57, 1.5, 0.3, 0.05);
+    b.color([0.42, 0.33, 0.2], MAT.WORN).boxB(0.42, 0.66, -1.24, 0.46, 0.34, 0.42);              // puidust kast
+    for (const z of [-1.07, -1.41]) b.color([0.3, 0.24, 0.14], MAT.WORN).box(0.42, 0.85, z, 0.47, 0.03, 0.03);
+    for (const x of [-0.42, -0.58]) { b.color(RED, MAT.PAINTED).boxB(x, 0.66, -1.38, 0.14, 0.38, 0.26); b.color(DARK).box(x, 1.06, -1.32, 0.04, 0.04, 0.06); }   // kanistrid
+    for (const sx of [0.5, -0.5]) { tube(sx, 0.45, -1.45, sx * 1.08, 0.5, -1.72, 0.05, CHROME); tube(sx * 1.08, 0.5, -1.72, sx * 1.08, 1.0, -1.74, 0.05, CHROME); b.color(DARK).cyl(sx * 1.08, 0.98, -1.74, 0.055, 0.06, 0.06, 10, true); }
+    for (const x of [0.62, -0.62]) b.color([1, 0.1, 0.05], MAT.GLOW).box(x, 0.78, -1.6, 0.16, 0.08, 0.03);
+    b.color(STEEL, MAT.METAL).cyl(0, 0.66, -0.75, 0.08, 0.06, 1.12, 10, true);                  // kuulipilduja post
+    b.color(DARK, MAT.METAL).cyl(0, 1.7, -0.75, 0.16, 0.16, 0.06, 14, true);
+    b.push().tf(0, 0.86, -1.68, 0, Math.PI / 2, 0).color(DARK, MAT.MATTE).cyl(0, -0.12, 0, 0.36, 0.36, 0.24, 16, true).color(STEEL, MAT.METAL).cyl(0, -0.13, 0, 0.18, 0.18, 0.26, 10, true).pop();   // varuratas
     M.body = b.build();
-    // veok: kabiin ees, kastiga platvorm taga
+
+    // ===================== VEOK =====================
     b = new MB(); b.jit = 0;
-    const TRUCK = [0.36, 0.42, 0.3], TRUCK2 = [0.26, 0.3, 0.22];
-    b.color(DARK, MAT.WORN).boxB(0, 0.5, 0, 1.7, 0.22, 4.4);
-    b.color(TRUCK, MAT.RUST).boxB(0, 0.72, 1.3, 1.9, 1.1, 1.5);                    // kabiin
-    b.color(TRUCK2, MAT.RUST).boxB(0, 1.82, 1.25, 1.86, 0.1, 1.4);
-    b.color([0.28, 0.42, 0.5], MAT.WORN).box(0, 1.5, 2.06, 1.6, 0.5, 0.04);        // esiklaas
-    for (const x of [0.96, -0.96]) b.color([0.28, 0.42, 0.5], MAT.WORN).box(x, 1.5, 1.3, 0.04, 0.45, 0.9);
-    b.color(TRUCK, MAT.RUST).boxB(0, 0.4, 2.05, 1.9, 0.6, 0.12);                   // nina
-    for (const x of [-0.65, 0.65]) b.color([1, 0.95, 0.75], MAT.GLOW).box(x, 0.85, 2.12, 0.3, 0.16, 0.04);
-    b.color(DARK).boxB(0, 0.25, 2.18, 1.95, 0.3, 0.18);
-    b.color(TRUCK2, MAT.RUST).boxB(0, 0.72, -1.05, 2.0, 0.12, 2.9);                // kast
-    for (const x of [0.98, -0.98]) b.color(TRUCK, MAT.RUST).boxB(x, 0.84, -1.05, 0.06, 0.55, 2.9);
-    b.color(TRUCK, MAT.RUST).boxB(0, 0.84, -2.48, 2.0, 0.55, 0.06);
-    for (let k = 0; k < 4; k++) b.color(DARK).boxB(0, 0.84, -0.1 - k * 0.8, 2.02, 0.05, 0.06);
-    b.color([0.36, 0.3, 0.2], MAT.WORN).boxB(0.45, 0.84, -1.6, 0.7, 0.5, 0.7); b.color([0.3, 0.32, 0.26], MAT.WORN).boxB(-0.5, 0.84, -0.7, 0.6, 0.4, 0.9);
-    b.color([1, 0.12, 0.06], MAT.GLOW).box(0.8, 0.95, -2.52, 0.18, 0.1, 0.04); b.color([1, 0.12, 0.06], MAT.GLOW).box(-0.8, 0.95, -2.52, 0.18, 0.1, 0.04);
-    b.color(STEEL, MAT.WORN).cyl(0.85, 1.8, 0.55, 0.06, 0.06, 0.9, 8, true);        // väljalasketoru
+    const TRUCK = [0.42, 0.46, 0.32], TRUCK2 = [0.3, 0.33, 0.23], CANVAS = [0.62, 0.55, 0.4];
+    for (const x of [0.52, -0.52]) b.color(DARK, MAT.METAL).boxB(x, 0.42, -0.1, 0.18, 0.24, 4.7);   // raamid
+    // kabiin
+    b.color(TRUCK, MAT.PAINTED).rbox(0, 1.28, 1.32, 1.96, 1.3, 1.5, 0.1);
+    b.color(TRUCK2, MAT.PAINTED).rbox(0, 1.96, 1.28, 1.9, 0.08, 1.42, 0.03);
+    b.color(DARK, MAT.METAL).box(0, 1.9, 2.08, 1.86, 0.06, 0.1);                                 // päikesesirm
+    for (let k = 0; k < 4; k++) discZ(-0.6 + k * 0.4, 2.02, 2.06, 0.06, 0.08, [1, 0.72, 0.25], MAT.GLOW);   // katusetuled
+    b.color(DARK, MAT.METAL).cyl(0.62, 2.0, 0.85, 0.09, 0.09, 0.05, 12, true); b.color([1, 0.5, 0.08], MAT.GLOW).cyl(0.62, 2.04, 0.85, 0.07, 0.05, 0.12, 12, true);   // vilkur
+    for (const x of [0.46, -0.46]) b.color(GLASS, MAT.METAL).box(x, 1.55, 2.075, 0.84, 0.55, 0.02);   // esiklaas
+    b.color(TRUCK2, MAT.PAINTED).box(0, 1.55, 2.08, 0.07, 0.58, 0.03);
+    for (const sx of [1, -1]) {
+      b.color(GLASS, MAT.METAL).box(sx * 0.985, 1.58, 1.42, 0.02, 0.48, 0.9);                   // külgaken
+      b.color(DARK).box(sx * 0.985, 1.05, 1.42, 0.02, 0.6, 0.02); b.color(DARK).box(sx * 0.985, 1.05, 0.96, 0.02, 0.6, 0.02);   // ukse jooned
+      b.color(CHROME, MAT.METAL).box(sx * 0.99, 1.2, 1.08, 0.03, 0.04, 0.16);                   // käepide
+      b.color(GUNM, MAT.METAL).boxB(sx * 0.98, 0.42, 1.25, 0.22, 0.04, 0.5);                    // astmed
+      b.color(GUNM, MAT.METAL).boxB(sx * 0.98, 0.68, 1.25, 0.18, 0.04, 0.46);
+      tube(sx * 0.98, 1.75, 1.95, sx * 1.22, 1.7, 2.02, 0.02, DARK);                            // peeglid
+      b.color(DARK, MAT.METAL).box(sx * 1.25, 1.55, 2.0, 0.07, 0.34, 0.18); b.color([0.5, 0.6, 0.65], MAT.METAL).box(sx * 1.25, 1.55, 1.9, 0.05, 0.3, 0.01);
+      // kütusepaagid
+      b.push().tf(sx * 0.82, 0.62, 0.15, 0, Math.PI / 2, 0).color(STEEL, MAT.METAL).cyl(0, -0.42, 0, 0.22, 0.22, 0.84, 16, true).pop();
+      for (const z of [-0.12, 0.42]) b.push().tf(sx * 0.82, 0.62, z, 0, Math.PI / 2, 0).color(DARK, MAT.METAL).cyl(0, -0.03, 0, 0.235, 0.235, 0.06, 16, false).pop();
+    }
+    // nina: iluvõre, tuled, kaitseraud ohutriipudega
+    b.color(TRUCK, MAT.PAINTED).rbox(0, 0.92, 2.2, 1.94, 0.6, 0.3, 0.06);
+    b.color(DARK, MAT.METAL).box(0, 0.95, 2.36, 1.1, 0.42, 0.02);
+    for (let k = -5; k <= 5; k++) b.color(CHROME, MAT.METAL).box(k * 0.1, 0.95, 2.37, 0.03, 0.4, 0.02);
+    for (const x of [0.75, -0.75]) { discZ(x, 0.95, 2.34, 0.13, 0.08, CHROME, MAT.METAL); discZ(x, 0.95, 2.36, 0.1, 0.08, [1, 0.96, 0.8], MAT.GLOW); }
+    b.color(GUNM, MAT.METAL).box(0, 0.48, 2.42, 2.12, 0.3, 0.22);
+    for (let k = 0; k < 10; k++) b.color(k % 2 ? DARK : YEL, MAT.PAINTED).box(-0.95 + k * 0.21, 0.48, 2.535, 0.21, 0.24, 0.01);
+    for (const x of [0.62, -0.62]) b.color(RED, MAT.PAINTED).box(x, 0.32, 2.56, 0.12, 0.08, 0.14);
+    b.color(DARK).box(0, 0.88, 0.58, 1.9, 0.6, 0.06);                                            // kabiini tagasein
+    // väljalasketoru kabiini taga
+    b.color(CHROME, MAT.METAL).cyl(0.78, 0.7, 0.5, 0.07, 0.07, 1.75, 12, true); b.color(DARK, MAT.METAL).cyl(0.78, 1.0, 0.5, 0.1, 0.1, 0.7, 12, false);
+    b.push().tf(0.78, 2.47, 0.48, 0, -0.5, 0).color(DARK, MAT.METAL).cyl(0, 0, 0, 0.075, 0.075, 0.1, 10, true).pop();
+    // poritiivad
+    fender(1.0, 0.55, 1.55, 0.72, 0.48, TRUCK);
+    fender(-1.0, 0.55, 1.55, 0.72, 0.48, TRUCK);
+    for (const sx of [1, -1]) {
+      b.color(GUNM, MAT.METAL).boxB(sx * 1.0, 1.28, -1.35, 0.5, 0.05, 2.0);
+      b.color(DARK).boxB(sx * 1.0, 0.12, -2.4, 0.46, 0.5, 0.03);
+    }
+    // kast: põrand, varbadega küljed, tagaluuk, kaared + osaline brezent
+    b.color(TRUCK2, MAT.PAINTED).boxB(0, 0.82, -1.08, 2.1, 0.1, 3.0);
+    for (const sx of [1, -1]) {
+      b.color(TRUCK, MAT.PAINTED).boxB(sx * 1.03, 0.92, -1.08, 0.05, 0.42, 3.0);
+      for (let k = 0; k < 5; k++) b.color(TRUCK2, MAT.PAINTED).boxB(sx * 1.06, 0.92, 0.3 - k * 0.7, 0.04, 0.48, 0.08);
+    }
+    b.color(TRUCK, MAT.PAINTED).boxB(0, 0.92, -2.56, 2.1, 0.42, 0.05);
+    for (let k = 0; k < 8; k++) b.color(k % 2 ? DARK : YEL, MAT.PAINTED).box(-0.875 + k * 0.25, 1.05, -2.59, 0.25, 0.12, 0.01);
+    for (const x of [0.85, -0.85]) b.color([1, 0.1, 0.05], MAT.GLOW).box(x, 0.88, -2.6, 0.2, 0.1, 0.03);
+    for (const z of [0.25, -0.55, -1.35]) {
+      for (const sx of [1, -1]) tube(sx * 1.02, 1.32, z, sx * 0.8, 2.0, z, 0.03, DARK);
+      tube(0.8, 2.0, z, -0.8, 2.0, z, 0.03, DARK);
+    }
+    b.color(CANVAS, MAT.MATTE).boxB(0, 2.02, -0.15, 1.7, 0.04, 0.95);
+    for (const sx of [1, -1]) b.push().tf(sx * 0.93, 1.67, -0.15, 0, 0, sx * -0.29).color(CANVAS, MAT.MATTE).box(0, 0, 0, 0.04, 0.72, 0.95).pop();
+    b.color(CANVAS, MAT.MATTE).box(0, 1.67, 0.32, 1.8, 0.72, 0.04);
+    // last: kastid, tünnid
+    b.color([0.42, 0.33, 0.2], MAT.WORN).boxB(0.45, 0.92, -1.75, 0.7, 0.55, 0.7);
+    b.color([0.36, 0.38, 0.32], MAT.WORN).boxB(-0.48, 0.92, -1.55, 0.62, 0.42, 0.9);
+    for (const [x, z] of [[0.55, -2.25], [0.15, -2.25]]) { b.color([0.2, 0.35, 0.55], MAT.PAINTED).cyl(x, 0.92, z, 0.2, 0.2, 0.62, 14, true); b.color(DARK).cyl(x, 1.1, z, 0.205, 0.205, 0.03, 14, false); }
     M.hauler = b.build();
-    // ratas (telg piki x-telge)
+
+    // ===================== RATAS (telg piki x-telge) =====================
     b = new MB(); b.jit = 0;
     b.push().tf(0, 0, 0, 0, 0, Math.PI / 2);
-    b.color([0.06, 0.06, 0.06], MAT.WORN).cyl(0, -0.17, 0, 0.45, 0.45, 0.34, 16, true);
-    b.color([0.45, 0.44, 0.42], MAT.WORN).cyl(0, -0.18, 0, 0.22, 0.22, 0.36, 10, true);
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; b.color([0.1, 0.1, 0.1]).box(Math.sin(a) * 0.43, 0, Math.cos(a) * 0.43, 0.09, 0.36, 0.09); }
+    b.color([0.07, 0.07, 0.07], MAT.MATTE).cyl(0, -0.15, 0, 0.42, 0.42, 0.3, 24, true);
+    b.color([0.07, 0.07, 0.07], MAT.MATTE).cyl(0, -0.17, 0, 0.39, 0.42, 0.02, 24, false); b.color([0.07, 0.07, 0.07], MAT.MATTE).cyl(0, 0.15, 0, 0.42, 0.39, 0.02, 24, false);
+    for (let k = 0; k < 18; k++) {   // mustriklotsid
+      const a = k / 18 * Math.PI * 2, off = k % 2 ? 0.075 : -0.075;
+      b.push().tf(Math.sin(a) * 0.43, off, Math.cos(a) * 0.43, a, 0, 0).color([0.09, 0.09, 0.09], MAT.MATTE).box(0, 0, 0, 0.1, 0.15, 0.04).pop();
+    }
+    b.color(GUNM, MAT.METAL).cyl(0, -0.165, 0, 0.27, 0.27, 0.33, 18, true);                       // velg
+    for (const yy of [-0.17, 0.17]) {
+      b.color(STEEL, MAT.METAL).cyl(0, yy - 0.012, 0, 0.29, 0.29, 0.024, 18, false);
+      for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2; b.color(CHROME, MAT.METAL).box(Math.sin(a) * 0.255, yy, Math.cos(a) * 0.255, 0.03, 0.03, 0.03); }
+      for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + 0.3; b.push().tf(Math.sin(a) * 0.13, yy * 0.95, Math.cos(a) * 0.13, a, 0, 0).color(STEEL, MAT.METAL).box(0, 0, 0, 0.06, 0.03, 0.2).pop(); }
+    }
+    b.color(CHROME, MAT.METAL).cyl(0, -0.2, 0, 0.065, 0.065, 0.4, 12, true);                      // rummu kate
     b.pop();
     M.wheel = b.build();
+    MB.detail = detail0;
     // kuulipilduja (pöördosa; toru +z suunas)
     b = new MB(); b.jit = 0;
     b.color(DARK, MAT.WORN).box(0, 0, 0.1, 0.16, 0.2, 0.8);
@@ -225,6 +348,8 @@ const Vehicles = (() => {
       const v = list[i];
       if (v.hurtT > 0) v.hurtT -= dt;
       if (v.dead) continue;
+      if (v.claim) for (let k = 0; k < 2; k++) { const c = v.claim[k]; if (c && (!c.alive || !c.toVeh || c.toVeh.v !== v)) v.claim[k] = null; }
+      { const g = v.seats[1]; if (g && g !== Player && g.vgun) { const wi = typeof Waves !== 'undefined' ? Waves.info() : null; if (!wi || wi.none || wi.done) { g.vgun = false; leave(v, g); if (g.crew && g.crew.task) g.crew.task.done = true; } } }
       const drv = v.seats[0];
       if (drv && drv !== Player && v.ai) aiDrive(v, dt);
       else if (drv !== Player) { v.throttle = 0; v.steerIn = 0; v.brake = v.speed !== 0 && Math.abs(v.speed) < 0.4 ? 1 : 0; }
@@ -286,7 +411,7 @@ const Vehicles = (() => {
       // kui juht lahkub, lahkub ka meeskonnaliige
       for (let s = 0; s < 2; s++) if (v.seats[s] && v.seats[s] !== Player) leave(v, v.seats[s]);
     } else {
-      e.inVehicle = null; e.pos.x = q.x; e.pos.z = q.z; e.pos.y = Ents.groundY(q.x, q.z, v.y + 0.5); e.pose = 'stand';
+      e.inVehicle = null; e.vgun = false; e.pos.x = q.x; e.pos.z = q.z; e.pos.y = Ents.groundY(q.x, q.z, v.y + 0.5); e.pose = 'stand';
       // jätka teekonda jalgsi sinna, kuhu sõit viis
       if (e.ride) { const r = e.ride; e.ride = null; if (r.goal) { e._noRide = true; Ents.goTo(e, r.goal.x, r.goal.z, r.goalCells, r.lv); e._noRide = false; } } else e.path = null;
     }
@@ -425,45 +550,169 @@ const Vehicles = (() => {
 
   // ---------- AI juhid (meeskond ja konkurendid) ----------
   // Ents.goTo kutsub: kui tee on pikk ja lähedal on vaba oma sõiduk, sõidab inimene sellega
+  const RIDE_MIN = 70, WALK_R = 60;
+  function releaseClaim(e) {
+    const w = e.toVeh; if (!w) return; e.toVeh = null;
+    const v = w.v; if (v.claim && v.claim[w.seat] === e) v.claim[w.seat] = null;
+    if (w.seat === 0 && !v.seats[0] && v.ai && !v.ai.go) v.ai = null;
+  }
+  const freeSeat = (v, k) => !v.seats[k] && !(v.claim && v.claim[k]);
   function tryRide(e, x, z, goalCells, lv) {
+    if (e && e.toVeh) releaseClaim(e);
     if (!e || e._noRide || e.inVehicle || e.kind !== 'human' || e.downed || lv) return false;
     const team = e.team; if (team !== 'crew' && !e.rival) return false;
-    const dist = Math.hypot(x - e.pos.x, z - e.pos.z); if (dist < 110) return false;
-    // juba ootav sõiduk sama sihtkohaga -> kõrvalistmele
+    const dist = Math.hypot(x - e.pos.x, z - e.pos.z); if (dist < RIDE_MIN) return false;
+    const dOf = (v) => Math.hypot(v.x - e.pos.x, v.z - e.pos.z);
+    // juba väljasõitev sõiduk sama sihtkohaga -> kõrvalistmele (kuulipilduja taha)
     for (const v of list) {
-      if (v.dead || v.team !== team || !v.ai || v.seats[1] || v.ai.go || Math.hypot(v.x - e.pos.x, v.z - e.pos.z) > 14) continue;
-      if (Math.hypot(v.ai.dest.x - x, v.ai.dest.z - z) > 40) continue;
-      board(v, e, 1, x, z, goalCells, lv); return true;
+      if (v.dead || v.team !== team || !v.ai || v.ai.go || !freeSeat(v, 1) || dOf(v) > WALK_R) continue;
+      if (Math.hypot(v.ai.dest.x - x, v.ai.dest.z - z) > 40 && !(v.ai.home && Bases.at(x, z) === Bases.at(v.ai.dest.x, v.ai.dest.z) && Bases.at(x, z))) continue;
+      claim(v, e, 1, x, z, goalCells, lv); return true;
     }
-    const v = list.filter((q) => !q.dead && q.team === team && !q.seats[0] && !q.seats[1] && q !== Player.vehicle && Math.hypot(q.x - e.pos.x, q.z - e.pos.z) < 26)
-      .sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
+    // vaba sõiduk: ainult siis, kui sinna kõndimine on palju lühem kui teekond ise
+    const v = list.filter((q) => !q.dead && q.team === team && freeSeat(q, 0) && !q.seats[1] && q !== Player.vehicle && dOf(q) < WALK_R && dOf(q) < dist * 0.4)
+      .sort((a, b) => dOf(a) - dOf(b))[0];
     if (!v) return false;
     // sihtpunkt: baasi puhul garaaži tõstuk (kui on), muidu otse
     let dx = x, dz = z;
     const B = Bases.at(x, z);
     if (team === 'crew' && B === Base) { const lift = Base.objsOfType('tostuk')[0]; if (lift) { dx = lift.cx; dz = lift.cz; } else { const a = Math.atan2(e.pos.x - x, e.pos.z - z); dx = x + Math.sin(a) * 16; dz = z + Math.cos(a) * 16; } }
-    v.ai = { dest: { x: dx, z: dz }, wait: 1.6, stuckT: 0, revT: 0, go: false, home: B === Base || (e.rival && Math.hypot(x - e.rival.base.x, z - e.rival.base.z) < 30) };
-    board(v, e, 0, x, z, goalCells, lv);
+    v.ai = { dest: { x: dx, z: dz }, wait: 1.6, stuckT: 0, revT: 0, go: false, hold: 0, home: B === Base || (e.rival && Math.hypot(x - e.rival.base.x, z - e.rival.base.z) < 30) };
+    claim(v, e, 0, x, z, goalCells, lv);
     return true;
+  }
+  // inimene kõnnib sõiduki juurde ja istub siis peale (mitte ei "teleporteeru")
+  function claim(v, e, seat, x, z, goalCells, lv) {
+    if (Math.hypot(v.x - e.pos.x, v.z - e.pos.z) < 3.5) { board(v, e, seat, x, z, goalCells, lv); return; }
+    v.claim = v.claim || [null, null]; v.claim[seat] = e;
+    e.toVeh = { v, seat, x, z, goalCells, lv, t: 0 };
+    e.path = (Bases.pathWorld && Bases.pathWorld(e.pos.x, e.pos.z, v.x, v.z)) || [{ x: v.x, z: v.z }]; e.pathI = 0; e.goal = { x: v.x, z: v.z }; e.goalCells = null; e.goalLv = 0;
+    if (e.crew) e.crew.act = seat === 0 ? 'Going to the ' + nameOf(v).toLowerCase() : 'Hopping on the ' + nameOf(v).toLowerCase();
+  }
+  // Ents.stepMove kutsub seda, kui inimene on teel sõiduki juurde
+  function walkStep(e, dt, speed) {
+    const w = e.toVeh, v = w.v; w.t += dt;
+    if (v.dead || v.seats[w.seat] || (w.seat === 0 && v === Player.vehicle) || w.t > 45 || !v.claim || v.claim[w.seat] !== e || e.downed) {
+      releaseClaim(e); e._noRide = true; Ents.goTo(e, w.x, w.z, w.goalCells, w.lv); e._noRide = false; return false;
+    }
+    if (Math.hypot(v.x - e.pos.x, v.z - e.pos.z) < 3.2) { v.claim[w.seat] = null; e.toVeh = null; board(v, e, w.seat, w.x, w.z, w.goalCells, w.lv); return false; }
+    e.toVeh = null; const done = Ents.stepMove(e, dt, speed * 1.15); e.toVeh = w;
+    if (done) { e.path = [{ x: v.x, z: v.z }]; e.pathI = 0; }
+    return false;
   }
   function board(v, e, seat, x, z, goalCells, lv) {
     v.seats[seat] = e; e.inVehicle = v; e.ride = { goal: { x, z }, goalCells: goalCells || null, lv: lv || 0 };
     e.path = [{ x, z }]; e.pathI = 0; e.goal = { x, z };
-    if (e.crew) e.crew.act = seat === 0 ? 'Driving the ' + nameOf(v).toLowerCase() : 'Riding along';
+    if (seat === 0 && v.ai) v.ai.wait = Math.max(v.ai.wait, 1.2);
+    Audio2.door && Audio2.door(v.x, v.z);
+    if (e.crew) {
+      e.crew.act = seat === 0 ? 'Driving the ' + nameOf(v).toLowerCase() : DEF[v.type].gun ? 'Riding shotgun on the machine gun' : 'Riding along';
+      // saak kasti: sõiduk tühjendab selle baasis lattu
+      const c = e.crew;
+      if (c.carry > 0 && c.carryKind && v.team === 'crew' && cargoCount(v) - (v.cargo.ammo_r || 0) + c.carry <= DEF[v.type].cargoCap) { v.cargo[c.carryKind] = (v.cargo[c.carryKind] || 0) + c.carry; c.carry = 0; c.carryKind = null; }
+    }
+  }
+  // kaitse: putukaparve ajal istub võitleja baasis seisva bagi kuulipilduja taha
+  function freeGunPost(e) {
+    for (const v of list) {
+      if (v.dead || v.team !== 'crew' || !DEF[v.type].gun || !freeSeat(v, 1) || v === Player.vehicle || !Base.isInside(v.x, v.z) || v.ai) continue;
+      const r = v.gunRes; if (r && r !== e && r.alive && r.crew && r.crew.task && r.crew.task.type === 'vgun' && !r.crew.task.done) continue;
+      v.gunRes = e; return v;
+    }
+    return null;
+  }
+  function manGun(v, e) {
+    if (!freeSeat(v, 1) || v.dead) return false;
+    v.seats[1] = e; e.inVehicle = v; e.ride = null; e.vgun = true; e.path = null;
+    if (e.crew) e.crew.act = 'Manning the buggy machine gun';
+    return true;
   }
   function aiDrive(v, dt) {
     const a = v.ai, d = DEF[v.type];
+    if (!a.go && v.claim && v.claim[1] && !v.seats[1] && (a.hold = (a.hold || 0) + dt) < 14) { v.throttle = 0; v.steerIn = 0; v.brake = 1; return; }
     if (a.wait > 0) { a.wait -= dt; v.throttle = 0; v.steerIn = 0; v.brake = 1; if (a.wait <= 0) a.go = true; return; }
-    const dx = a.dest.x - v.x, dz = a.dest.z - v.z, dist = Math.hypot(dx, dz);
+    const fdist = Math.hypot(a.dest.x - v.x, a.dest.z - v.z);
+    const arriveR = a.home ? 4 : 9;
+    const BB = Bases.at(v.x, v.z), inB = !!(BB && BB.isInside(v.x, v.z));
+    // edenemise valvur: kui 25 s jooksul sihtkohale lähemale ei jõua, jäetakse sõiduk maha ja minnakse jala
+    if (a.best === undefined || fdist < a.best - 2) { a.best = fdist; a.bestT = 0; } else if ((a.bestT += dt) > 25) { abandon(v); return; }
+    const onLiftRoute = a.route && a.route.length && a.route[a.route.length - 1].tight;
+    if (fdist < (onLiftRoute ? 2.2 : arriveR) || (a.home && !onLiftRoute && inB && fdist < 6)) { arrive(v); return; }
+    // marsruut läbi väravate / garaažiukse (inimuksed on sõidukile liiga kitsad)
+    if (!a.route) { a.route = planRoute(v, a); a.ri = 0; }
+    let tg = a.route[Math.min(a.ri, a.route.length - 1)];
+    while (a.ri < a.route.length - 1 && Math.hypot(tg.x - v.x, tg.z - v.z) < (tg.tight ? 2.7 : 3.4)) { a.ri++; tg = a.route[a.ri]; }
+    // takistuste vältimine väljas (kivid, kaktused, järsud nõlvad): proovi ette, vajadusel põike kõrvale
+    if (a.detour) { a.detourT -= dt; if (a.detourT <= 0 || Math.hypot(a.detour.x - v.x, a.detour.z - v.z) < 2.5) a.detour = null; }
+    if (!inB && !tg.tight && a.revT <= 0 && (a.probeT = (a.probeT || 0) - dt) <= 0) {
+      a.probeT = 0.3;
+      const T0 = a.detour || tg, L = Math.min(8, Math.hypot(T0.x - v.x, T0.z - v.z));
+      if (L > 3 && !pathClear(v, Math.atan2(T0.x - v.x, T0.z - v.z), L)) pickDetour(v, a, Math.atan2(tg.x - v.x, tg.z - v.z));
+    }
+    const T = a.detour || tg;
+    const dx = T.x - v.x, dz = T.z - v.z, dist = Math.hypot(dx, dz);
     const want = Math.atan2(dx, dz), err = angDiff(v.yaw, want);
-    const arriveR = a.home ? 6 : 9;
-    if (dist < arriveR || (a.home && Bases.at(v.x, v.z) && Bases.at(v.x, v.z).isInside(v.x, v.z) && dist < 14)) { arrive(v); return; }
     // tagurdamine, kui kinni
-    if (a.revT > 0) { a.revT -= dt; v.throttle = -0.8; v.steerIn = err > 0 ? 1 : -1; v.brake = 0; return; }
+    if (a.revT > 0) { a.revT -= dt; v.throttle = -0.8; v.steerIn = err > 0 ? 1 : -1; v.brake = 0; if (a.revT <= 0 && a.pendDetour) { a.pendDetour = false; if (!pickDetour(v, a, Math.atan2(tg.x - v.x, tg.z - v.z), true)) a.revT = 1.2; } return; }
+    // garaažist välja tagurpidi, kui sihtpunkt on selja taga ja lähedal
+    if (a.backOut === undefined) a.backOut = Math.abs(err) > 2.0 && dist < 18;
+    if (a.backOut) {
+      const errB = angDiff(v.yaw + Math.PI, want);
+      if (dist < 2.2 || Math.abs(errB) > 1.6 || (a.backT = (a.backT || 0) + dt) > 9) { a.backOut = false; a.ri = Math.min(a.ri + 1, a.route.length - 1); }
+      else { v.throttle = -0.6; v.brake = 0; v.steerIn = clamp(errB * 2.2, -1, 1); return; }
+    }
+    // terav pööre kohapeal: tagurda nurga all (kolmepunktipööre)
+    if (Math.abs(err) > 1.5 && dist < 10 && v.speed < 3.6) { a.revT = 1.1; return; }
     v.steerIn = clamp(-err * 2.2, -1, 1) * (v.speed < 0 ? -1 : 1);
-    const slow = dist < 30 ? 0.45 : Math.abs(err) > 1.0 ? 0.35 : 1;
-    v.throttle = slow; v.brake = Math.abs(v.speed) > d.maxSpeed * 0.55 && dist < 20 ? 1 : 0;
-    if (Math.abs(v.speed) < 1.2) { a.stuckT += dt; if (a.stuckT > 2.2) { a.stuckT = 0; a.revT = 1.3; a.stuckN = (a.stuckN || 0) + 1; if (a.stuckN > 5) arrive(v); } } else a.stuckT = 0;
+    // sihtkiirus: baasi juures ja pööretel aeglaselt
+    let vT = d.maxSpeed;
+    if (BB) vT = Math.min(vT, inB ? 4 : 7);
+    if (fdist < 25) vT = Math.min(vT, 5);
+    const nx = a.route[a.ri + 1];
+    if (nx && dist < 14) { const t2 = Math.abs(angDiff(want, Math.atan2(nx.x - tg.x, nx.z - tg.z))); if (t2 > 0.6) vT = Math.min(vT, t2 > 1.2 ? 3.5 : 6); }
+    if (Math.abs(err) > 0.45) vT = Math.min(vT, Math.abs(err) > 1.1 ? 3 : 6.5);
+    v.throttle = v.speed < vT ? (vT - v.speed > 3 ? 1 : 0.5) : 0;
+    v.brake = v.speed > vT + 1.5 ? 1 : 0;
+    if (Math.abs(v.speed) < 1.2) { a.stuckT += dt; if (a.stuckT > 2.2) { a.stuckT = 0; a.revT = 1.3; a.stuckN = (a.stuckN || 0) + 1; if (a.stuckN % 2 === 0) a.route = null;
+      if (!inB) a.pendDetour = true; if (a.stuckN > 7) { abandon(v); return; } } } else a.stuckT = 0;
+  }
+  const _pb = { x: 0, z: 0 };
+  function blockedAt(v, x, z) {
+    _pb.x = x; _pb.z = z;
+    if (World.collideCircle(_pb, 1.1, v.y + 0.35, v.y + 1.7, true)) return true;
+    return World.heightAt(x, z) - v.y > 2.0 && !Bases.at(x, z);
+  }
+  function pathClear(v, an, L) { for (let r = 2.5; r <= L + 0.01; r += 1.8) if (blockedAt(v, v.x + Math.sin(an) * r, v.z + Math.cos(an) * r)) return false; return true; }
+  function pickDetour(v, a, ang, wide) {
+    const offs = wide ? [1.0, -1.0, 1.5, -1.5, 2.1, -2.1, 0.5, -0.5] : [0.45, -0.45, 0.85, -0.85, 1.3, -1.3, 1.8, -1.8];
+    for (const off of offs) if (pathClear(v, ang + off, 9)) { a.detour = { x: v.x + Math.sin(ang + off) * 9, z: v.z + Math.cos(ang + off) * 9 }; a.detourT = 3; return true; }
+    return false;
+  }
+  // marsruut: garaažist otse välja ja koju tagasi otse ukse eest sisse
+  function liftFront(o, k) { const f = o.rot * Math.PI / 2; return { x: o.cx + Math.sin(f) * k, z: o.cz + Math.cos(f) * k }; }
+  function planRoute(v, a) {
+    const lifts = v.team === 'crew' ? Base.objsOfType('tostuk') : [];
+    const from = lifts.find((o) => Math.hypot(o.cx - v.x, o.cz - v.z) < 4);
+    const to = lifts.find((o) => Math.hypot(o.cx - a.dest.x, o.cz - a.dest.z) < 1);
+    const out = [];
+    let sx = v.x, sz = v.z;
+    if (from) { const p = Object.assign(liftFront(from, 13), { tight: true }); out.push(p); sx = p.x; sz = p.z; }
+    const ex = to ? liftFront(to, 19) : a.dest;
+    const mid = Bases.vehicleRoute(sx, sz, ex.x, ex.z) || [{ x: ex.x, z: ex.z }];
+    out.push(...mid);
+    if (to) { for (const k of [11, 6.5]) out.push(Object.assign(liftFront(to, k), { tight: true })); out.push({ x: to.cx, z: to.cz, tight: true }); }
+    return out;
+  }
+  function abandon(v) {
+    // saak tagasi inimeste kätte (kast jääb muidu kõrbesse)
+    for (const e of v.seats) {
+      if (!e || e === Player || !e.crew || e.crew.carry > 0) continue;
+      const k = Object.keys(v.cargo).find((q) => q !== 'ammo_r' && v.cargo[q] > 0);
+      if (!k) break;
+      const n = Math.min(v.cargo[k], 40); v.cargo[k] -= n; e.crew.carry = n; e.crew.carryKind = k;
+    }
+    if (v.team === 'crew' && Math.random() < 0.5) UI.toast('The ' + nameOf(v).toLowerCase() + ' got stuck – the crew continues on foot.');
+    arrive(v);
   }
   function arrive(v) {
     v.throttle = 0; v.steerIn = 0; v.brake = 1; v.speed *= 0.3;
@@ -473,7 +722,7 @@ const Vehicles = (() => {
   // konkurent ostab sõiduki samadel tingimustel (raha + vanaraud)
   function rivalBuy(r, type) {
     const d = DEF[type];
-    const f = Math.atan2(-r.base.x, -r.base.z), x = r.base.x + Math.sin(f + 0.9) * 9, z = r.base.z + Math.cos(f + 0.9) * 9;
+    const f = Math.atan2(-r.base.x, -r.base.z), n = teamVehicles(r.team).length, x = r.base.x + Math.sin(f + 0.9 + n * 0.45) * 9, z = r.base.z + Math.cos(f + 0.9 + n * 0.45) * 9;
     return spawn(type, x, z, f, { team: r.team, rivalId: r.id });
   }
   function teamVehicles(team) { return list.filter((v) => v.team === team && !v.dead); }
@@ -488,17 +737,17 @@ const Vehicles = (() => {
       const tint = v.dead ? [0.25, 0.22, 0.2, 0] : v.hurtT > 0 ? [1.6, 0.7, 0.6, 0] : null;
       const d = DEF[v.type];
       const rt = !tint && v.team !== 'crew' && typeof Rivals !== 'undefined' && Rivals.get(v.team) ? Rivals.get(v.team).tint : tint;
-      GFX.draw(M[d.mesh], v.m, rt, null, { rust: 0.7 });
+      GFX.draw(M[d.mesh], v.m, rt, null, { rust: v.dead ? 0.9 : 0.22 });
       for (let k = 0; k < d.wheels.length; k++) {
         const [wx, wy, wz] = d.wheels[k];
         M4.child(v.wm[k], v.m, wx, wy, wz, k < 2 ? -v.steer : 0, v.wheelRot / d.wheelS, 0, d.wheelS, d.wheelS, d.wheelS);
-        GFX.draw(M.wheel, v.wm[k], v.dead ? tint : null, null, { rust: 0.3 });
+        GFX.draw(M.wheel, v.wm[k], v.dead ? tint : null, null, { rust: 0.15 });
       }
       // kuulipilduja: maailma suunas
       if (d.gun) {
         const gp = M4.point(v.m, d.gun.x, d.gun.y, d.gun.z, tmp);
         M4.compose(v.gm, gp.x, gp.y, gp.z, v.gunYaw, -v.gunPitch, 0);
-        GFX.draw(M.gun, v.gm, tint, null, { rust: 0.4 });
+        GFX.draw(M.gun, v.gm, tint, null, { rust: 0.2 });
       }
       if (!v.dead && GFX.env.night > 0.35) {
         const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
@@ -520,5 +769,5 @@ const Vehicles = (() => {
   function reset() { for (const v of list) for (const e of v.seats) if (e && e !== Player) { e.inVehicle = null; e.ride = null; } list.length = 0; if (typeof Player !== 'undefined') { Player.vehicle = null; Player.seat = 0; } }
 
   return { DEF, list, initMeshes, spawn, near, update, draw, enter, leave, playerUpdate, camera, interactions, liftInteraction, serialize, deserialize, reset, cargoCount, sound,
-    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, rivalBuy, teamVehicles, nameOf, cargoText };
+    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, walkStep, releaseClaim, freeGunPost, manGun, rivalBuy, teamVehicles, nameOf, cargoText };
 })();

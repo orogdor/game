@@ -606,6 +606,8 @@ const Crew = (() => {
       if (fighter || !Base.isInside(e.pos.x, e.pos.z) && c.trait !== 'argpyks') {
         const post = freePost(e);
         if (post) return { type: 'post', step: 0, obj: post };
+        const gv = typeof Vehicles !== 'undefined' && Vehicles.freeGunPost(e);
+        if (gv) return { type: 'vgun', step: 0, v: gv };
       }
       if (!fighter) return { type: 'shelter', step: 0, t: 30 };
     }
@@ -824,7 +826,7 @@ const Crew = (() => {
     if (e.hp < e.maxHp * 0.3 && !Base.isInside(e.pos.x, e.pos.z) && (!c.task || c.task.type !== 'home')) {
       c.task = { type: 'home', step: 0 }; UI.toast(c.name.split(' ')[0] + ' is wounded and falling back to the base');
     }
-    { const wi = Waves.info(); if (wi && !wi.none && !wi.done && wi.warned && c.task && !['post', 'shelter', 'follow', 'home'].includes(c.task.type)) { if (sleeping) wakeUp(e); e.gesture = null; c.task.done = true; } }
+    { const wi = Waves.info(); if (wi && !wi.none && !wi.done && wi.warned && c.task && !['post', 'vgun', 'shelter', 'follow', 'home'].includes(c.task.type)) { if (sleeping) wakeUp(e); e.gesture = null; c.task.done = true; } }
     if (c.task && e.stuckN > 6) { e.stuckN = 0; if (e.pose !== 'lie') e.pose = 'stand'; c.task.done = true; }
     if (!c.task || c.task.done) {
       e.gesture = null; e.aimPitch = 0; e.dance = 0; e.lunge2 = 0;
@@ -1439,6 +1441,14 @@ const Crew = (() => {
           const wd = wi.dir; Ents.face(e, Math.cos(wd) * 200, Math.sin(wd) * 200, dt, 1.5);
           setAct(e, o.type === 'torn' ? 'Guarding in the tower' : o.type === 'kmpesa' ? 'Manning the machine gun' : 'Guarding on the rampart');
         }
+        return;
+      }
+      case 'vgun': {   // bagi kuulipilduja kui kaitsepost
+        const v = k.v, wi = Waves.info();
+        if (!v || v.dead || !wi || wi.none || wi.done || (v.seats[1] && v.seats[1] !== e)) { k.done = true; return; }
+        e.hasGun = true;
+        if (k.step === 0) { e._noRide = true; Ents.goTo(e, v.x, v.z); e._noRide = false; k.step = 1; setAct(e, 'Running to the buggy machine gun'); }
+        else if (Math.hypot(v.x - e.pos.x, v.z - e.pos.z) < 3 || Ents.stepMove(e, dt, sp * 1.3)) { if (!Vehicles.manGun(v, e)) k.done = true; }
         return;
       }
       case 'shelter': {

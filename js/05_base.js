@@ -1188,7 +1188,11 @@ function createBase(opt) {
 
   // ---------- teekonnaotsing ----------
   const PASS = { varav: 1, varav3: 1, suurvarav: 1, trepp: 1, okas: 1, sisetrepp: 1, tostuk: 1 };
-  function walkable(i, j) { if (!inGrid(i, j)) return false; const id = objAt(i, j); if (!id) return true; const o = objs.get(id); return !!(o && PASS[o.type]); }
+  // sõidukirežiim: inimuksed ei sobi, läbitav ainult väravad ja garaaž
+  const VPASS = { varav: 1, varav3: 1, suurvarav: 1, tostuk: 1 };
+  let vehMode = false;
+  function walkable(i, j) { if (!inGrid(i, j)) return false; const id = objAt(i, j); if (!id) return true; const o = objs.get(id); return !!(o && (vehMode ? VPASS : PASS)[o.type]); }
+  function vehiclePath(ax, az, bx, bz) { vehMode = true; try { return pathWorld(ax, az, bx, bz); } finally { vehMode = false; } }
   function canStep(i, j, di, dj) {
     if (!inGrid(i + di, j + dj)) return false;
     if (di && dj) {
@@ -1196,6 +1200,7 @@ function createBase(opt) {
       for (const [t, a, b] of es) if (isWall(t, a, b)) return false;
       return true;
     }
+    if (vehMode) { const [t, a, b] = edgeOf(i, j, di, dj); if (edgeType(t, a, b) === 'door') return false; }
     return !edgeBlocked(i, j, di, dj);
   }
   function doorCenter(t, ei, ej) { return t === 'v' ? { x: X0 + ei * CS, z: Z0 + (ej + 0.5) * CS } : { x: X0 + (ei + 0.5) * CS, z: Z0 + ej * CS }; }
@@ -1232,6 +1237,13 @@ function createBase(opt) {
       }
     }
     return null;
+  }
+  // sõidukile: ka 1 m kõrval paralleelsed jooned peavad olema vabad (ei lõika nurki)
+  function lineOK(ax, az, bx, bz) {
+    if (!straightOK(ax, az, bx, bz)) return false;
+    if (!vehMode) return true;
+    const L = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / L * 1.0, nz = (bx - ax) / L * 1.0;
+    return straightOK(ax + nx, az + nz, bx + nx, bz + nz) && straightOK(ax - nx, az - nz, bx - nx, bz - nz);
   }
   function straightOK(ax, az, bx, bz) {
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.3));
@@ -1287,7 +1299,7 @@ function createBase(opt) {
     while (k < pts.length) {
       let far = k, lim = pts.length - 1;
       for (let q = k; q < pts.length; q++) if (pts[q].door) { lim = q; break; }
-      for (let m = lim; m > k; m--) if (straightOK(out[out.length - 1].x, out[out.length - 1].z, pts[m].x, pts[m].z)) { far = m; break; }
+      for (let m = lim; m > k; m--) if (lineOK(out[out.length - 1].x, out[out.length - 1].z, pts[m].x, pts[m].z)) { far = m; break; }
       out.push(pts[far]); k = far + 1;
     }
     out.shift();
@@ -1619,7 +1631,7 @@ function createBase(opt) {
     inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, isWide, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
-    findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
+    findPath, pathWorld, vehiclePath, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
     serialize, deserialize, markDirty: () => { dirty = true; }, rebuildNow: () => rebuild(), computeRooms,
     get viewLevel() { return viewLevel; }, set viewLevel(v) { viewLevel = v ? 1 : 0; },
   };
@@ -1636,5 +1648,14 @@ const Bases = {
     if (goalCells) return Base.pathWorld(ax, az, bx, bz, goalCells);
     const b = this.at(ax, az) || this.at(bx, bz);
     return b ? b.pathWorld(ax, az, bx, bz) : [{ x: bx, z: bz }];
+  },
+  // sõidukite marsruut: läbi väravate ja garaažiukse, mööda baase
+  vehicleRoute(ax, az, bx, bz) {
+    const A = this.at(ax, az), B = this.at(bx, bz);
+    let out = [];
+    if (A && A.vehiclePath) { const p = A.vehiclePath(ax, az, bx, bz); if (p) out = p; else return null; }
+    if (B && B !== A && B.vehiclePath) { if (out.length) out.pop(); const s = out.length ? out[out.length - 1] : { x: ax, z: az }; const p = B.vehiclePath(s.x, s.z, bx, bz); if (p) out = out.concat(p); else return null; }
+    if (!out.length) out = [{ x: bx, z: bz }];
+    return out;
   },
 };

@@ -214,6 +214,14 @@ const Rivals = (() => {
           if (Math.hypot(Player.pos.x - r.base.x, Player.pos.z - r.base.z) < 200 || Math.random() < 0.5) UI.msg('Radio: ' + r.short + ' bought an armed buggy.', 'rival');
         }
       }
+      // teine sõiduk: veok saagi vedamiseks (samad hinnad mis mängijal)
+      else if (typeof Vehicles !== 'undefined' && r.hasGarage && Vehicles.teamVehicles(r.team).length === 1 && (r.men || 0) >= 5) {
+        const vc = Vehicles.DEF.hauler.cost;
+        if (spend(r, { s: vc.s, c: vc.c }, reserve(r) + 250)) {
+          Vehicles.rivalBuy(r, 'hauler');
+          if (Math.hypot(Player.pos.x - r.base.x, Player.pos.z - r.base.z) < 200 || Math.random() < 0.5) UI.msg('Radio: ' + r.short + ' bought a hauler truck.', 'rival');
+        }
+      }
       if (r.bb.rooms.size >= 8) continue;
       if (growBase(r, true)) {
         r.bb.rebuildNow();
