@@ -416,6 +416,8 @@ function objInteraction(o) {
   switch (o.type) {
     case 'tostuk':
       return Vehicles.liftInteraction(o);
+    case 'kapp': case 'kohvimasin': case 'pesumasin': case 'ravikapp': case 'moonapress': case 'treipink': case 'uurimislaud': case 'raadiojaam': case 'piljard': case 'toovanker':
+      return Gadgets.playerInteraction(o);
     case 'vanagen':
       if (o.broken) return { label: 'Repair the generator', sub: '25 scrap', hold: 2.6, cost: { s: 25 }, act: () => repairObj(o, 25, () => { G.flags.gen = true; Audio2.powerOn(); UI.msg('The generator coughed and started. The lights are back on!', 'good'); Objectives.check(); }), tick: () => FX.repair(o.cx, 1.4, o.cz) };
       return { label: 'Old generator', sub: Base.power.supply + ' ⚡ produced · ' + Base.power.demand + ' ⚡ used', disabled: true };
@@ -465,8 +467,8 @@ function objInteraction(o) {
         else { Player.reset(o.cx, o.cz, Player.yaw); Player.pos.y = Ents.groundY(o.cx, o.cz); }
         Audio2.step(false); } };
     }
-    case 'varav':
-      return { label: 'Gate', sub: Waves.active() ? 'Locked — swarm attacking' : 'Opens by itself when you approach', disabled: true };
+    case 'varav': case 'varav3': case 'suurvarav':
+      return { label: OBJ[o.type].name, sub: Waves.active() ? 'Locked — swarm attacking' : 'Opens by itself when you approach', disabled: true };
     case 'kmpesa':
       return { label: 'MG nest', sub: 'Crew mans it during a swarm · in storage ' + (G.stash.ammo_r || 0) + ' rounds', disabled: true };
     case 'kaardilaud': {

@@ -216,6 +216,7 @@ const Game = (() => {
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.getElementById('loading').hidden = false; document.getElementById('loading').textContent = 'Graphics reset. Reload the page.'; });
     buildModels();
     Vehicles.initMeshes();
+    Gadgets.initMeshes();
     Chars.init();
     Input.init(canvas);
     Build.init(canvas);

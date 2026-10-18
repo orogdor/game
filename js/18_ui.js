@@ -929,7 +929,7 @@ const UI = (() => {
     else showHUD(true);
   }
   function buildTools(S) {
-    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['floor', 'Floor', 'box'], ['obj', 'Items', 'box'], ['job', 'Room job', 'room'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
+    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['doorW', 'Wide door', 'door'], ['windowW', 'Wide window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['floor', 'Floor', 'box'], ['obj', 'Items', 'box'], ['job', 'Room job', 'room'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
       .filter(([k]) => k !== 'floor' || S.level);
     $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k || (k === 'level' && S.level) ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
     $('bTools').querySelectorAll('.tool').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));

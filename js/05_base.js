@@ -33,33 +33,46 @@ const OBJ = {
   vallikaik: { name: 'Rampart walk', cat: 'vall', cost: { s: 10, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 2.0, deck: 2.0, sy: 2.0 / 1.5, hp: 400, desc: 'Platform behind the wall. You shoot over the wall from there. Reach it by stairs.' },
   trepp: { name: 'Stairs', cat: 'vall', cost: { s: 8, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.1, ramp: 2.0, sy: 2.0 / 1.5, hp: 300, desc: 'Leads up to the rampart walk. Rotate so the high end faces the rampart.' },
   torn: { name: 'Watchtower', cat: 'kaitse', cost: { s: 60, c: 150 }, size: [2, 2], where: 'out', power: 1, h: 6.0, deck: 6.1, hp: 700, desc: 'A guard in the tower sees far and shoots more accurately. Floodlight at night. You can climb up.' },
-  varav: { name: 'Gate', cat: 'vall', cost: { s: 40, c: 0 }, size: [2, 1], where: 'out', power: 1, h: 2.7, hp: 800, desc: 'Opens for your own people. Locked during a bug swarm.' },
+  varav: { name: 'Gate', cat: 'vall', cost: { s: 40, c: 0 }, size: [2, 1], where: 'out', power: 1, h: 2.7, hp: 800, gate: true, desc: 'Opens for your own people. Locked during a bug swarm.' },
+  varav3: { name: 'Wide gate', cat: 'vall', cost: { s: 60, c: 30 }, size: [3, 1], where: 'out', power: 1, h: 2.7, hp: 1100, gate: true, sx: 1.5, mesh: 'varav', desc: 'A 6 m gate – room for a vehicle and a group of people.' },
+  suurvarav: { name: 'Big gate', cat: 'vall', cost: { s: 85, c: 60 }, size: [4, 1], where: 'out', power: 2, h: 2.7, hp: 1500, gate: true, sx: 2, mesh: 'varav', desc: 'An 8 m wall gate for trucks. Opens for your own people and vehicles.' },
   kmpesa: { name: 'MG nest', cat: 'kaitse', cost: { s: 30, c: 80 }, size: [2, 1], where: 'out', power: 0, h: 1.0, hp: 350, desc: 'Sandbagged nest. A crew member mans it during a swarm. Uses carbine ammo from storage.' },
   siil: { name: 'Tank trap', cat: 'vall', cost: { s: 5, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 1.2, hp: 500, desc: 'Steel hedgehog. Big bugs can\'t get through.' },
   okas: { name: 'Barbed wire', cat: 'vall', cost: { s: 6, c: 0 }, size: [1, 1], where: 'out', power: 0, h: 0.9, hp: 120, desc: 'Slows and hurts bugs that climb through it.' },
   maagitehas: { name: 'Ore works', cat: 'too', cost: { s: 60, c: 150 }, size: [2, 1], where: 'any', power: 2, h: 2.4, desc: 'Crusher and smelter. Sells the ore drill (needed to mine iron ore rocks in the desert) and smelts iron ore into steel scrap.' },
   kaardilaud: { name: 'Map table', cat: 'too', cost: { s: 20, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 1.1, desc: 'The heart of the command post. With a radar it shows the swarm\'s direction and size an hour ahead.' },
+  // kasutatavad toaesemed (meeskond ja mängija kasutavad, vt 14d_gadgets.js)
+  kapp: { name: 'Personal lockers', cat: 'elu', cost: { s: 25, c: 20 }, size: [1, 1], where: 'in', power: 0, h: 1.9, useLabel: 'Check your gear', desc: 'Everyone checks their gear morning and evening: +5 morale and a little health. Barracks item.' },
+  kohvimasin: { name: 'Coffee machine', cat: 'olme', cost: { s: 15, c: 60 }, size: [1, 1], where: 'in', power: 1, h: 1.5, useLabel: 'Make coffee', desc: 'Tired people drink coffee: +30 energy so they keep working. Canteen item.' },
+  pesumasin: { name: 'Washing machine', cat: 'olme', cost: { s: 25, c: 70 }, size: [1, 1], where: 'in', power: 1, h: 0.9, useLabel: 'Do laundry', desc: 'Clean clothes: hygiene drops half as fast for a day. Washroom item.' },
+  ravikapp: { name: 'Medicine cabinet', cat: 'too', cost: { s: 30, c: 90 }, size: [1, 1], where: 'in', power: 1, h: 1.9, useLabel: 'Pack a medkit', desc: 'Packs medkits into storage (15 ₵ each, up to 2 a day, 6 in stock) and patches up whoever uses it. Infirmary item.' },
+  moonapress: { name: 'Ammo press', cat: 'too', cost: { s: 40, c: 90 }, size: [1, 1], where: 'in', power: 1, h: 1.7, useLabel: 'Press rifle ammo', desc: 'Turns 2 scrap into 20 rifle rounds for storage, up to 4 times a day. Armoury item.' },
+  treipink: { name: 'Lathe', cat: 'too', cost: { s: 50, c: 110 }, size: [2, 1], where: 'in', power: 1, h: 1.2, useLabel: 'Turn parts', desc: 'Salvages parts: +3 scrap per job, 3 jobs a day. Workshop item.' },
+  uurimislaud: { name: 'Research bench', cat: 'too', cost: { s: 40, c: 140 }, size: [1, 1], where: 'in', power: 1, h: 1.3, useLabel: 'Analyse samples', desc: 'Sample analysis: +3 % to the nest search (twice a day); after the nest is found, research data sells for 40 ₵. Lab item.' },
+  raadiojaam: { name: 'Radio station', cat: 'kaitse', cost: { s: 30, c: 110 }, size: [1, 1], where: 'in', power: 1, h: 2.5, useLabel: 'Listen to the radio', desc: 'Radio sweeps (3 a day) pinpoint comet impact sites and warn about rival raids. Command post item.' },
+  piljard: { name: 'Pool table', cat: 'elu', cost: { s: 30, c: 120 }, size: [2, 1], where: 'in', power: 0, h: 0.85, useLabel: 'Play pool', desc: 'An evening game: +8 morale and better relations with people nearby. Rec room item.' },
+  toovanker: { name: 'Tool cart', cat: 'garaaz', cost: { s: 25, c: 60 }, size: [1, 1], where: 'in', power: 0, h: 1.1, useLabel: 'Fix the vehicle', desc: 'Crew fix damaged vehicles parked next to it for free (+150 hp a job). Garage item.' },
   terminal: { name: 'Comms terminal', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.6 },
   hoidla: { name: 'Storage', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.4 },
   vanagen: { name: 'Old generator', fixed: true, size: [2, 1], where: 'in', power: -4, h: 2.1 },
 };
 // tubade ülesanded: kui toas on AINULT lubatud esemed ja nõutud asjad olemas, annab tuba boonuse
 const ROOM_PURPOSES = {
-  barracks: { name: 'Barracks', allow: ['voodi', 'nari', 'taim', 'diivan'], need: (m) => (m.voodi || 0) + (m.nari || 0) * 2 >= 2, needTxt: 'at least 2 beds', bonus: 'Sleep recovers 30% faster.' },
-  canteen: { name: 'Canteen', allow: ['laud', 'pliit', 'vesi', 'taim', 'jukebox', 'teler', 'kasvu'], need: (m) => m.laud && (m.pliit || m.vesi), needTxt: 'a table + a stove or water dispenser', bonus: 'Eating lifts morale twice as much.' },
-  washroom: { name: 'Washroom', allow: ['dush', 'wc', 'vesi', 'taim'], need: (m) => m.dush && m.wc, needTxt: 'a shower + a toilet', bonus: 'Showers take half the time and lift morale twice as much.' },
-  infirmary: { name: 'Infirmary', allow: ['ravila', 'voodi', 'vesi', 'taim'], need: (m) => m.ravila, needTxt: 'a medical bay', bonus: 'Wounds heal 60% faster indoors.' },
-  armoury: { name: 'Armoury', allow: ['relvakapp', 'toolaud', 'taim'], need: (m) => m.relvakapp && m.toolaud, needTxt: 'a gun locker + a workbench', bonus: 'The crew shoots 10% more accurately.' },
-  workshop: { name: 'Workshop', allow: ['toolaud', 'lihvija', 'maagitehas', 'taim'], need: (m) => m.lihvija || m.maagitehas, needTxt: 'a diamond polisher or the ore works', bonus: 'Polishing and smelting give 20% more.' },
-  lab: { name: 'Science lab', allow: ['skanner', 'kaardilaud', 'taim'], need: (m) => m.skanner, needTxt: 'the deep scanner', bonus: 'The deep scanner searches 35% faster.' },
-  command: { name: 'Command post', allow: ['kaardilaud', 'relvakapp', 'taim'], need: (m) => m.kaardilaud, needTxt: 'a map table', bonus: 'Swarm warnings with direction and size – even without a radar.' },
-  rec: { name: 'Rec room', allow: ['diivan', 'teler', 'jukebox', 'trenn', 'taim', 'laud'], need: (m) => ((m.diivan ? 1 : 0) + (m.teler ? 1 : 0) + (m.jukebox ? 1 : 0) + (m.trenn ? 1 : 0)) >= 2, needTxt: '2 of: sofa, TV, jukebox, training bench', bonus: 'Everyone in the room slowly gains morale.' },
-  garage: { name: 'Garage', allow: ['tostuk', 'toolaud', 'relvakapp', 'taim'], need: (m) => m.tostuk, needTxt: 'a car lift', bonus: 'Vehicle repairs cost half.' },
+  barracks: { name: 'Barracks', allow: ['voodi', 'nari', 'taim', 'diivan', 'kapp'], need: (m) => (m.voodi || 0) + (m.nari || 0) * 2 >= 2, needTxt: 'at least 2 beds', bonus: 'Sleep recovers 30% faster.' },
+  canteen: { name: 'Canteen', allow: ['laud', 'pliit', 'vesi', 'taim', 'jukebox', 'teler', 'kasvu', 'kohvimasin'], need: (m) => m.laud && (m.pliit || m.vesi), needTxt: 'a table + a stove or water dispenser', bonus: 'Eating lifts morale twice as much.' },
+  washroom: { name: 'Washroom', allow: ['dush', 'wc', 'vesi', 'taim', 'pesumasin'], need: (m) => m.dush && m.wc, needTxt: 'a shower + a toilet', bonus: 'Showers take half the time and lift morale twice as much.' },
+  infirmary: { name: 'Infirmary', allow: ['ravila', 'voodi', 'vesi', 'taim', 'ravikapp'], need: (m) => m.ravila, needTxt: 'a medical bay', bonus: 'Wounds heal 60% faster indoors.' },
+  armoury: { name: 'Armoury', allow: ['relvakapp', 'toolaud', 'taim', 'moonapress'], need: (m) => m.relvakapp && m.toolaud, needTxt: 'a gun locker + a workbench', bonus: 'The crew shoots 10% more accurately.' },
+  workshop: { name: 'Workshop', allow: ['toolaud', 'lihvija', 'maagitehas', 'taim', 'treipink'], need: (m) => m.lihvija || m.maagitehas, needTxt: 'a diamond polisher or the ore works', bonus: 'Polishing and smelting give 20% more.' },
+  lab: { name: 'Science lab', allow: ['skanner', 'kaardilaud', 'taim', 'uurimislaud'], need: (m) => m.skanner, needTxt: 'the deep scanner', bonus: 'The deep scanner searches 35% faster.' },
+  command: { name: 'Command post', allow: ['kaardilaud', 'relvakapp', 'taim', 'raadiojaam'], need: (m) => m.kaardilaud, needTxt: 'a map table', bonus: 'Swarm warnings with direction and size – even without a radar.' },
+  rec: { name: 'Rec room', allow: ['diivan', 'teler', 'jukebox', 'trenn', 'taim', 'laud', 'piljard'], need: (m) => ((m.diivan ? 1 : 0) + (m.teler ? 1 : 0) + (m.jukebox ? 1 : 0) + (m.trenn ? 1 : 0)) >= 2, needTxt: '2 of: sofa, TV, jukebox, training bench', bonus: 'Everyone in the room slowly gains morale.' },
+  garage: { name: 'Garage', allow: ['tostuk', 'toolaud', 'relvakapp', 'taim', 'toovanker'], need: (m) => m.tostuk, needTxt: 'a car lift', bonus: 'Vehicle repairs cost half.' },
 };
 // baasi müra ja valgus: [müra, valgus] töötavana. Iga ese lisab ka 1 punkti lihtsalt olemasoluga.
 const SIG = {
   generaator: [10, 1], vanagen: [12, 1], lihvija: [6, 1], jukebox: [5, 1], teler: [2, 1], pliit: [2, 1], kasvu: [2, 3], toolaud: [2, 0],
-  skanner: [5, 3], radar: [3, 1], kahur: [3, 1], myyrturel: [3, 1], varav: [2, 1], vesi: [1, 0], dush: [1, 0], trenn: [1, 0],
+  skanner: [5, 3], radar: [3, 1], kahur: [3, 1], myyrturel: [3, 1], varav: [2, 1], varav3: [2, 1], suurvarav: [3, 1], vesi: [1, 0], dush: [1, 0], trenn: [1, 0],
   ravila: [1, 1], kaardilaud: [1, 1], prozektor: [1, 9], torn: [1, 6], paike: [0, 0], maagitehas: [7, 2],
 };
 const THREAT_TIERS = [[0, 'Quiet', '#97d276'], [35, 'Noticeable', '#e8d06a'], [70, 'Resonant', '#ffa04a'], [120, 'Lighthouse', '#ff5b47']];
@@ -95,6 +108,7 @@ function createBase(opt) {
   const cellObjUp = new Int16Array(N * N);   // teise korruse esemed
   // TEINE KORRUS ehitatakse nagu esimene: oma seinad -> oma toad. Toad võivad esimesest korrusest kuni 3 ruutu üle ulatuda.
   const upWalls = new Set();                  // teise korruse seinad 'v:i:j'
+  const wide = new Set(), upWide = new Set();   // laiad uksed/aknad (alumine / ülemine korrus)
   const upOpen = new Map();                   // teise korruse avad: 'door' | 'window'
   const voids = new Set();                    // kustutatud vahelagi (teise korruse toas, esimese korruse toa kohal) -> kõrge ruum
   const upper = new Set();                    // arvutatud: teise korruse tubade rakud 'i:j'
@@ -209,7 +223,8 @@ function createBase(opt) {
     if (type === 'door' && !(inA && inB)) return { ok: false, why: 'An upstairs door has to lead into another upstairs room.' };
     return { ok: true };
   }
-  function setUpOpening(t, i, j, type) { const k = t + ':' + i + ':' + j; if (type && type !== 'wall') upOpen.set(k, type); else upOpen.delete(k); dirty = true; }
+  function setUpOpening(t, i, j, type, w) { const k = t + ':' + i + ':' + j; if (type && type !== 'wall') upOpen.set(k, type); else upOpen.delete(k); if (w && type && type !== 'wall') upWide.add(k); else upWide.delete(k); dirty = true; }
+  function isWide(t, i, j, lv) { return (lv ? upWide : wide).has(t + ':' + i + ':' + j); }
   // vahelagi: kustuta / taasta (kõrge ruum tekib kustutatud põranda kohale)
   function canVoid(i, j) {
     if (!hiAt(i, j)) return { ok: false, why: 'No upper-floor room here.' };
@@ -235,8 +250,7 @@ function createBase(opt) {
       const k = ekey(t, i, j); if (upWalls.has(k)) continue;
       upWalls.add(k); n++;
       const [ra, rb] = edgeRooms(t, i, j), lo = openings.get(k);
-      if (ra && rb) { if (lo === 'door') upOpen.set(k, 'door'); }
-      else if (lo === 'window' || ((i + j) % 2 === 0 && lo !== 'door' && lo !== 'garage')) upOpen.set(k, 'window');
+      if (ra && rb && lo === 'door') upOpen.set(k, 'door');
     }
     upChanged();
     return n;
@@ -270,7 +284,7 @@ function createBase(opt) {
     return e;
   }
   // ---------- müüride ühendused: nurgad, ristmikud, otsad, tornid ----------
-  const JOIN = { myyr: 1, myyrturel: 1, varav: 1, torn: 1, vallikaik: 1 };
+  const JOIN = { myyr: 1, myyrturel: 1, varav: 1, varav3: 1, suurvarav: 1, torn: 1, vallikaik: 1 };
   const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   // vallikäik (platvorm) seisab müüri taga: see ei tee müürist nurka ega ristmikku
   function joinAt(i, j, self) { const id = objAt(i, j); if (!id || id === self.id) return null; const q = objs.get(id); return q && JOIN[q.type] && q.type !== 'vallikaik' ? q : null; }
@@ -485,7 +499,7 @@ function createBase(opt) {
     }
     if (pickC) setOpening(pickC.t, pickC.i, pickC.j, 'door');
   }
-  function setOpening(t, i, j, type) { const k = ekey(t, i, j); if (!type) openings.delete(k); else openings.set(k, type); dirty = true; }
+  function setOpening(t, i, j, type, w) { const k = ekey(t, i, j); if (!type) openings.delete(k); else openings.set(k, type); if (w && type) wide.add(k); else wide.delete(k); dirty = true; }
   function canPlaceOpening(t, i, j, type) {
     if (!isWall(t, i, j)) return { ok: false, why: 'There\'s no wall here.' };
     const [a, b] = edgeRooms(t, i, j);
@@ -509,7 +523,7 @@ function createBase(opt) {
   function stairExit(o) { const [di, dj] = stairDir(o); return di > 0 ? { i: o.i - 1, j: o.j } : di < 0 ? { i: o.i + o.w, j: o.j } : dj > 0 ? { i: o.i, j: o.j - 1 } : { i: o.i, j: o.j + o.h }; }
   function nearDoor(i, j) { for (const [t, a, b] of [['v', i, j], ['v', i + 1, j], ['h', i, j], ['h', i, j + 1]]) if (edgeType(t, a, b) === 'door') return true; return false; }
   // müüri/valli peale ehitatav kahur, värav vms vahetab selle välja
-  const REPLACERS = { kahur: 1, myyrturel: 1, varav: 1, kmpesa: 1 }, REPLACEABLE = { myyr: 1, vallikaik: 1, barrikaad: 1, okas: 1, siil: 1 };
+  const REPLACERS = { kahur: 1, myyrturel: 1, varav: 1, varav3: 1, suurvarav: 1, kmpesa: 1 }, REPLACEABLE = { myyr: 1, vallikaik: 1, barrikaad: 1, okas: 1, siil: 1 };
   function replaceSet(type, i, j, rot) {
     const out = new Set(); if (!REPLACERS[type]) return out;
     const [w, h] = footprint(type, rot);
@@ -641,7 +655,7 @@ function createBase(opt) {
     dirty = true;
     return o;
   }
-  function updateObjMatrix(o) { const c = objCenter(o); const fy = (roomAt(o.i, o.j) ? FLOOR_Y : 0) + OY + (o.lv ? WH : 0); const sy = OBJ[o.type].sy || 1; M4.compose(o.m, c.x, fy, c.z, objYaw(o), 0, 0, 1, sy, 1); o.cx = c.x; o.cz = c.z; o.y = fy; }
+  function updateObjMatrix(o) { const c = objCenter(o); const fy = (roomAt(o.i, o.j) ? FLOOR_Y : 0) + OY + (o.lv ? WH : 0); const sy = OBJ[o.type].sy || 1, sx = OBJ[o.type].sx || 1; M4.compose(o.m, c.x, fy, c.z, objYaw(o), 0, 0, sx, sy, 1); o.cx = c.x; o.cz = c.z; o.y = fy; }
   function removeObj(id) {
     const o = objs.get(id); if (!o) return;
     const grid = o.lv ? cellObjUp : cellObj;
@@ -924,14 +938,14 @@ function createBase(opt) {
         colliders.push(gcol);
         gdoors.push({ x: mx, z: mz, t, L, GH, open: 0, col: gcol, m: M4.create() });
       } else if (op === 'door') {
-        const dw = 1.4, sOff = (L - dw) / 2;
+        const W_ = wide.has(key), dw = W_ ? 1.7 : 1.4, sOff = (L - dw) / 2;
         seg(0, sOff, 0, WH, false); seg(L - sOff, L, 0, WH, false); seg(0, L, 2.3, WH, false);
         seg(0, sOff, 0, WH, true); seg(L - sOff, L, 0, WH, true);
         const b = B.main[q];
         const [fx0, fz0] = P(sOff), [fx1, fz1] = P(L - sOff), [mx, mz] = P(L / 2);
         // futuristlik raam: paksud piidad, kaldnurgad, helendav kontuur ja olekutuli
         const FR = [0.15, 0.155, 0.17], FR2 = [0.24, 0.25, 0.27];
-        if (MODELS.obj.doorFrame) frames.push({ mesh: 'doorFrame', m: M4.compose(M4.create(), mx, OY, mz, yawW) });
+        if (MODELS.obj.doorFrame && !W_) frames.push({ mesh: 'doorFrame', m: M4.compose(M4.create(), mx, OY, mz, yawW) });
         else {
           b.color(FR).boxB(fx0, 0, fz0, t === 'v' ? WT + 0.16 : 0.16, 2.42, t === 'v' ? 0.16 : WT + 0.16);
           b.color(FR).boxB(fx1, 0, fz1, t === 'v' ? WT + 0.16 : 0.16, 2.42, t === 'v' ? 0.16 : WT + 0.16);
@@ -940,7 +954,7 @@ function createBase(opt) {
         for (const side of [1, -1]) {
           const ext = side === extSide, col = ext ? ACCENT : COOL;
           if (!ext && !(side > 0 ? rb : ra)) continue;
-          if (!MODELS.obj.doorFrame) { pbox(SL, sOff + 0.1, 0.1, 0.03, 2.0, 0.02, 0.09, side, col, MAT.GLOW); pbox(SL, L - sOff - 0.1, 0.1, 0.03, 2.0, 0.02, 0.09, side, col, MAT.GLOW); }
+          if (!MODELS.obj.doorFrame || W_) { pbox(SL, sOff + 0.1, 0.1, 0.03, 2.0, 0.02, 0.09, side, col, MAT.GLOW); pbox(SL, L - sOff - 0.1, 0.1, 0.03, 2.0, 0.02, 0.09, side, col, MAT.GLOW); }
           pbox(SL, L / 2, 2.62, dw - 0.3, 0.03, 0.02, 0.09, side, col, MAT.GLOW);
           pbox(SL, L / 2, 0.035, dw - 0.2, 0.012, 0.15, -0.02, side, col, MAT.GLOW);
         }
@@ -949,30 +963,31 @@ function createBase(opt) {
         const dcol = { t: 's', ax: p1x, az: p1z, bx: p2x, bz: p2z, r: 0.1, y0: OY, y1: OY + 2.3, kind: 'door', door: true, noRay: true };
         colliders.push(dcol);
         const ext = extSide;
-        doors.push({ x: mx, z: mz, t, ux, uz, open: 0, col: dcol, m1: M4.create(), m2: M4.create(), ext, nx: nx * extSide, nz: nz * extSide, lm: M4.create() });
+        doors.push({ x: mx, z: mz, t, ux, uz, k: dw / 1.4, open: 0, col: dcol, m1: M4.create(), m2: M4.create(), ext, nx: nx * extSide, nz: nz * extSide, lm: M4.create() });
       } else if (op === 'window') {
-        const ww = 1.5, sOff = (L - ww) / 2;
-        seg(0, L, 0, 1.0, false); seg(0, L, 2.0, WH, false); seg(0, sOff, 1.0, 2.0, false); seg(L - sOff, L, 1.0, 2.0, false);
-        seg(0, L, 0, LOW_H, true);
+        const W_ = wide.has(key), ww = W_ ? 1.7 : 1.5, sOff = (L - ww) / 2, y0w = W_ ? 0.6 : 1.0, y1w = W_ ? 2.45 : 2.0;
+        seg(0, L, 0, y0w, false); seg(0, L, y1w, WH, false); seg(0, sOff, y0w, y1w, false); seg(L - sOff, L, y0w, y1w, false);
+        seg(0, L, 0, Math.min(LOW_H, y0w), true);
         const [mx, mz] = P(L / 2);
-        G.color([0.42, 0.62, 0.70]).boxB(mx, 1.0, mz, t === 'v' ? 0.04 : ww, 1.0, t === 'v' ? ww : 0.04);
+        G.color([0.42, 0.62, 0.70]).boxB(mx, y0w, mz, t === 'v' ? 0.04 : ww, y1w - y0w, t === 'v' ? ww : 0.04);
         const b = B.main[q];
         const FR = [0.15, 0.155, 0.17];
-        if (MODELS.obj.windowFrame) frames.push({ mesh: 'windowFrame', m: M4.compose(M4.create(), mx, OY, mz, yawW + (extSide < 0 ? Math.PI : 0)) });
+        if (MODELS.obj.windowFrame && !W_) frames.push({ mesh: 'windowFrame', m: M4.compose(M4.create(), mx, OY, mz, yawW + (extSide < 0 ? Math.PI : 0)) });
         else {
-          b.color(FR).boxB(mx, 0.93, mz, t === 'v' ? WT + 0.2 : ww + 0.16, 0.09, t === 'v' ? ww + 0.16 : WT + 0.2);
-          b.color(FR).boxB(mx, 1.98, mz, t === 'v' ? WT + 0.14 : ww + 0.16, 0.08, t === 'v' ? ww + 0.16 : WT + 0.14);
-          b.color(FR).boxB(mx, 1.47, mz, t === 'v' ? WT + 0.04 : ww, 0.03, t === 'v' ? ww : WT + 0.04);
+          b.color(FR).boxB(mx, y0w - 0.07, mz, t === 'v' ? WT + 0.2 : ww + 0.16, 0.09, t === 'v' ? ww + 0.16 : WT + 0.2);
+          b.color(FR).boxB(mx, y1w - 0.02, mz, t === 'v' ? WT + 0.14 : ww + 0.16, 0.08, t === 'v' ? ww + 0.16 : WT + 0.14);
+          b.color(FR).boxB(mx, (y0w + y1w) / 2 - 0.03, mz, t === 'v' ? WT + 0.04 : ww, 0.03, t === 'v' ? ww : WT + 0.04);
+          if (W_) for (const s_ of [sOff, L - sOff]) { const [jx, jz] = P(s_); b.color(FR).boxB(jx, y0w, jz, t === 'v' ? WT + 0.12 : 0.08, y1w - y0w, t === 'v' ? 0.08 : WT + 0.12); }
         }
         for (const side of [1, -1]) {
           const ext = side === extSide;
           if (!ext && !(side > 0 ? rb : ra)) continue;
-          pbox(SL, L / 2, 1.0, ww - 0.2, 0.025, 0.03, 0.08, side, ext ? ACCENT : [1.0, 0.9, 0.76], MAT.GLOW);
+          pbox(SL, L / 2, y0w, ww - 0.2, 0.025, 0.03, 0.08, side, ext ? ACCENT : [1.0, 0.9, 0.76], MAT.GLOW);
         }
         const [p0x, p0z] = P(0), [p3x, p3z] = P(L), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff);
-        addWallCol(p0x, p0z, p3x, p3z, 0, 1.0); addWallCol(p0x, p0z, p3x, p3z, 2.0, WH);
-        addWallCol(p0x, p0z, p1x, p1z, 1.0, 2.0); addWallCol(p2x, p2z, p3x, p3z, 1.0, 2.0);
-        addWallCol(p1x, p1z, p2x, p2z, 1.0, 2.0, { noRay: true, glass: true });
+        addWallCol(p0x, p0z, p3x, p3z, 0, y0w); addWallCol(p0x, p0z, p3x, p3z, y1w, WH);
+        addWallCol(p0x, p0z, p1x, p1z, y0w, y1w); addWallCol(p2x, p2z, p3x, p3z, y0w, y1w);
+        addWallCol(p1x, p1z, p2x, p2z, y0w, y1w, { noRay: true, glass: true });
       } else {
         seg(0, L, 0, WH, false); seg(0, L, 0, WH, true);
         if (extSide) extDeco(extSide);
@@ -1069,22 +1084,23 @@ function createBase(opt) {
           }
         }
       };
+      const uW = upWide.has(t + ':' + i + ':' + j);
       if (op === 'door') {
-        const dw = 1.4, sOff = (L - dw) / 2;
+        const dw = uW ? 1.7 : 1.4, sOff = (L - dw) / 2;
         useg(0, sOff, 0, WH); useg(L - sOff, L, 0, WH); useg(sOff, L - sOff, 2.3, WH);
         const [p0x, p0z] = P(0), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff), [p3x, p3z] = P(L);
         addWallCol(p0x, p0z, p1x, p1z, WH, WH * 2); addWallCol(p2x, p2z, p3x, p3z, WH, WH * 2); addWallCol(p1x, p1z, p2x, p2z, WH + 2.3, WH * 2);
       } else if (op === 'window') {
-        const ww = 1.5, sOff = (L - ww) / 2;
-        useg(0, L, 0, 1.0); useg(0, L, 2.0, WH); useg(0, sOff, 1.0, 2.0); useg(L - sOff, L, 1.0, 2.0);
+        const ww = uW ? 1.7 : 1.5, sOff = (L - ww) / 2, a0 = uW ? 0.6 : 1.0, a1 = uW ? 2.45 : 2.0;
+        useg(0, L, 0, a0); useg(0, L, a1, WH); useg(0, sOff, a0, a1); useg(L - sOff, L, a0, a1);
         const [mx, mz] = P(L / 2);
-        G.color([0.42, 0.62, 0.70]).boxB(mx, WH + 1.0, mz, t === 'v' ? 0.04 : ww, 1.0, t === 'v' ? ww : 0.04);
-        B.up[q].color([0.15, 0.155, 0.17]).boxB(mx, WH + 0.93, mz, t === 'v' ? WT + 0.2 : ww + 0.16, 0.09, t === 'v' ? ww + 0.16 : WT + 0.2);
-        B.up[q].color([0.15, 0.155, 0.17]).boxB(mx, WH + 1.98, mz, t === 'v' ? WT + 0.14 : ww + 0.16, 0.08, t === 'v' ? ww + 0.16 : WT + 0.14);
+        G.color([0.42, 0.62, 0.70]).boxB(mx, WH + a0, mz, t === 'v' ? 0.04 : ww, a1 - a0, t === 'v' ? ww : 0.04);
+        B.up[q].color([0.15, 0.155, 0.17]).boxB(mx, WH + a0 - 0.07, mz, t === 'v' ? WT + 0.2 : ww + 0.16, 0.09, t === 'v' ? ww + 0.16 : WT + 0.2);
+        B.up[q].color([0.15, 0.155, 0.17]).boxB(mx, WH + a1 - 0.02, mz, t === 'v' ? WT + 0.14 : ww + 0.16, 0.08, t === 'v' ? ww + 0.16 : WT + 0.14);
         const [p0x, p0z] = P(0), [p3x, p3z] = P(L), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff);
-        addWallCol(p0x, p0z, p3x, p3z, WH, WH + 1.0); addWallCol(p0x, p0z, p3x, p3z, WH + 2.0, WH * 2);
-        addWallCol(p0x, p0z, p1x, p1z, WH + 1.0, WH + 2.0); addWallCol(p2x, p2z, p3x, p3z, WH + 1.0, WH + 2.0);
-        addWallCol(p1x, p1z, p2x, p2z, WH + 1.0, WH + 2.0, { noRay: true, glass: true });
+        addWallCol(p0x, p0z, p3x, p3z, WH, WH + a0); addWallCol(p0x, p0z, p3x, p3z, WH + a1, WH * 2);
+        addWallCol(p0x, p0z, p1x, p1z, WH + a0, WH + a1); addWallCol(p2x, p2z, p3x, p3z, WH + a0, WH + a1);
+        addWallCol(p1x, p1z, p2x, p2z, WH + a0, WH + a1, { noRay: true, glass: true });
       } else {
         useg(0, L, 0, WH);
         const [p0x, p0z] = P(0), [p3x, p3z] = P(L);
@@ -1153,8 +1169,8 @@ function createBase(opt) {
       }
       if (o.type === 'paike' || o.type === 'prozektor' || o.type === 'radar') { const cc = objCenter(o); Object.assign(c, { x0: cc.x - 0.45, x1: cc.x + 0.45, z0: cc.z - 0.45, z1: cc.z + 0.45 }); }
       if (o.type === 'okas' || o.type === 'trepp') continue;
-      if (o.type === 'myyr' || o.type === 'myyrturel' || o.type === 'varav' || o.type === 'vallikaik') { c.x0 = x0 + 0.02; c.z0 = z0 + 0.02; c.x1 = x0 + o.w * CS - 0.02; c.z1 = z0 + o.h * CS - 0.02; }
-      if (o.type === 'varav') { c.door = false; o.col = c; c.off = !!o.open && o.open > 0.6; }
+      if (o.type === 'myyr' || o.type === 'myyrturel' || d.gate || o.type === 'vallikaik') { c.x0 = x0 + 0.02; c.z0 = z0 + 0.02; c.x1 = x0 + o.w * CS - 0.02; c.z1 = z0 + o.h * CS - 0.02; }
+      if (d.gate) { c.door = false; o.col = c; c.off = !!o.open && o.open > 0.6; }
       colliders.push(c);
     }
     for (const c of colliders) World.addCol(c);
@@ -1171,7 +1187,7 @@ function createBase(opt) {
   }
 
   // ---------- teekonnaotsing ----------
-  const PASS = { varav: 1, trepp: 1, okas: 1, sisetrepp: 1, tostuk: 1 };
+  const PASS = { varav: 1, varav3: 1, suurvarav: 1, trepp: 1, okas: 1, sisetrepp: 1, tostuk: 1 };
   function walkable(i, j) { if (!inGrid(i, j)) return false; const id = objAt(i, j); if (!id) return true; const o = objs.get(id); return !!(o && PASS[o.type]); }
   function canStep(i, j, di, dj) {
     if (!inGrid(i + di, j + dj)) return false;
@@ -1300,10 +1316,11 @@ function createBase(opt) {
     }
     for (const o of objs.values()) {
       o.anim += dt; if (o.cool > 0) o.cool -= dt;
-      if (o.type === 'varav') {
+      if (OBJ[o.type].gate) {
         let near = false;
-        const locked = typeof Waves !== 'undefined' && Waves.active() || !o.on;
-        if (!locked) for (const h of humans) if (h.alive !== false && (h.kind === 'player' || h.team === 'crew') && Math.abs(h.pos.x - o.cx) < 4.5 && Math.abs(h.pos.z - o.cz) < 4.5) { near = true; break; }
+        const locked = typeof Waves !== 'undefined' && Waves.active() || !o.on, R = 2.5 + o.w * CS * 0.5;
+        if (!locked) for (const h of humans) if (h.alive !== false && (h.kind === 'player' || h.team === 'crew') && Math.abs(h.pos.x - o.cx) < R && Math.abs(h.pos.z - o.cz) < R) { near = true; break; }
+        if (!near && !locked && typeof Vehicles !== 'undefined') { const v = Vehicles.near(o.cx, o.cz, R + 5); if (v && v.team === 'crew') near = true; }
         const prev = o.open || 0;
         o.open = clamp(prev + (near ? dt * 1.6 : -dt * 1.2), 0, 1);
         if (o.col) o.col.off = o.open > 0.6;
@@ -1336,9 +1353,9 @@ function createBase(opt) {
     if (meshes.glass && !low) GFX.draw(meshes.glass, baseM, [1, 1, 1, 0], lit && isNight ? [0.5, 0.35, 0.18] : [0, 0, 0], { alpha: 0.42, cull: false });
     if (!low) for (const f of frames) GFX.draw(MODELS.obj[f.mesh], f.m, f.t || null, null, { rust: 0.4 });
     if (!low) for (const d of doors) {
-      const off = 0.36 + d.open * 0.62, yaw = d.t === 'v' ? Math.PI / 2 : 0;
-      M4.compose(d.m1, d.x - d.ux * off, OY + 0.08, d.z - d.uz * off, yaw);
-      M4.compose(d.m2, d.x + d.ux * off, OY + 0.08, d.z + d.uz * off, yaw);
+      const dk = d.k || 1, off = (0.36 + d.open * 0.62) * dk, yaw = d.t === 'v' ? Math.PI / 2 : 0;
+      M4.compose(d.m1, d.x - d.ux * off, OY + 0.08, d.z - d.uz * off, yaw, 0, 0, dk, 1, 1);
+      M4.compose(d.m2, d.x + d.ux * off, OY + 0.08, d.z + d.uz * off, yaw, 0, 0, dk, 1, 1);
       GFX.draw(MODELS.obj.doorPanel, d.m1, null, null, { rust: 0.5 });
       GFX.draw(MODELS.obj.doorPanel, d.m2, null, null, { rust: 0.5 });
       if (d.ext) {
@@ -1399,7 +1416,7 @@ function createBase(opt) {
       const d = OBJ[o.type];
       if (o.type === 'sisetrepp') continue;
       if (o.lv && low && !lv1) continue;
-      let mesh = MODELS.obj[o.type];
+      let mesh = MODELS.obj[d.mesh || o.type];
       if (o.type === 'vanagen') mesh = MODELS.obj.generaator;
       if (!mesh) continue;
       const powered = d.power > 0 ? o.on : d.power < 0 ? !o.broken : true;
@@ -1424,7 +1441,7 @@ function createBase(opt) {
       }
       if (o.type === 'prozektor' && o.on && isNight) GFX.addLight(o.cx + Math.sin(objYaw(o)) * 6, OY + 3.2, o.cz + Math.cos(objYaw(o)) * 6, 24, 1.0, 0.95, 0.85, 2.2);
       if (o.type === 'pliit' && o.on && o.data.cooking > 0) GFX.addLight(o.cx, OY + 1.4, o.cz, 4, 1.0, 0.5, 0.15, 1.2);
-      if (o.type === 'varav') {
+      if (d.gate) {
         if (!o.hm) o.hm = M4.create();
         M4.child(o.hm, o.m, (o.open || 0) * 3.6, 0, 0, 0, 0, 0);
         GFX.draw(MODELS.obj.varavPanel, o.hm, tint, null, { rust: 0.6 });
@@ -1558,7 +1575,7 @@ function createBase(opt) {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
     const jobs = []; for (const [rid, k] of roomJob) { const r = rooms.get(rid); if (r) jobs.push([r.cells[0][0], r.cells[0][1], k]); }
-    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
+    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], wide: [...wide], upWide: [...upWide], voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
@@ -1571,6 +1588,7 @@ function createBase(opt) {
     }
     openings.clear();
     for (const [k, v] of d.openings) if (walls.has(k)) openings.set(k, v);
+    wide.clear(); upWide.clear(); for (const k of d.wide || []) if (openings.has(k)) wide.add(k); for (const k of d.upWide || []) upWide.add(k);
     if (d.up2) {
       for (const k of d.upWalls || []) upWalls.add(k);
       for (const [k, v] of d.upOpen || []) if (v === 'door' || v === 'window') upOpen.set(k, v);
@@ -1598,7 +1616,7 @@ function createBase(opt) {
   }
   return {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
-    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
+    inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, isWide, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,

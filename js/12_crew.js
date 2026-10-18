@@ -703,6 +703,8 @@ const Crew = (() => {
         if (wr) return expedition(e, { type: 'salvage', step: 0, wreck: wr, t: 0, helper: true });
       }
     }
+    // kasulikud toaesemed (kohvimasin, laskemoonapress, raadio …)
+    if (typeof Gadgets !== 'undefined') { const g = Gadgets.crewChoice(e); if (g) return g; }
     // vaba aeg: inimlikud tegevused
     const h = Econ.hour(), r = Math.random();
     { const lc = leisureChoice(e); if (lc) return lc; }
@@ -751,7 +753,7 @@ const Crew = (() => {
     // vajadused
     if (c.thirst === undefined) c.thirst = 90;
     if (c.hygiene === undefined) { c.hygiene = 80; c.bladder = 80; c.rel = c.rel || {}; }
-    c.hygiene = Math.max(0, c.hygiene - dt * (sleeping ? 0.03 : Base.isInside(e.pos.x, e.pos.z) ? 0.08 : 0.16));
+    c.hygiene = Math.max(0, c.hygiene - dt * (sleeping ? 0.03 : Base.isInside(e.pos.x, e.pos.z) ? 0.08 : 0.16) * (c.cleanUntil > G.time.total ? 0.5 : 1));
     c.bladder = Math.max(0, c.bladder - dt * (sleeping ? 0.05 : 0.2));
     if (c.hygiene < 15) c.morale = Math.max(0, c.morale - dt * 0.02);
     // jutumullid: aeg-ajalt ütleb midagi oma oleku kohta
@@ -1446,6 +1448,20 @@ const Crew = (() => {
         if (k.step === 0) { const cc = freeRoomCell(); if (cc) Ents.goTo(e, cc.x, cc.z); k.step = 1; setAct(e, 'Taking cover'); }
         else if (k.step === 1) { if (Ents.stepMove(e, dt, sp * 1.3)) k.step = 2; }
         else { e.moveAmt = 0; e.gesture = 'fold'; setAct(e, 'Sheltering in the base'); k.t -= dt; if (k.t <= 0) k.done = true; }
+        return;
+      }
+      case 'gadget': {
+        const o = k.obj;
+        if (!o || !Base.objs.has(o.id)) { k.done = true; return; }
+        if (k.step === 0) { if (!goObj(e, o)) { k.done = true; return; } k.step = 1; setAct(e, 'Going to the ' + OBJ[o.type].name.toLowerCase()); }
+        else if (k.step === 1) { if (Ents.stepMove(e, dt, sp)) { k.step = 2; k.w = 0; } }
+        else {
+          e.hasGun = false; Ents.face(e, o.cx, o.cz, dt); e.gesture = o.type === 'piljard' ? 'look' : 'fix';
+          setAct(e, Gadgets.actText(o.type));
+          k.w += dt * workMult(c);
+          if (Math.random() < dt * 1.5 && (o.type === 'moonapress' || o.type === 'treipink' || o.type === 'toovanker')) FX.sparks(o.cx + rand(-0.3, 0.3), 1.0, o.cz + rand(-0.3, 0.3), [1, 0.6, 0.3], 2, 2);
+          if (k.w > k.t) { const m = Gadgets.apply(e, o); if (m && Math.hypot(Player.pos.x - e.pos.x, Player.pos.z - e.pos.z) < 30) UI.toast(c.name.split(' ')[0] + ': ' + m); k.done = true; }
+        }
         return;
       }
       case 'use': {

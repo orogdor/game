@@ -135,7 +135,7 @@ const Build = (() => {
     if (!p) { hover = null; return; }
     const c = Base.toCell(p.x, p.z);
     hover = { x: p.x, z: p.z, i: c.i, j: c.j, vi: Math.round((p.x - Base.X0) / Base.CS), vj: Math.round((p.z - Base.Z0) / Base.CS) };
-    if (S.tool === 'door' || S.tool === 'window' || S.tool === 'demolish') hover.edge = edgeAt(p);
+    if (EDGE_TOOLS.has(S.tool) || S.tool === 'demolish') hover.edge = edgeAt(p);
     if (S.tool === 'obj' && S.item) {
       const [w, h] = Base.footprint(S.item, S.rot);
       hover.oi = Math.round((p.x - Base.X0) / Base.CS - w / 2); hover.oj = Math.round((p.z - Base.Z0) / Base.CS - h / 2);
@@ -217,7 +217,7 @@ const Build = (() => {
     } else if (S.tool === 'obj' && S.item) {
       if (touch) { movePendingObj(); showPendingConfirm(); }
       else if (hover) commitObj(S.item, hover.oi, hover.oj, hover.rot);
-    } else if ((S.tool === 'door' || S.tool === 'window') && hover && hover.edge && moved < 25) {
+    } else if (EDGE_TOOLS.has(S.tool) && hover && hover.edge && moved < 25) {
       if (touch) { pending = { kind: 'edge', e: hover.edge, type: S.tool }; showPendingConfirm(); }
       else commitEdge(hover.edge, S.tool);
     } else if (S.tool === 'paint' && hover && moved < 25) {
@@ -380,37 +380,45 @@ const Build = (() => {
     UI.toast((hasStairs ? 'Walls raised upstairs.' : 'Walls raised upstairs. Add Indoor stairs (Items → Garage & stairs) so people can get up.') + ' On Floor 2 you can build more walls – rooms may reach 3 tiles past the ground floor.');
     return true;
   }
+  const EDGE_TOOLS = new Set(['door', 'window', 'doorW', 'windowW']);
+  // laiad variandid: 'doorW' / 'windowW' → sama ava, aga laiem (ja aken ka kõrgem)
+  const edgeSpec = (type) => { const w = type.endsWith('W'), bt = w ? type.slice(0, -1) : type; return { w, bt, cost: (bt === 'door' ? 8 : 6) + (w ? 4 : 0), refund: (bt === 'door' ? 4 : 3) + (w ? 2 : 0) }; };
+  const curEdge = (ed) => {
+    const lv = S.level ? 1 : 0, c = lv ? Base.upOpening(ed.t, ed.i, ed.j) : Base.edgeType(ed.t, ed.i, ed.j);
+    if (c !== 'door' && c !== 'window') return c;
+    return c + (Base.isWide(ed.t, ed.i, ed.j, lv) ? 'W' : '');
+  };
   function commitEdge(ed, type) {
+    const sp = edgeSpec(type), cur = curEdge(ed), cs = cur && (cur.startsWith('door') || cur.startsWith('window')) ? edgeSpec(cur) : null;
     if (S.level) {
-      const cur = Base.upOpening(ed.t, ed.i, ed.j);
       if (cur === type) {
-        Base.setUpOpening(ed.t, ed.i, ed.j, 'wall'); const refund = type === 'door' ? 4 : 3; G.res.scrap += refund;
-        undo.push({ type: 'upedge', ed, prev: type, cost: { s: -refund } }); Audio2.build(); pending = null; UI.buildConfirm(null); return true;
+        Base.setUpOpening(ed.t, ed.i, ed.j, 'wall'); G.res.scrap += sp.refund;
+        undo.push({ type: 'upedge', ed, prev: type, cost: { s: -sp.refund } }); Audio2.build(); pending = null; UI.buildConfirm(null); return true;
       }
-      const ok = Base.canSetUpOpening(ed.t, ed.i, ed.j, type); if (!ok.ok) { deny(ok.why); return false; }
-      const cost = { s: type === 'door' ? 8 : 6 }; const af = afford(cost); if (af) { deny(af); return false; }
+      const ok = Base.canSetUpOpening(ed.t, ed.i, ed.j, sp.bt); if (!ok.ok) { deny(ok.why); return false; }
+      const cost = { s: sp.cost }; const af = afford(cost); if (af) { deny(af); return false; }
       pay(cost); undo.push({ type: 'upedge', ed, prev: cur || 'wall', cost });
-      Base.setUpOpening(ed.t, ed.i, ed.j, type); Audio2.build(); pending = null; UI.buildConfirm(null);
+      Base.setUpOpening(ed.t, ed.i, ed.j, sp.bt, sp.w); Audio2.build(); pending = null; UI.buildConfirm(null);
       return true;
     }
-    const cur = Base.edgeType(ed.t, ed.i, ed.j);
     if (cur === type) {
-      if (type === 'door') {
+      if (sp.bt === 'door') {
         const [ra, rb] = Base.edgeRooms(ed.t, ed.i, ed.j);
         if ((ra && Base.doorCount(ra) <= 1) || (rb && Base.doorCount(rb) <= 1)) { deny('A room needs at least one door.'); return false; }
       }
       Base.setOpening(ed.t, ed.i, ed.j, null);
-      const refund = type === 'door' ? 4 : 3; G.res.scrap += refund;
-      undo.push({ type: 'edge', ed, prev: type, now: null, cost: { s: -refund } });
+      G.res.scrap += sp.refund;
+      undo.push({ type: 'edge', ed, prev: type, now: null, cost: { s: -sp.refund } });
       Audio2.build(); pending = null; UI.buildConfirm(null); return true;
     }
-    const ok = Base.canPlaceOpening(ed.t, ed.i, ed.j, type);
+    // ainult laiuse vahetus (tavaline uks ↔ lai uks): seina kontrolli pole vaja
+    const ok = cs && cs.bt === sp.bt ? { ok: true } : Base.canPlaceOpening(ed.t, ed.i, ed.j, sp.bt);
     if (!ok.ok) { deny(ok.why); return false; }
-    const cost = { s: type === 'door' ? 8 : 6 };
+    const cost = { s: sp.cost };
     const af = afford(cost); if (af) { deny(af); return false; }
     pay(cost);
     undo.push({ type: 'edge', ed, prev: cur === 'wall' ? null : cur, now: type, cost });
-    Base.setOpening(ed.t, ed.i, ed.j, type);
+    Base.setOpening(ed.t, ed.i, ed.j, sp.bt, sp.w);
     Audio2.build(); pending = null; UI.buildConfirm(null);
     return true;
   }
@@ -484,9 +492,9 @@ const Build = (() => {
     if (!u) { UI.toast('Nothing to undo'); return; }
     if (u.type === 'walls') { const r = Base.removeWalls(u.edges, true); if (!r.ok) { deny(r.why); undo.push(u); return; } pay(u.cost, -1); for (const o of r.lost || []) pay(OBJ[o.type].cost, -1); }
     else if (u.type === 'obj') { Base.removeObj(u.id); pay(u.cost, -1); }
-    else if (u.type === 'edge') { Base.setOpening(u.ed.t, u.ed.i, u.ed.j, u.prev); pay(u.cost, -1); }
+    else if (u.type === 'edge') { const pw = !!(u.prev && u.prev.endsWith('W')); Base.setOpening(u.ed.t, u.ed.i, u.ed.j, u.prev ? (pw ? u.prev.slice(0, -1) : u.prev) : null, pw); pay(u.cost, -1); }
     else if (u.type === 'upwalls') { Base.removeUpWalls(u.edges); pay(u.cost, -1); }
-    else if (u.type === 'upedge') { Base.setUpOpening(u.ed.t, u.ed.i, u.ed.j, u.prev); pay(u.cost, -1); }
+    else if (u.type === 'upedge') { const pw = !!(u.prev && u.prev.endsWith('W')); Base.setUpOpening(u.ed.t, u.ed.i, u.ed.j, pw ? u.prev.slice(0, -1) : u.prev, pw); pay(u.cost, -1); }
     else if (u.type === 'tall') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && OBJ[o.type].needsTall) { deny('Remove the ' + OBJ[o.type].name + ' first.'); undo.push(u); return; } Base.setTall(u.rid, false); pay(u.cost, -1); }
     else if (u.type === 'upper') { for (const o of Base.objs.values()) if (Base.roomAt(o.i, o.j) === u.rid && (o.lv || o.type === 'sisetrepp')) { deny('Remove the stairs and the upstairs items first.'); undo.push(u); return; } Base.setUpper(u.rid, false); pay(u.cost, -1); }
     Audio2.ui(); UI.toast('Undone');
@@ -512,8 +520,7 @@ const Build = (() => {
     else if (pending.kind === 'objline') { const li = lineInfo(pending.type, pending.cells); cost = li.n + ' × · ' + costStr(li.cost); ok = li.n > 0 && !afford(li.cost); label = 'Build'; }
     else if (pending.kind === 'tall') { const c = tallCost(pending.rid); const on = Base.roomIsTall(pending.rid); cost = on ? 'refund ' + costStr(half(c)) : costStr(c); ok = on || !afford(c); label = on ? 'Make normal' : 'Tall room'; }
     else if (pending.kind === 'upper') { const c = upperCost(pending.rid); cost = costStr(c); ok = !afford(c) && !Base.roomHasUpper(pending.rid); label = '2nd floor'; }
-    else if (pending.kind === 'edge' && S.level) { const cur = Base.upOpening(pending.e.t, pending.e.i, pending.e.j); if (cur === pending.type) { label = 'Remove'; cost = '+' + (pending.type === 'door' ? 4 : 3) + ' scrap'; } else { cost = (pending.type === 'door' ? 8 : 6) + ' scrap'; ok = Base.canSetUpOpening(pending.e.t, pending.e.i, pending.e.j, pending.type).ok; } }
-    else if (pending.kind === 'edge') { const cur = Base.edgeType(pending.e.t, pending.e.i, pending.e.j); if (cur === pending.type) { label = 'Remove'; cost = '+' + (pending.type === 'door' ? 4 : 3) + ' scrap'; } else { cost = (pending.type === 'door' ? 8 : 6) + ' scrap'; ok = Base.canPlaceOpening(pending.e.t, pending.e.i, pending.e.j, pending.type).ok; } }
+    else if (pending.kind === 'edge') { const sp = edgeSpec(pending.type), cur = curEdge(pending.e); if (cur === pending.type) { label = 'Remove'; cost = '+' + sp.refund + ' scrap'; } else { cost = sp.cost + ' scrap'; const cs = cur && cur !== 'wall' && cur !== 'garage' ? edgeSpec(cur) : null; ok = cs && cs.bt === sp.bt ? true : (S.level ? Base.canSetUpOpening(pending.e.t, pending.e.i, pending.e.j, sp.bt).ok : Base.canPlaceOpening(pending.e.t, pending.e.i, pending.e.j, sp.bt).ok); } }
     else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.kind === 'floor' ? 'Floor tile' : pending.tg.edges.length + ' wall segments'; }
     UI.buildConfirm({ label, cost, ok, canRotate: pending.kind === 'obj' });
   }
@@ -526,6 +533,8 @@ const Build = (() => {
       wall: S.level ? 'Floor 2: drag walls between upstairs tiles to split the upper floor into rooms (3 scrap per segment). Add doors with the Door tool.' : 'Drag walls from corner to corner. When the walls fully enclose an area, a room and a door appear. A wall segment costs 3 scrap.',
       door: 'Tap the wall where you want a door. Tap again to remove it.',
       window: 'Tap the outer wall where you want a window.',
+      doorW: 'Wide door (1.7 m) – tap a wall. Tap again to remove it.',
+      windowW: 'Wide, tall window – tap an outer wall.',
       obj: S.item ? '' : 'Pick an item from the catalogue.',
       paint: 'Tap a room to change its colour. Cleaning a rusty room costs 10 scrap.',
       demolish: S.level ? 'Tap an upstairs item, or an empty upper floor to remove it.' : 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
@@ -608,8 +617,8 @@ const Build = (() => {
         const ok = canPut(S.item, t.i, t.j, t.rot, S.level).ok && !afford(OBJ[S.item].cost);
         const cx = Base.X0 + (t.i + w / 2) * Base.CS, cz = Base.Z0 + (t.j + h / 2) * Base.CS;
         const fy = (Base.roomAt(t.i, t.j) ? Base.FLOOR_Y : 0) + LY;
-        M4.compose(tmpM2, cx, fy, cz, t.rot * Math.PI / 2, 0, 0, 1, OBJ[S.item].sy || 1, 1);
-        const mesh = MODELS.obj[S.item];
+        M4.compose(tmpM2, cx, fy, cz, t.rot * Math.PI / 2, 0, 0, OBJ[S.item].sx || 1, OBJ[S.item].sy || 1, 1);
+        const mesh = MODELS.obj[OBJ[S.item].mesh || S.item];
         if (mesh) GFX.draw(mesh, tmpM2, ok ? [0.7, 1.3, 0.8, 0.2] : [1.4, 0.5, 0.45, 0.2], null, { alpha: 0.7, shadow: false });
         else if (S.item === 'sisetrepp') {   // trepi eelvaade: astmeline kiil
           const yw = t.rot * Math.PI / 2, sx = Math.sin(yw), sz = Math.cos(yw);
@@ -622,9 +631,9 @@ const Build = (() => {
         box(cx + fx * ext, 0.16, cz + fz * ext, 0.35, 0.06, 0.35, YEL, 0.7);
       }
     }
-    if ((S.tool === 'door' || S.tool === 'window') && hover && hover.edge) {
+    if (EDGE_TOOLS.has(S.tool) && hover && hover.edge) {
       const e2 = pending && pending.kind === 'edge' ? pending.e : hover.edge;
-      edgeBox(e2, wallHere(e2.t, e2.i, e2.j) ? (S.tool === 'door' ? YEL : BLUE) : RED);
+      edgeBox(e2, wallHere(e2.t, e2.i, e2.j) ? (S.tool.startsWith('door') ? YEL : BLUE) : RED);
     } else if (pending && pending.kind === 'edge') edgeBox(pending.e, YEL);
     if (S.tool === 'floor' && hover && S.level) { const c = Base.cellCenter(hover.i, hover.j), ok = Base.voidAt(hover.i, hover.j) || Base.canVoid(hover.i, hover.j).ok; box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, ok ? YEL : RED, 0.45); }
     if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper' || S.tool === 'tall' || S.tool === 'job') && (hover || pending)) {
