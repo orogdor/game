@@ -236,7 +236,7 @@ const Game = (() => {
     // avaekraan
     G.mode = 'title';
     UI.showTitle(Save.has());
-    Save.init().then(() => { if (G.mode === 'title') UI.showTitle(Save.has()); });
+    Save.init().then(() => { if (G.mode === 'title') { UI.showTitle(Save.has()); titlePreview(); } });
     document.getElementById('loading').hidden = true;
     if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
       try { window.claude.hot.snapshot(() => (G.mode === 'play' || G.mode === 'build' ? { save: Save.data() } : {})); } catch (e) { /* ignoreeri */ }
@@ -339,12 +339,45 @@ const Game = (() => {
     if (GFX.S.skinErr) UI.msg('Character graphics didn\'t start (' + GFX.S.skinErr + '). Using simple models.', 'warn');
     if (!Input.isTouch) UI.lockHint(true);
   }
+  // avamenüü taust: viimati pooleli jäänud mängu baas ja meeskond
+  let preview = null;
+  function titlePreview() {
+    preview = null;
+    const d = Save.has() ? Save.load() : null;
+    if (!d || !d.base) return;
+    try {
+      if (G.seed !== d.seed) { G.seed = d.seed; World.generate(d.seed); GFX.setTerrain(null, false); World.setTerrainShadow(Q[qKey].terrainShadow); }
+      Vehicles.reset();
+      Base.deserialize(d.base); Base.rebuildNow(); Base.updatePower(true);
+      if (d.look) G.look = d.look;
+      Vehicles.deserialize(d.vehicles || []);
+      const cells = [...Base.rooms.values()].flatMap((r) => r.cells);
+      if (!cells.length) { preview = null; return; }
+      let cx = 0, cz = 0, maxZ = -1e9;
+      for (const [i, j] of cells) { const c = Base.cellCenter(i, j); cx += c.x; cz += c.z; maxZ = Math.max(maxZ, c.z); }
+      cx /= cells.length; cz /= cells.length;
+      const gx = cx, gz = maxZ + 5.5;
+      const cam = { x: gx + 2.5, z: gz + 9 };
+      const figs = [];
+      const crew = (d.crew || []).slice(0, 7);
+      const n = crew.length + 1;
+      const put = (f, k) => { const off = (k - (n - 1) / 2) * 1.5, row = Math.abs(off) * 0.25; f.pos = { x: gx + off, y: 0, z: gz - row }; f.yaw = Math.atan2(cam.x - f.pos.x, cam.z - f.pos.z) + rand(-0.25, 0.25); figs.push(f); };
+      const mid = Math.floor(n / 2);
+      let k = 0;
+      for (let q = 0; q < n; q++) {
+        if (q === mid) put({ id: 900, team: 'player', look: d.look || G.look, phase: 0, moveAmt: 0, aim: 0, pose: 'stand', hasGun: true, hurtT: 0, flash: 0 }, q);
+        else { const c = crew[k++]; if (c) put({ id: 901 + k, team: 'crew', crew: { look: c.crew.look, name: c.crew.name, morale: 70, energy: 80 }, phase: 0, moveAmt: 0, aim: 0, pose: 'stand', hasGun: Math.random() < 0.6, hurtT: 0, flash: 0 }, q); }
+      }
+      preview = { cx, cz, gx, gz, figs };
+    } catch (e) { console.warn('title preview', e); preview = null; }
+  }
   function toTitle() {
     G.mode = 'title';
     Input.exitLock();
     Audio2.setMusic(false);
     UI.showTitle(Save.has());
     G.time.t = 0.555;
+    titlePreview();
   }
   function toggleBuild() {
     if (G.mode === 'play' && !Player.dead) { UI.closePanel(); Build.enter(); }
@@ -462,8 +495,15 @@ const Game = (() => {
     // madal kinokaamera, päike taustal, aeglane triiv
     const a = Math.sin(titleT * 0.045) * 0.12;
     C.useTarget = true;
+    if (preview) {
+      // oma baas ja meeskond: kaamera triivib meeskonna ees, baas taustal
+      const p = preview, b = Math.sin(titleT * 0.05) * 0.35;
+      C.pos.x = p.gx + 2 + Math.sin(b) * 6; C.pos.z = p.gz + 6.5 + Math.cos(b) * 1.2; C.pos.y = World.heightAt(C.pos.x, C.pos.z) + 1.7 + Math.sin(titleT * 0.11) * 0.15;
+      C.target.x = (p.gx + p.cx) / 2; C.target.z = (p.gz * 2 + p.cz) / 3; C.target.y = World.heightAt(p.gx, p.gz) + 1.9;
+    } else {
     C.pos.x = 11 + Math.sin(a) * 6; C.pos.z = 15 + Math.cos(a) * 2; C.pos.y = 1.35 + Math.sin(titleT * 0.11) * 0.15;
     C.target.x = -6; C.target.y = 2.9; C.target.z = -3;
+    }
     const aspect = GFX.S.w / GFX.S.h;
     C.fov = clamp(2 * Math.atan(Math.tan(40 * DEG) / aspect), 45 * DEG, 80 * DEG);
   }
@@ -508,9 +548,9 @@ const Game = (() => {
     const sc = G.mode === 'build' ? { x: Build.cam.tx, y: 0, z: Build.cam.tz } : G.mode === 'play' ? { x: Player.pos.x + Math.sin(Player.yaw) * 18, y: Player.pos.y, z: Player.pos.z + Math.cos(Player.yaw) * 18 } : { x: 2, y: 0, z: 0 };
     GFX.beginShadowCenter(sc.x, sc.z);
     World.draw();
-    if (G.mode === 'title') { Base.power.lightsOn = true; GFX.addLight(-1, 2.6, 6.2, 9, 1, 0.75, 0.45, 2.2); }
+    if (G.mode === 'title') { Base.power.lightsOn = true; if (preview) GFX.addLight(preview.gx, World.heightAt(preview.gx, preview.gz) + 3, preview.gz + 2.5, 11, 1, 0.75, 0.45, 2.2); else GFX.addLight(-1, 2.6, 6.2, 9, 1, 0.75, 0.45, 2.2); }
     Base.draw(G.mode === 'build', GFX.env.night > 0.5 || G.mode === 'title', G.time.total);
-    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Aliens.drawProjs(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else Ents.drawTitleFigure();
+    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Aliens.drawProjs(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else { Ents.drawTitleFigure(preview && preview.figs); if (preview) Vehicles.draw(); }
     Build.draw();
     if (G.mode === 'play') Player.drawViewmodel(dt);
     GFX.render(sc);

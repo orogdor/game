@@ -1,6 +1,6 @@
 // K73 teenustöötaja: kõik mängu failid (kood, mudelid, tekstuurid) vahemällu -> töötab ka ilma internetita.
 // Iga uus versioon saab uue vahemälu nime (ehitusskript lisab failide räsi), vana kustutatakse.
-const CACHE = 'k73-v64-80bef89d';
+const CACHE = 'k73-v65-d6551a10';
 const FILES = [
 "./",
 "./css/k73.css",

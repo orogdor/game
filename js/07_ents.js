@@ -89,8 +89,9 @@ const Ents = (() => {
     let mx = dx / d, mz = dz / d;
     if (isHuman(e) && e.kind === 'human') {
       // elutruu liikumine: pööra enne astumist, kiirenda/aeglusta sujuvalt, aeglusta sihtkoha ja ukse ees
-      const turn = Math.abs(angDiff(e.yaw, Math.atan2(mx, mz)));
-      let want = sp * (turn > 1.6 ? 0.15 : turn > 0.9 ? 0.5 : 1);
+      // aimLock: tulistaja liigub külg- või tagurpidi, aga hoiab pilgu sihtmärgil
+      const turn = e.aimLock !== undefined ? 0 : Math.abs(angDiff(e.yaw, Math.atan2(mx, mz)));
+      let want = sp * (turn > 1.6 ? 0.15 : turn > 0.9 ? 0.5 : 1) * (e.aimLock !== undefined ? 0.75 : 1);
       if (e.pathI === e.path.length - 1 && d < 1.6) want *= 0.45 + 0.55 * d / 1.6;
       if (tgt.door && d < 2.2) {
         want *= 0.55;
@@ -128,7 +129,8 @@ const Ents = (() => {
     const step = Math.min(d, sp * dt);
     e.pos.x += mx * step; e.pos.z += mz * step;
     const want = Math.atan2(mx, mz);
-    e.yaw += angDiff(e.yaw, want) * Math.min(1, dt * (e.kind === 'human' ? 6.5 : 10));
+    if (e.aimLock !== undefined) e.yaw += angDiff(e.yaw, e.aimLock) * Math.min(1, dt * 10);
+    else e.yaw += angDiff(e.yaw, want) * Math.min(1, dt * (e.kind === 'human' ? 6.5 : 10));
     World.collideCircle(e.pos, e.radius, e.pos.y + 0.3, e.pos.y + 1.7, isHuman(e));
     e.pos.y = groundY(e.pos.x, e.pos.z, e.pos.y);
     e.moveAmt = Math.min(1, e.moveAmt + dt * 5);
@@ -677,7 +679,10 @@ const Ents = (() => {
     if (r) { e.headPos = e.headPos || { x: 0, y: 0, z: 0 }; e.headPos.x = r.head.x; e.headPos.y = r.head.y; e.headPos.z = r.head.z; }
   }
   const titleFig = { id: 2, team: 'crew', pos: { x: 3.2, y: 0, z: 10.2 }, yaw: Math.PI - 0.25, phase: 0, moveAmt: 0, aim: 0, pose: 'stand', hasGun: true, hurtT: 0, flash: 0 };
-  function drawTitleFigure() { titleFig.pos.y = groundY(titleFig.pos.x, titleFig.pos.z); titleFig.headYaw = Math.sin(G.time.total * 0.3) * 0.25; drawHuman(titleFig); }
+  function drawTitleFigure(figs) {
+    if (figs && figs.length) { for (const f of figs) { f.pos.y = groundY(f.pos.x, f.pos.z); f.headYaw = Math.sin(G.time.total * 0.3 + f.id) * 0.3; drawHuman(f); } return; }
+    titleFig.pos.y = groundY(titleFig.pos.x, titleFig.pos.z); titleFig.headYaw = Math.sin(G.time.total * 0.3) * 0.25; drawHuman(titleFig);
+  }
   function drawGoat(e) {
     if (typeof Prey !== 'undefined' && Prey.draw(e)) return;
     const ms = mats(e, 7);

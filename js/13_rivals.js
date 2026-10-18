@@ -298,12 +298,14 @@ const Rivals = (() => {
       e.aim = Math.min(1, e.aim + dt * 4);
       e.aimPitch = Math.atan2(tp.y - (e.pos.y + 1.35), d);
       if (d > 24) { if (!e.path || Ents.arrived(e) || Math.random() < dt * 1.5) { e.path = [{ x: tp.x, z: tp.z }]; e.pathI = 0; } Ents.stepMove(e, dt, sp); }
-      else if (d < 9 && t.kind !== 'turret') { const ax = e.pos.x - (tp.x - e.pos.x), az = e.pos.z - (tp.z - e.pos.z); e.path = [{ x: ax, z: az }]; e.pathI = 0; Ents.stepMove(e, dt, sp * 0.7); }
+      else if (d < 9 && t.kind !== 'turret') { const ax = e.pos.x - (tp.x - e.pos.x), az = e.pos.z - (tp.z - e.pos.z); e.path = [{ x: ax, z: az }]; e.pathI = 0; e.aimLock = Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z); Ents.stepMove(e, dt, sp * 0.7); e.aimLock = undefined; }
       else {
+        e.aimLock = Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z);
         // väike külgsamm
         e.strafe = (e.strafe || rand(-1, 1)) ; if (Math.random() < dt * 0.4) e.strafe = -e.strafe;
         const sx = Math.cos(e.yaw) * e.strafe, sz = -Math.sin(e.yaw) * e.strafe;
         e.path = [{ x: e.pos.x + sx * 2, z: e.pos.z + sz * 2 }]; e.pathI = 0; Ents.stepMove(e, dt, sp * 0.45);
+        e.aimLock = undefined;
       }
       if (e.cool <= 0 && Math.abs(angDiff(e.yaw, Math.atan2(tp.x - e.pos.x, tp.z - e.pos.z))) < 0.35) {
         fireAt(e, t, e.dmg, e.acc, 'enemy');
