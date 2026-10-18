@@ -608,7 +608,7 @@ const Ents = (() => {
     const dist = Math.hypot(e.pos.x - e._lx, e.pos.z - e._lz); e._lx = e.pos.x; e._lz = e.pos.z;
     const vNow = dt > 0 ? Math.min(9, dist / dt) : 0;
     e._v += (vNow - e._v) * Math.min(1, dt * 8);
-    const v = e.alive === false ? 0 : e._v;
+    const v = e.alive === false || e.inVehicle || e.seated ? 0 : e._v;   // sõidukis istub/seisab paigal, ei jookse
     const runW = clamp((v - 2.2) / 1.6, 0, 1), moveW = clamp(v / 0.9, 0, 1);
     e._ph += dist / lerp(1.45, 2.8, runW);
     e._it += dt;

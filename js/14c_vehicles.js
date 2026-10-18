@@ -260,46 +260,99 @@ const Vehicles = (() => {
   // ---------- füüsika ----------
   function step(v, dt) {
     const d = DEF[v.type];
-    // gaas / pidur / tagurpidi
-    const thr = v.throttle;
-    if (v.brake) v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), d.brake * 1.2 * dt);
-    else if (thr > 0.05) v.speed += (v.speed < -0.3 ? d.brake : d.accel) * thr * dt;
-    else if (thr < -0.05) v.speed += (v.speed > 0.3 ? -d.brake : -d.accel * 0.7) * -thr * dt;
-    else { v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), (1.6 + Math.abs(v.speed) * 0.35) * dt); }
-    // liiv aeglustab, tõus ka
-    const sand = Bases.at(v.x, v.z) && Bases.at(v.x, v.z).isInside(v.x, v.z) ? 1 : 0.92;
-    v.speed = clamp(v.speed, -d.rev, d.maxSpeed * sand);
-    // rool
-    const steerT = v.steerIn * 0.55 * (1 - Math.min(0.72, Math.abs(v.speed) / 24));
-    v.steer += (steerT - v.steer) * Math.min(1, dt * 6);
-    v.yaw -= v.speed / d.wheelBase * Math.tan(v.steer) * dt;
+    if (v.vx === undefined) { v.vx = Math.sin(v.yaw) * v.speed; v.vz = Math.cos(v.yaw) * v.speed; v.vy = 0; v.air = false; v.yawRate = 0; v.comp = 0; v.wOff = d.wheels.map(() => 0); }
+    let fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    const rx = Math.cos(v.yaw), rz = -Math.sin(v.yaw);
+    let vF = v.vx * fx + v.vz * fz, vS = v.vx * rx + v.vz * rz;
+    const B = Bases.at(v.x, v.z), paved = !!(B && B.isInside(v.x, v.z));
+    const sand = paved ? 1 : 0.92;
+    if (!v.air) {
+      // mootor / pidur / tagurpidi
+      const thr = v.throttle;
+      if (v.brake) vF -= Math.sign(vF) * Math.min(Math.abs(vF), d.brake * 1.2 * dt);
+      else if (thr > 0.05) vF += (vF < -0.3 ? d.brake : d.accel * (1 - Math.max(0, vF) / (d.maxSpeed * sand * 1.08))) * thr * dt;
+      else if (thr < -0.05) vF += (vF > 0.3 ? -d.brake : -d.accel * 0.7) * -thr * dt;
+      else vF -= Math.sign(vF) * Math.min(Math.abs(vF), (1.4 + Math.abs(vF) * 0.3) * dt);
+      if (v.hand) vF -= Math.sign(vF) * Math.min(Math.abs(vF), 4.5 * dt);
+      // kalle: ülesmäge aeglustab, allamäge kiirendab
+      vF += 9.8 * Math.sin(v.pitch) * 0.75 * dt;
+      // liiv pidurdab rohkem kui baasi põrand
+      vF -= vF * (paved ? 0.02 : 0.06) * dt;
+      vF = clamp(vF, -d.rev, d.maxSpeed * sand * 1.1);
+      // külghaare: rehvid suruvad külglibisemise nulli (liivas ja käsipiduriga vähem) -> libisemine/drift
+      const latMax = (paved ? 22 : 15) * (v.hand ? 0.28 : 1) * (v.type === 'hauler' ? 0.85 : 1);
+      const dv = Math.min(Math.abs(vS), latMax * dt);
+      v.latAcc = -Math.sign(vS) * dv / Math.max(dt, 1e-4);
+      vS -= Math.sign(vS) * dv;
+      // rool: kiirusega tundlikkus väheneb, libisemisel juhitavus väheneb
+      const steerT = v.steerIn * 0.58 * (1 - Math.min(0.7, Math.abs(vF) / 26));
+      v.steer += (steerT - v.steer) * Math.min(1, dt * 7);
+      const slip = clamp(Math.abs(vS) / 6, 0, 0.6);
+      const wantRate = vF / d.wheelBase * Math.tan(v.steer) * (1 - slip * 0.5) + (v.hand ? v.steer * Math.sign(vF) * Math.min(1, Math.abs(vF) / 8) * 1.2 : 0);
+      v.yawRate += (wantRate - v.yawRate) * Math.min(1, dt * 9);
+    } else {
+      v.yawRate *= Math.max(0, 1 - dt * 0.5);   // õhus pöörlemine ei muutu kuigi palju
+      v.latAcc = 0;
+    }
+    v.yaw -= v.yawRate * dt;
+    // maailma kiirus (kere pöörab, kiirusvektor jääb -> libisemine)
+    v.vx = fx * vF + rx * vS; v.vz = fz * vF + rz * vS;
+    fx = Math.sin(v.yaw); fz = Math.cos(v.yaw);
     // liikumine + kokkupõrked kahe ringiga (esi- ja tagaots)
-    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
     const ox = v.x, oz = v.z, oh = World.heightAt(ox, oz);
-    let nx = v.x + fx * v.speed * dt, nz = v.z + fz * v.speed * dt;
+    let nx = v.x + v.vx * dt, nz = v.z + v.vz * dt;
     const L = d.len || 0.9, pF = { x: nx + fx * L, z: nz + fz * L }, pB = { x: nx - fx * L, z: nz - fz * L };
     const y0 = v.y + 0.35, y1 = v.y + 1.7;
     const hitF = World.collideCircle(pF, 1.0, y0, y1, true), hitB = World.collideCircle(pB, 1.0, y0, y1, true);
     nx = (pF.x + pB.x) / 2; nz = (pF.z + pB.z) / 2;
     if (hitF || hitB) {
-      const moved = Math.hypot(nx - ox, nz - oz), want = Math.abs(v.speed * dt);
-      if (Math.abs(v.speed) > 7 && moved < want * 0.5) { const dmg = (Math.abs(v.speed) - 7) * 6; v.hp -= dmg; v.hurtT = 0.3; UI.shake(0.4); Audio2.land(); }
-      v.speed *= hitF && v.speed > 0 || hitB && v.speed < 0 ? 0.35 : 0.8;
+      const moved = Math.hypot(nx - ox, nz - oz), sp = Math.hypot(v.vx, v.vz), want = sp * dt;
+      if (sp > 7 && moved < want * 0.5) { const dmg = (sp - 7) * 6; v.hp -= dmg; v.hurtT = 0.3; UI.shake(0.4); Audio2.land(); }
+      // kokkupõrge: kiirus pärast tegelikku liikumist (libiseb mööda seina)
+      const k = hitF && vF > 0 || hitB && vF < 0 ? 0.35 : 0.8;
+      v.vx = (nx - ox) / Math.max(dt, 1e-4) * k + v.vx * (1 - k) * 0.3; v.vz = (nz - oz) / Math.max(dt, 1e-4) * k + v.vz * (1 - k) * 0.3;
+      v.yawRate *= 0.5;
     }
     // järsk kalju: ei sõida üles
     const nh = World.heightAt(nx, nz), hd = Math.hypot(nx - ox, nz - oz);
-    if (hd > 1e-4 && nh - oh > hd * 1.0 && !Bases.at(nx, nz)) { nx = ox; nz = oz; v.speed *= 0.3; }
+    if (!v.air && hd > 1e-4 && nh - oh > hd * 1.0 && !Bases.at(nx, nz)) { nx = ox; nz = oz; v.vx *= 0.3; v.vz *= 0.3; }
     v.x = clamp(nx, -World.HALF + 14, World.HALF - 14); v.z = clamp(nz, -World.HALF + 14, World.HALF - 14);
-    // maapind, kalle
+    // vertikaal: vedrustus maas, ballistika õhus (düünihüpped)
     const gy = groundAt(v.x, v.z, v.y);
-    v.y += (gy - v.y) * Math.min(1, dt * 14);
-    if (v.y < gy - 0.05) v.y = gy - 0.05;
+    if (v.air) {
+      v.vy -= 18 * dt; v.y += v.vy * dt;
+      if (v.y <= gy) {
+        const imp = -v.vy; v.y = gy; v.air = false; v.vy = 0;
+        v.comp = Math.min(0.3, imp * 0.03);
+        if (imp > 7) { UI.shake(Math.min(0.6, imp * 0.04)); Audio2.land(); FX.dust(v.x, v.y + 0.2, v.z, 10, 2); if (imp > 13) { v.hp -= (imp - 13) * 8; v.hurtT = 0.3; } }
+      }
+    } else {
+      const vyG = (gy - v.y) / Math.max(dt, 1e-4);
+      // maapind langeb kiiremini kui auto järgi jõuab -> lendu (ainult kiirusel)
+      if (gy < v.y - 0.25 && Math.abs(vF) > 9 && !paved) { v.air = true; v.vy = clamp(v.lastVy || 0, -2, 9); }
+      else { v.y += (gy - v.y) * Math.min(1, dt * 16); if (v.y < gy - 0.05) v.y = gy - 0.05; v.lastVy = clamp(vyG, -20, 20) * 0.6 + (v.lastVy || 0) * 0.4; }
+    }
+    v.comp = Math.max(0, (v.comp || 0) - dt * 0.8);
+    // kere kalle: rataste maapinna järgi + kaldumine kurvis + tagant vajumine kiirendusel
     const hF = groundAt(v.x + fx * 1.25, v.z + fz * 1.25, v.y), hB = groundAt(v.x - fx * 1.25, v.z - fz * 1.25, v.y);
     const lx = Math.cos(v.yaw), lz = -Math.sin(v.yaw);
     const hL = groundAt(v.x + lx * 0.8, v.z + lz * 0.8, v.y), hR = groundAt(v.x - lx * 0.8, v.z - lz * 0.8, v.y);
-    v.pitch += (-Math.atan2(hF - hB, 2.5) - v.pitch) * Math.min(1, dt * 8);
-    v.roll += (Math.atan2(hL - hR, 1.6) - v.roll) * Math.min(1, dt * 8);
-    v.wheelRot += v.speed * dt / 0.45;
+    const accF = (vF - (v.lastVF || vF)) / Math.max(dt, 1e-4); v.lastVF = vF;
+    if (!v.air) {
+      v.pitch += (-Math.atan2(hF - hB, 2.5) - clamp(accF * 0.006, -0.05, 0.05) - v.pitch) * Math.min(1, dt * 8);
+      v.roll += (Math.atan2(hL - hR, 1.6) + clamp((v.latAcc || 0) * 0.004, -0.09, 0.09) - v.roll) * Math.min(1, dt * 7);
+    } else { v.pitch += (0.12 - v.pitch) * Math.min(1, dt * 0.8); v.roll *= Math.max(0, 1 - dt); }
+    // rataste vedrustus (joonistamiseks)
+    for (let k = 0; k < d.wheels.length; k++) {
+      const [wx, wy, wz] = d.wheels[k];
+      const px = v.x + fx * wz + lx * wx, pz = v.z + fz * wz + lz * wx;
+      const want = v.air ? -0.18 : clamp(groundAt(px, pz, v.y) - (v.y + wz * -Math.sin(v.pitch) + wx * Math.sin(v.roll)), -0.2, 0.15);
+      v.wOff[k] += (want - v.wOff[k]) * Math.min(1, dt * 14);
+    }
+    v.speed = vF; v.slip = Math.abs(vS);
+    v.wheelRot += vF * dt / 0.45;
+    // libisemisel tolm rataste alt
+    if (!v.air && !paved && Math.abs(vS) > 3 && Math.random() < 0.7) FX.dust(v.x - fx * 1.2 + rand(-0.8, 0.8), v.y + 0.15, v.z - fz * 1.2 + rand(-0.8, 0.8), 2, 1.2);
     // olendid: vaenlased saavad löögi, omad lükatakse eest
     for (const e of Ents.list) {
       if (!e.alive || e.kind === 'player' || e.inVehicle || e.kind === 'boss' || e.kind === 'core' || e.kind === 'rturret' || e.kind === 'jelly') continue;
@@ -309,7 +362,7 @@ const Vehicles = (() => {
       if (!friendly && Math.abs(v.speed) > 5 && !(e.hitBy && e.hitBy > G.time.total)) {
         e.hitBy = G.time.total + 0.6;
         Ents.damage(e, Math.abs(v.speed) * 6, v.seats[0] === Player ? Player : v.seats[0] || null);
-        v.speed *= e.kind === 'crab' || e.kind === 'kiskja' ? 0.5 : 0.85;
+        { const k = e.kind === 'crab' || e.kind === 'kiskja' ? 0.5 : 0.85; v.speed *= k; if (v.vx !== undefined) { v.vx *= k; v.vz *= k; } }
         FX.dust(e.pos.x, e.pos.y + 0.4, e.pos.z, 10, 2); UI.shake(0.2);
       }
       const k = (m - dd) / dd; e.pos.x += ex * k; e.pos.z += ez * k;
@@ -353,7 +406,7 @@ const Vehicles = (() => {
       const drv = v.seats[0];
       if (drv && drv !== Player && v.ai) aiDrive(v, dt);
       else if (drv !== Player) { v.throttle = 0; v.steerIn = 0; v.brake = v.speed !== 0 && Math.abs(v.speed) < 0.4 ? 1 : 0; }
-      if (Math.abs(v.speed) > 0.01 || drv || Math.abs(v.y - groundAt(v.x, v.z, v.y)) > 0.02) step(v, dt);
+      if (Math.abs(v.speed) > 0.01 || drv || v.air || (v.vx && Math.hypot(v.vx, v.vz) > 0.01) || Math.abs(v.y - groundAt(v.x, v.z, v.y)) > 0.02) step(v, dt);
       // istujad kaasa
       for (let k = 0; k < 2; k++) {
         const e = v.seats[k]; if (!e || e === Player) continue;
@@ -371,7 +424,7 @@ const Vehicles = (() => {
     }
   }
   function destroy(v) {
-    v.dead = true; v.hp = 0; v.speed = 0;
+    v.dead = true; v.hp = 0; v.speed = 0; v.vx = v.vz = 0;
     FX.explosion(v.x, v.y + 1, v.z, [1, 0.6, 0.3], 3); Audio2.explode(v.x, v.z, true); UI.shake(0.7);
     for (let k = 0; k < 2; k++) if (v.seats[k]) { const e = v.seats[k]; leave(v, e); if (e === Player) Player.hurt(35, null); else Ents.damage(e, 35, null); }
     const items = []; for (const k in v.cargo) if (v.cargo[k] > 0) items.push([k, v.cargo[k]]);
@@ -404,7 +457,7 @@ const Vehicles = (() => {
     const p = M4.point(v.m, 1.5 * side, 0, k === 0 ? 0.1 : -1.0, {});
     const q = { x: p.x, z: p.z }; World.collideCircle(q, 0.4, v.y + 0.3, v.y + 1.7, true);
     if (e === Player) {
-      Player.vehicle = null; Player.seat = 0;
+      Player.vehicle = null; Player.seat = 0; v.hand = false;
       if (Player._wBefore) { Player.weapon = Player._wBefore; Player._wBefore = null; }
       Player.pos.x = q.x; Player.pos.z = q.z; Player.pos.y = Ents.groundY(q.x, q.z, v.y + 0.5); Player.vel.x = Player.vel.z = 0;
       Player.yaw = v.yaw + (k === 0 ? Math.PI / 2 : Math.PI); Player.pitch = 0;
@@ -433,8 +486,7 @@ const Vehicles = (() => {
     if (inp.lookX || inp.lookY) P._lookT = 0; else P._lookT = (P._lookT || 0) + dt;
     const seat = P.seat;
     if (seat === 0) {
-      v.throttle = inp.moveY; v.steerIn = inp.moveX; v.brake = inp.jump || inp.sprint && false ? 1 : 0;
-      if (inp.jump) v.brake = 1;
+      v.throttle = inp.moveY; v.steerIn = inp.moveX; v.brake = 0; v.hand = !!inp.jump;   // tühik = käsipidur (drift)
       // kaamera pöörab ise sõidusuunda, kui hiirt/sõrme ei liigutata
       if (P._lookT > 1.2 && Math.abs(v.speed) > 2) { const want = v.speed > 0 ? v.yaw : v.yaw + Math.PI; P.yaw += angDiff(P.yaw, want) * Math.min(1, dt * 1.6); P.pitch += (-0.18 - P.pitch) * Math.min(1, dt * 1.5); }
     }
@@ -454,7 +506,7 @@ const Vehicles = (() => {
       P.recoil = Math.max(0, P.recoil - dt * 6); P.kick = Math.max(0, P.kick - dt * 8);
     }
     // tegevus: lühike vajutus = vaheta istet, pikk = välju
-    P.inter = { key: 'veh' + seat, label: 'Hold E: get out', sub: seat === 0 ? 'Tap E: ' + (GN ? 'man the machine gun' : 'move to the passenger seat') + ' · Space: brake · cargo: ' + cargoText(v) : 'Tap E: take the wheel' + (GN ? ' · ammo ' + (P.mag.bugmg || 0) + ' + ' + (v.cargo.ammo_r || 0) : ''), hold: 0.6 };
+    P.inter = { key: 'veh' + seat, label: 'Hold E: get out', sub: seat === 0 ? 'Tap E: ' + (GN ? 'man the machine gun' : 'move to the passenger seat') + ' · Space: handbrake · cargo: ' + cargoText(v) : 'Tap E: take the wheel' + (GN ? ' · ammo ' + (P.mag.bugmg || 0) + ' + ' + (v.cargo.ammo_r || 0) : ''), hold: 0.6 };
     if (inp.actHeld) { P.interT += dt; if (P.interT >= 0.6) { P.interT = 0; P._actUsed = true; leave(v, P); return; } }
     else {
       if (P.interT > 0 && P.interT < 0.35 && !P._actUsed) {   // lühike vajutus
@@ -715,7 +767,7 @@ const Vehicles = (() => {
     arrive(v);
   }
   function arrive(v) {
-    v.throttle = 0; v.steerIn = 0; v.brake = 1; v.speed *= 0.3;
+    v.throttle = 0; v.steerIn = 0; v.brake = 1; v.speed *= 0.3; if (v.vx !== undefined) { v.vx *= 0.3; v.vz *= 0.3; }
     v.ai = null;
     for (let k = 1; k >= 0; k--) { const e = v.seats[k]; if (e && e !== Player) leave(v, e); }
   }
@@ -729,18 +781,18 @@ const Vehicles = (() => {
   function OY0() { return Base.OY || 0; }
 
   // ---------- joonistus ----------
-  const figs = [{ id: 9001, team: 'player', pos: { x: 0, y: 0, z: 0 }, yaw: 0, phase: 0, moveAmt: 0, aim: 0, pose: 'sit', hasGun: false, hurtT: 0, flash: 0, kind: 'human' }];
+  const figs = [{ id: 9001, team: 'player', pos: { x: 0, y: 0, z: 0 }, yaw: 0, phase: 0, moveAmt: 0, aim: 0, pose: 'sit', hasGun: false, hurtT: 0, flash: 0, kind: 'human', seated: true }];
   function draw() {
     if (!M) initMeshes();
     for (const v of list) {
-      M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll);
+      M4.compose(v.m, v.x, v.y - (v.comp || 0), v.z, v.yaw, v.pitch, v.roll);
       const tint = v.dead ? [0.25, 0.22, 0.2, 0] : v.hurtT > 0 ? [1.6, 0.7, 0.6, 0] : null;
       const d = DEF[v.type];
       const rt = !tint && v.team !== 'crew' && typeof Rivals !== 'undefined' && Rivals.get(v.team) ? Rivals.get(v.team).tint : tint;
       GFX.draw(M[d.mesh], v.m, rt, null, { rust: v.dead ? 0.9 : 0.22 });
       for (let k = 0; k < d.wheels.length; k++) {
         const [wx, wy, wz] = d.wheels[k];
-        M4.child(v.wm[k], v.m, wx, wy, wz, k < 2 ? -v.steer : 0, v.wheelRot / d.wheelS, 0, d.wheelS, d.wheelS, d.wheelS);
+        M4.child(v.wm[k], v.m, wx, wy + (v.wOff ? v.wOff[k] : 0) - (v.comp || 0) * 0.3, wz, k < 2 ? -v.steer : 0, v.wheelRot / d.wheelS, 0, d.wheelS, d.wheelS, d.wheelS);
         GFX.draw(M.wheel, v.wm[k], v.dead ? tint : null, null, { rust: 0.15 });
       }
       // kuulipilduja: maailma suunas
