@@ -52,6 +52,7 @@ const Aliens = (() => {
   }
 
   // ---------- populatsioon ----------
+  function spawnPackAt(x, z, target) { spawnPack(x, z); for (const o of Ents.list) if (o.kind === 'alien' && o.alive && Math.hypot(o.pos.x - x, o.pos.z - z) < 10 && o.state !== 'hunt') { o.state = 'hunt'; o.target = target; o.stateT = 25; } }
   function packs() { const s = new Set(); for (const e of Ents.list) if (e.kind === 'alien' && e.alive) s.add(e.pack); return s.size; }
   function spawnPack(x, z) {
     const id = 'p' + Math.random().toString(36).slice(2, 7), n = randi(2, 3);
@@ -214,5 +215,5 @@ const Aliens = (() => {
   }
   function reset() { spawnT = 2; raidT = DAY_LEN * 1.2; }
 
-  return { initMeshes, update, hurt, onKill, harvest, spheres, isThreat, draw, drawProjs, tick, reset, populate, launchRaid, ACID_PRICE, nearestPack: (x, z, r) => Ents.list.filter((e) => e.kind === 'alien' && e.alive && Math.hypot(e.pos.x - x, e.pos.z - z) < r).sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z))[0] || null };
+  return { initMeshes, update, hurt, onKill, harvest, spheres, isThreat, draw, drawProjs, tick, reset, populate, launchRaid, spawnPackAt, ACID_PRICE, nearestPack: (x, z, r) => Ents.list.filter((e) => e.kind === 'alien' && e.alive && Math.hypot(e.pos.x - x, e.pos.z - z) < r).sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z))[0] || null };
 })();

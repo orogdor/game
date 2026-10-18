@@ -389,7 +389,7 @@ const Vehicles = (() => {
         if (ammo) {
           if (ammo === 'cargo') v.cargo.ammo_r--; else G.stash.ammo_r--;
           v.gunCool = 0.11;
-          const fake = { pos: { x: gp.x, y: gp.y - 1.33, z: gp.z }, yaw: v.gunYaw, team: e.team, kind: 'turret' };
+          const fake = { pos: { x: gp.x, y: gp.y - 1.33, z: gp.z }, yaw: v.gunYaw, team: e.team, kind: 'turret', vehicle: true };
           fireAt(fake, t, 16, 0.55, 'lmg');
         } else if (!v.noAmmoMsg && v.team === 'crew') { v.noAmmoMsg = true; UI.toast('The buggy machine gun is out of rifle ammo – load some into the cargo box.'); }
       }

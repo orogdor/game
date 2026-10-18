@@ -164,15 +164,21 @@ const World = (() => {
       const crack = Noise.n2(x * 0.6, z * 0.6) > 0.45 ? 0.6 : 1, line = Math.abs(dd) < 0.18 && Math.sin(t * r.L * 0.8) > 0 ? 1 : 0;
       c = mixRgb(c, line ? [0.55, 0.5, 0.36] : [0.2 * crack + 0.05, 0.19 * crack + 0.05, 0.19 * crack + 0.05], k);
     }
-    // linn: tolmune asfalt, tänavavõrk
+    // linn: tolmune plaatidega väljak, ringteed ja radiaalteed (lagunenud asfalt)
     const cd = Math.hypot(x - sites.city.x, z - sites.city.z);
-    if (cd < sites.city.r + 60) {
-      const k = 1 - smoothstep(sites.city.r - 20, sites.city.r + 60, cd);
-      const gx = ((x - sites.city.x) % 46 + 46 + 23) % 46, gz = ((z - sites.city.z) % 46 + 46 + 23) % 46;
-      const road = Math.min(gx, 46 - gx) < 5 || Math.min(gz, 46 - gz) < 5;
-      const sandOver = smoothstep(0.1, 0.6, Noise.n2(x * 0.03 + 11, z * 0.03 - 5));
-      const base = road ? mixRgb([0.2, 0.19, 0.19], [0.24, 0.22, 0.21], n2 * 0.5 + 0.5) : [0.42, 0.37, 0.33];
-      c = mixRgb(c, mixRgb(base, c, sandOver * 0.55), k);
+    if (cd < sites.city.r + 120) {
+      const k = 1 - smoothstep(sites.city.r - 10, sites.city.r + 30, cd);
+      const ang = Math.atan2(z - sites.city.z, x - sites.city.x) - (sites.city.roadA || 0);
+      const sec = TAU / 8, ra = ((ang % sec) + sec * 1.5) % sec - sec / 2;   // nurk lähima radiaaltee suhtes
+      const dRad = Math.abs(Math.sin(ra) * cd);
+      const dRing = Math.min(Math.abs(cd - 60), Math.abs(cd - 140), Math.abs(cd - 212));
+      const road = (dRad < 4.5 && cd > 16 && cd < sites.city.r + 110) || (dRing < 4.5 && cd < sites.city.r);
+      const sandOver = smoothstep(0.15, 0.65, Noise.n2(x * 0.03 + 11, z * 0.03 - 5));
+      const crack = Noise.n2(x * 0.5, z * 0.5) > 0.42 ? 0.65 : 1;
+      const tiles = ((Math.floor(x / 3) + Math.floor(z / 3)) & 1) ? 0.96 : 1.04;
+      const base = road ? [0.21 * crack, 0.2 * crack, 0.2 * crack] : [0.47 * tiles, 0.44 * tiles, 0.41 * tiles];
+      const kk = road ? (1 - smoothstep(sites.city.r + 60, sites.city.r + 110, cd)) : k;
+      c = mixRgb(c, mixRgb(base, c, sandOver * (road ? 0.45 : 0.6)), kk);
     }
     return c;
   }
@@ -206,6 +212,7 @@ const World = (() => {
         if (sc > bs) { bs = sc; bc = { x, z }; }
       }
       sites.city = Object.assign({ level: 0, r: 230 }, bc || { x: 1600, z: 0 }); }
+    sites.city.roadA = 0;
     // väikesed mahajäetud asulad (2–4 maja) ja lagunenud teed nende vahel
     sites.villages = [];
     for (let t = 0; t < 400 && sites.villages.length < 8; t++) {
@@ -219,7 +226,8 @@ const World = (() => {
     { const nodes = [sites.city, ...sites.villages], done = [nodes[0]], rest = nodes.slice(1);
       while (rest.length) { let best = null; for (const a of done) for (const b of rest) { const d = Math.hypot(a.x - b.x, a.z - b.z); if (!best || d < best.d) best = { a, b, d }; } done.push(best.b); rest.splice(rest.indexOf(best.b), 1); sites.roads.push(roadSeg(best.a, best.b)); }
       // vana maantee linnast kaardi serva poole
-      const ca = Math.atan2(sites.city.z, sites.city.x); sites.roads.push(roadSeg(sites.city, { x: sites.city.x + Math.cos(ca + 0.4) * 600, z: sites.city.z + Math.sin(ca + 0.4) * 600 })); }
+      const ca = Math.atan2(sites.city.z, sites.city.x); sites.roads.push(roadSeg(sites.city, { x: sites.city.x + Math.cos(ca + 0.4) * 600, z: sites.city.z + Math.sin(ca + 0.4) * 600 }));
+      const r0 = sites.roads[0]; if (r0) sites.city.roadA = Math.atan2(r0.dz, r0.dx); }   // linna radiaalteed joondatakse esimese maanteega (värav tee otsas)
     sites.campLevel = [0, 0];
     sites.nestLevel = 0;
     sites.campLevel = sites.rivals.map((r) => rawH(r.x, r.z));

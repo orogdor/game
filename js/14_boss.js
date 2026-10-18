@@ -14,8 +14,9 @@ const Boss = (() => {
   function spawn(saved) {
     const n = World.sites.nest;
     const e = Ents.spawn('boss', 'wild', n.x, n.z, { radius: 8.5, state: 'sleep', maxHp: 1 });
-    e.nodes = NODE_POS.map((p, i) => ({ hp: 1040, max: 1040, alive: true, m: M4.create(), i }));
-    e.heartHp = 5200; e.heartMax = 5200; e.guardT = 0; e.guarded = false;
+    // väga vastupidav: võitmiseks on vaja täit salka (~8 võitlejat) ja sõiduki kuulipildujat
+    e.nodes = NODE_POS.map((p, i) => ({ hp: 1800, max: 1800, alive: true, m: M4.create(), i, lastHit: 0 }));
+    e.heartHp = 9000; e.heartMax = 9000; e.heartHit = 0; e.guardT = 0; e.guarded = false;
     e.stompCD = 4; e.barrageCD = 6; e.summonCD = 16; e.chargeCD = 12; e.act = null; e.actT = 0; e.lastSeen = 0; e.roarT = 0;
     e.yaw = rand(0, TAU); e.ms = [];
     if (saved) {
@@ -87,7 +88,7 @@ const Boss = (() => {
     if (idx >= 4 && idx <= 8) {
       const n = e.nodes[idx - 4];
       if (!n.alive) return;
-      n.hp -= dmg;
+      n.hp -= dmg; n.lastHit = G.time.total;
       FX.sparks(x, y, z, [1, 0.5, 0.85], 8, 5);
       UI.hitMarker(false);
       if (n.hp <= 0) {
@@ -99,7 +100,9 @@ const Boss = (() => {
         else { UI.banner('The heart is exposed', 'Shoot the glowing heart under its chest', 'good'); UI.msg('The Stoneheart\'s chest plates open. The heart is exposed!', 'good'); e.enraged = true; }
       }
     } else if (idx === 9) {
-      e.heartHp -= dmg;
+      // süda: soomusplaatide vahelt läbib ainult raske relv (sõiduki kuulipilduja, rööbaskahur); käsirelvad veerandi
+      const hv = src === Player ? (Player.weapon === 'bugmg' ? 1.6 : Player.weapon === 'rail' || Player.weapon === 'gl' ? 0.6 : 0.25) : 0.25;
+      e.heartHp -= dmg * hv; e.heartHit = G.time.total;
       FX.sparks(x, y, z, [1, 0.4, 0.6], 10, 5);
       UI.hitMarker(false);
       if (e.heartHp <= 0) die(e, src);
@@ -114,7 +117,17 @@ const Boss = (() => {
     // üldine kahju (mürsud, konkurendid): pisike kriimustus
     if (!e.alive) return;
     if (src && src.team && src.team !== 'player') { wake(e, src); }
-    if (exposed(e)) { e.heartHp -= amt * 0.15; if (e.heartHp <= 0) die(e, src); }
+    // meeskond, konkurendid ja sõiduki kuulipilduja: tulistavad kristallsõlmi; süda ainult raske relvaga täiel määral
+    const heavy = !!(src && (src.vehicle || src.kind === 'turret' || src === Player));
+    const live = e.nodes.filter((n) => n.alive);
+    if (live.length) {
+      const n = live[Math.floor(Math.random() * live.length)];
+      n.hp -= amt * (heavy ? 1.6 : 1); n.lastHit = G.time.total;
+      if (n.hp <= 0) { n.alive = false; local(e, NODE_POS[n.i], tmp); FX.crystalBurst(tmp.x, tmp.y, tmp.z); FX.explosion(tmp.x, tmp.y, tmp.z, [1, 0.4, 0.8], 1.6); Audio2.roar(e.pos.x, e.pos.z); const left = e.nodes.filter((q) => q.alive).length; if (left > 0) UI.msg('Crystal node shattered! Remaining ' + left + '.', 'good'); else { UI.banner('The heart is exposed', 'Only heavy weapons crack the heart: vehicle machine gun or railgun', 'good'); e.enraged = true; } }
+      return;
+    }
+    e.heartHp -= amt * (heavy ? 1.6 : 0.25); e.heartHit = G.time.total;
+    if (e.heartHp <= 0) die(e, src);
   }
   function charge(r) {
     const e = api.e; if (!e || !e.alive) return;
@@ -174,7 +187,7 @@ const Boss = (() => {
         const grounded = t.kind !== 'player' || Player.onGround || Player.pos.y - Ents.groundY(Player.pos.x, Player.pos.z) < 0.5;
         if (Math.abs(d - r.r) < 1.6 && grounded) {
           r.hit.add(t);
-          Ents.damage(t, 26 * G.dk.edmg, e);
+          Ents.damage(t, 40 * G.dk.edmg, e);
           if (t.kind === 'player') { const k = 7 / Math.max(1, d); Player.vel.x += (t.pos.x - r.x) * k; Player.vel.z += (t.pos.z - r.z) * k; Player.vel.y = 4; Player.onGround = false; }
         }
       }
@@ -182,6 +195,11 @@ const Boss = (() => {
     }
     if (!e.alive) { e.deathT += dt; return; }
     guardTick(e, dt);
+    // taastumine: kui sõlme/südant mõnda aega ei tabata, kasvab kristall tagasi (väike salk ei jõua)
+    if (e.state !== 'sleep') {
+      for (const n of e.nodes) if (n.alive && n.hp < n.max && G.time.total - (n.lastHit || 0) > 5) n.hp = Math.min(n.max, n.hp + 8 * dt);
+      if (exposed(e) && e.heartHp < e.heartMax && G.time.total - (e.heartHit || 0) > 6) e.heartHp = Math.min(e.heartMax, e.heartHp + 18 * dt);
+    } else { for (const n of e.nodes) if (n.alive) n.hp = Math.min(n.max, n.hp + 40 * dt); if (exposed(e)) e.heartHp = Math.min(e.heartMax, e.heartHp + 80 * dt); }
     if (e.state === 'sleep') {
       e.phase += dt * 0.3;
       const t = nearestTarget(e, 85);
@@ -228,20 +246,21 @@ const Boss = (() => {
     if (d > 13 && d < 95 && e.barrageCD <= 0) {
       e.barrageCD = e.enraged ? rand(4, 6) : rand(6, 9);
       const live = e.nodes.map((q, i) => (q.alive ? i : -1)).filter((i) => i >= 0);
-      const k = 4 + Math.floor(Math.random() * 4);
+      const k = 7 + Math.floor(Math.random() * 5);
       for (let i = 0; i < k; i++) {
         const src = local(e, live.length ? NODE_POS[pick(live)] : [0, 8, 0], {});
         const tx = t.pos.x + (t.vel ? t.vel.x * 0.9 : 0) + rand(-4, 4), tz = t.pos.z + (t.vel ? t.vel.z * 0.9 : 0) + rand(-4, 4);
         const ty = Ents.groundY(tx, tz);
         const dist = Math.hypot(tx - src.x, tz - src.z), T = clamp(dist / 26, 0.9, 2.4);
-        Ents.projs.push({ x: src.x, y: src.y + 1, z: src.z, vx: (tx - src.x) / T, vy: (ty - src.y - 1) / T + 0.5 * 12 * T, vz: (tz - src.z) / T, g: 12, life: 5, dmg: 15 * G.dk.edmg, owner: e, kind: 'shard', r: 0.6, splash: 3.6, delay: i * 0.14 });
+        Ents.projs.push({ x: src.x, y: src.y + 1, z: src.z, vx: (tx - src.x) / T, vy: (ty - src.y - 1) / T + 0.5 * 12 * T, vz: (tz - src.z) / T, g: 12, life: 5, dmg: 20 * G.dk.edmg, owner: e, kind: 'shard', r: 0.6, splash: 4.2, delay: i * 0.14 });
       }
       Audio2.roar(e.pos.x, e.pos.z);
       return;
     }
     if (e.summonCD <= 0) {
       e.summonCD = rand(18, 28) * (e.enraged ? 0.75 : 1);
-      const ns = 3 + (Math.random() < 0.5 ? 1 : 0) + (e.enraged ? 1 : 0);
+      const ns = 4 + (Math.random() < 0.5 ? 2 : 0) + (e.enraged ? 2 : 0);
+      if (typeof Aliens !== 'undefined' && Aliens.spawnPackAt) Aliens.spawnPackAt(t.pos.x + rand(-20, 20), t.pos.z + rand(-20, 20), t);   // ka töölised (happekullid) tulevad appi
       for (let i = 0; i < ns; i++) { const a = rand(0, TAU); const s = Spawner.stalker(t.pos.x + Math.cos(a) * rand(10, 16), t.pos.z + Math.sin(a) * rand(10, 16), 'hunt'); s.target = t; FX.dust(s.pos.x, s.pos.y + 0.3, s.pos.z, 12, 2); }
       UI.msg('The sand is boiling. The Stoneheart is calling stalkers for help!', 'danger');
     }
