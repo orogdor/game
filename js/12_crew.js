@@ -637,13 +637,15 @@ const Crew = (() => {
     if (!offDuty) switch (c.role) {
       case 'valvur': return { type: 'patrol', step: 0 };
       case 'jahimees': {
+        // pärast lahingut: lähedal lebavast surnud kullist happenäärmed kaasa
+        { const dead = Ents.list.find((o) => o.kind === 'alien' && !o.alive && o.harvestable && !o.claimed && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 70); if (dead && !(c.carry > 0)) { dead.claimed = e.id; return { type: 'hunt', step: 0, target: dead, t: 0 }; } }
         if (night) break;
         const need = (G.res.food + G.res.meat) < count() * 4 + 8;
         { const o = outingOf(e, 'hunt', (g) => g.alive && Math.hypot(g.pos.x, g.pos.z) < 420); if (o) return { type: 'hunt', step: 0, target: o.crew.task.target, t: 0, buddy: o, goal: o.crew.task.target }; }
         // tulnukajaht: happenäärmed on hea raha (kui toitu on piisavalt)
         if (!need && Math.random() < 0.55) {
           const al = Aliens.nearestPack(0, 0, 420);
-          if (al) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
+          if (al && Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack).length <= 2) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
         }
         if (need || Math.random() < 0.4) {
           let best = null, bd = 240;
@@ -1191,6 +1193,11 @@ const Crew = (() => {
       case 'hunt': {
         e.hasGun = true;
         k.t += dt;
+        // tulnukajaht: kui siht põgeneb või kaob, korja lähim surnud kull (happenäärmed)
+        if (k.target && k.target.kind === 'alien' && k.step < 2 && (!k.target.alive || k.target.flee > 0 || k.target.state !== 'hunt' && k.t > 20)) {
+          const dead = Ents.list.filter((o) => o.kind === 'alien' && !o.alive && o.harvestable && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 45).sort((p, q) => Math.hypot(p.pos.x - e.pos.x, p.pos.z - e.pos.z) - Math.hypot(q.pos.x - e.pos.x, q.pos.z - e.pos.z))[0];
+          if (dead) k.target = dead;
+        }
         const g = k.target;
         if (k.step < 3 && (k.t > 150 || Econ.isNight())) { k.step = 4; }
         if (k.step === 0 || k.step === 1) {
@@ -1211,8 +1218,10 @@ const Crew = (() => {
             }
           }
         } else if (k.step === 2) {
-          if (!g || !(g.butcherable || g.harvestable)) { k.step = 4; return; }
-          e.aim = 0; setAct(e, 'Butchering meat');
+          if (!g || g.remove || !(g.butcherable || g.harvestable)) { k.step = 4; return; }
+          if (Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z) < 2.2) { k.step = 3; k.t2 = 0; return; }
+          if ((k.t2w = (k.t2w || 0) + dt) > 60) { k.step = 4; return; }
+          e.aim = 0; setAct(e, g && g.kind === 'alien' ? 'Harvesting acid glands' : 'Butchering meat');
           if (Ents.stepMove(e, dt, sp)) { k.step = 3; k.t2 = 0; }
         } else if (k.step === 3) {
           k.t2 += dt; e.hasGun = false; e.gesture = 'fix'; if (Math.random() < 0.2) FX.goo(g.pos.x, g.pos.y + 0.4, g.pos.z, [0.5, 0.15, 0.12], 1);

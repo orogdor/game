@@ -54,10 +54,10 @@ const Aliens = (() => {
   // ---------- populatsioon ----------
   function packs() { const s = new Set(); for (const e of Ents.list) if (e.kind === 'alien' && e.alive) s.add(e.pack); return s.size; }
   function spawnPack(x, z) {
-    const id = 'p' + Math.random().toString(36).slice(2, 7), n = randi(2, 4);
+    const id = 'p' + Math.random().toString(36).slice(2, 7), n = randi(2, 3);
     for (let k = 0; k < n; k++) {
       const a = rand(0, TAU), r = rand(2, 7);
-      Ents.spawn('alien', 'wild', x + Math.cos(a) * r, z + Math.sin(a) * r, { maxHp: 50, radius: 0.9, speed: 0, state: 'roam', home: { x, z }, pack: id, cool: rand(0, 2), hitY: 1.1, hitR: 0.8 });
+      Ents.spawn('alien', 'wild', x + Math.cos(a) * r, z + Math.sin(a) * r, { maxHp: 32, radius: 0.9, speed: 0, state: 'roam', home: { x, z }, pack: id, cool: rand(0, 2), hitY: 1.1, hitR: 0.8 });
     }
   }
   function farFromBases(x, z, d) { if (Math.hypot(x, z) < d) return false; for (const r of Rivals.list) if (r.base && Math.hypot(x - r.base.x, z - r.base.z) < d) return false; return true; }
@@ -86,8 +86,9 @@ const Aliens = (() => {
     if (e.cool > 0) e.cool -= dt;
     if (e.swing > 0) e.swing -= dt;
     e.stateT -= dt;
+    if (e.flee > 0) { e.flee -= dt; Ents.stepMove(e, dt, 5); e.speed = 5; return; }
     if (e.state !== 'hunt') {
-      const t = nearestHuman(e, AGGRO_R);
+      const t = e.hp < e.maxHp * 0.25 ? null : nearestHuman(e, AGGRO_R);
       if (t) { e.state = 'hunt'; e.target = t; e.stateT = 18; Audio2.stalker(e.pos.x, e.pos.z); alertPack(e, t); }
       else {
         // rahulik uitamine karja kodu ümber
@@ -101,6 +102,8 @@ const Aliens = (() => {
         return;
       }
     }
+    // raskelt haavatud kull põgeneb pessa
+    if (e.hp < e.maxHp * 0.25) { e.state = 'roam'; e.target = null; e.stateT = 8; Ents.goTo(e, e.home.x + rand(-8, 8), e.home.z + rand(-8, 8)); e.flee = 6; return; }
     const t = e.target;
     if (!t || !t.alive || t.inVehicle || e.stateT <= 0 || Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z) > 48 || Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) > LEASH) {
       e.state = 'roam'; e.target = null; e.path = null; return;
@@ -110,14 +113,14 @@ const Aliens = (() => {
     e.speed = 5.6;
     if (d > 2.2) { if (!e.path || Math.random() < dt * 2) { e.path = [{ x: t.pos.x, z: t.pos.z }]; e.pathI = 0; } Ents.stepMove(e, dt, d > 9 ? 5.6 : 4.2); }
     else e.moveAmt = Math.max(0, e.moveAmt - dt * 4);
-    if (d < 2.6 && e.cool <= 0) { Ents.damage(t, 9 * G.dk.edmg, e); e.cool = 1.6; e.swing = 0.35; Audio2.crab(e.pos.x, e.pos.z); e.stateT = 18; }
+    if (d < 2.6 && e.cool <= 0) { Ents.damage(t, 7 * G.dk.edmg, e); e.cool = 1.9; e.swing = 0.35; Audio2.crab(e.pos.x, e.pos.z); e.stateT = 18; }
     else if (d > 6 && d < 24 && e.cool <= 0 && Math.random() < dt * 1.5) {
       // happesülg: kaarega klomp, pritsib maandumisel
-      e.cool = rand(2.6, 3.6); e.spit = 0.4;
+      e.cool = rand(3.5, 5); e.spit = 0.4;
       const tx = t.pos.x + (t.vel ? t.vel.x * 0.4 : 0), tz = t.pos.z + (t.vel ? t.vel.z * 0.4 : 0);
       const sx = e.pos.x + Math.sin(e.yaw) * 0.8, sy = e.pos.y + 1.6, sz = e.pos.z + Math.cos(e.yaw) * 0.8;
       const dist = Math.hypot(tx - sx, tz - sz), T = clamp(dist / 18, 0.45, 1.5), ty = Ents.groundY ? Ents.groundY(tx, tz) + 0.9 : World.heightAt(tx, tz) + 0.9;
-      Ents.projs.push({ x: sx, y: sy, z: sz, vx: (tx - sx) / T, vy: (ty - sy) / T + 0.5 * 14 * T, vz: (tz - sz) / T, g: 14, life: 3, dmg: 7 * G.dk.edmg, owner: e, kind: 'acid', r: 0.35, delay: 0 });
+      Ents.projs.push({ x: sx, y: sy, z: sz, vx: (tx - sx) / T, vy: (ty - sy) / T + 0.5 * 14 * T, vz: (tz - sz) / T, g: 14, life: 3, dmg: 6 * G.dk.edmg, owner: e, kind: 'acid', r: 0.35, delay: 0 });
       Audio2.stalker(e.pos.x, e.pos.z);
     }
   }
@@ -173,7 +176,7 @@ const Aliens = (() => {
     spawnT -= dt;
     if (spawnT <= 0) { spawnT = 45; populate(packs() === 0); }
     // happeklombi pritsmed: maandudes kahjustab lähedal olijaid veidi
-    for (const e of Ents.list) if (e.kind === 'alien' && !e.alive && e.deathT > 300) e.remove = true;
+    for (const e of Ents.list) if (e.kind === 'alien' && !e.alive && e.deathT > 300) { e.remove = true; e.harvestable = false; }
   }
   function reset() { spawnT = 2; }
 

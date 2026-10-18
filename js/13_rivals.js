@@ -376,6 +376,7 @@ const Rivals = (() => {
         break;
       }
       case 'hunt': {   // tulnukajaht: tapa, lõika happenäärmed, vii koju (müüakse nagu mängijal)
+        if (e.prey && e.prey.alive && e.prey.flee > 0) { const dead = Ents.list.find((o) => o.kind === 'alien' && !o.alive && o.harvestable && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 45); if (dead) e.prey = dead; }
         const g = e.prey;
         if (!g || (!g.alive && !g.harvestable) || e.carry > 0) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
         const d = Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z);
