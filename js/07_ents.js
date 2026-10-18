@@ -67,6 +67,8 @@ const Ents = (() => {
   function arrived(e) { return !e.path || e.pathI >= e.path.length; }
   function freeSpot(x, z, r) { const q = { x, z }; World.collideCircle(q, r, 0.3, 1.7, true); return Math.hypot(q.x - x, q.z - z) < 0.05; }
   function stepMove(e, dt, speed) {
+    // lukus võõra uks ees: lõhu või häki (Bases.attackDoor)
+    if (e.kind !== 'player' && !e.inVehicle && e.alive && (e.doorT = (e.doorT || 0) - dt) <= 0) { const dd = Bases.blockingDoor(e, 1.9); if (dd) { Bases.attackDoor(e, dd, dt); e.doorT = 0; return false; } e.doorT = 0.25; }
     if (e.toVeh && typeof Vehicles !== 'undefined') return Vehicles.walkStep(e, dt, speed);
     if (!e.path || e.pathI >= e.path.length) { e.moveAmt = Math.max(0, e.moveAmt - dt * 4); return true; }
     let tgt = e.detour || e.path[e.pathI];
@@ -131,7 +133,7 @@ const Ents = (() => {
     const want = Math.atan2(mx, mz);
     if (e.aimLock !== undefined) e.yaw += angDiff(e.yaw, e.aimLock) * Math.min(1, dt * 10);
     else e.yaw += angDiff(e.yaw, want) * Math.min(1, dt * (e.kind === 'human' ? 6.5 : 10));
-    World.collideCircle(e.pos, e.radius, e.pos.y + 0.3, e.pos.y + 1.7, isHuman(e));
+    World.collideCircle(e.pos, e.radius, e.pos.y + 0.3, e.pos.y + 1.7, e);
     e.pos.y = groundY(e.pos.x, e.pos.z, e.pos.y);
     e.moveAmt = Math.min(1, e.moveAmt + dt * 5);
     e.speed = sp;

@@ -91,6 +91,18 @@ const Aliens = (() => {
       const t = e.hp < e.maxHp * 0.25 ? null : nearestHuman(e, AGGRO_R);
       if (t) { e.state = 'hunt'; e.target = t; e.stateT = 18; Audio2.stalker(e.pos.x, e.pos.z); alertPack(e, t); }
       else {
+        // rüüsteretk: kari läheb mõne baasi südame (tuuma) kallale
+        if (e.raid) {
+          const c = e.raid.core;
+          if (!c || !c.alive || (e.raid.t += dt) > 260) { e.raid = null; e.path = null; }
+          else {
+            const d = Math.hypot(c.pos.x - e.pos.x, c.pos.z - e.pos.z);
+            e.speed = 4.2;
+            if (d > 4.2) { if (!e.path || Ents.arrived(e) || Math.random() < dt * 0.3) Ents.goTo(e, c.pos.x + rand(-2.5, 2.5), c.pos.z + rand(-2.5, 2.5)); Ents.stepMove(e, dt, 4.2); }
+            else { Ents.face(e, c.pos.x, c.pos.z, dt, 5); e.moveAmt = Math.max(0, e.moveAmt - dt * 4); if (e.cool <= 0) { Ents.damage(c, 14, e); e.cool = 1.5; e.swing = 0.35; Audio2.crab(e.pos.x, e.pos.z); FX.goo(c.pos.x, c.pos.y + 1.5, c.pos.z, [0.55, 1.0, 0.2], 4); } }
+            return;
+          }
+        }
         // rahulik uitamine karja kodu ümber
         if (!e.path || Ents.arrived(e) || e.stateT <= 0) {
           e.stateT = rand(4, 11);
@@ -105,7 +117,7 @@ const Aliens = (() => {
     // raskelt haavatud kull põgeneb pessa
     if (e.hp < e.maxHp * 0.25) { e.state = 'roam'; e.target = null; e.stateT = 8; Ents.goTo(e, e.home.x + rand(-8, 8), e.home.z + rand(-8, 8)); e.flee = 6; return; }
     const t = e.target;
-    if (!t || !t.alive || t.inVehicle || e.stateT <= 0 || Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z) > 48 || Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) > LEASH) {
+    if (!t || !t.alive || t.inVehicle || e.stateT <= 0 || Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z) > 48 || (!e.raid && Math.hypot(e.pos.x - e.home.x, e.pos.z - e.home.z) > LEASH)) {
       e.state = 'roam'; e.target = null; e.path = null; return;
     }
     const d = Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z);
@@ -172,13 +184,28 @@ const Aliens = (() => {
     }
   }
 
+  let raidT = DAY_LEN * 1.2;
+  function launchRaid() {
+    const cores = Ents.list.filter((c) => c.kind === 'core' && c.alive);
+    if (!cores.length) return false;
+    const core = pick(cores);
+    // lähim kari valitud tuumale
+    const al = nearestPack(core.pos.x, core.pos.z, 900); if (!al) return false;
+    const n = Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack);
+    for (const o of n) { o.raid = { core, t: 0 }; o.home = { x: core.pos.x, z: core.pos.z }; o.state = 'roam'; o.path = null; }
+    if (core.playerCore) { UI.msg('Acid mantises are heading for your base core! (' + n.length + ')', 'danger'); Audio2.alarm && Audio2.alarm(); }
+    return true;
+  }
+  function nearestPack(x, z, r) { return Ents.list.filter((e) => e.kind === 'alien' && e.alive && !e.raid && Math.hypot(e.pos.x - x, e.pos.z - z) < r).sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z))[0] || null; }
   function tick(dt) {
+    raidT -= dt;
+    if (raidT <= 0) { raidT = DAY_LEN * rand(0.9, 1.6); if (G.time.day >= 2) launchRaid(); }
     spawnT -= dt;
     if (spawnT <= 0) { spawnT = 45; populate(packs() === 0); }
     // happeklombi pritsmed: maandudes kahjustab lähedal olijaid veidi
     for (const e of Ents.list) if (e.kind === 'alien' && !e.alive && e.deathT > 300) { e.remove = true; e.harvestable = false; }
   }
-  function reset() { spawnT = 2; }
+  function reset() { spawnT = 2; raidT = DAY_LEN * 1.2; }
 
-  return { initMeshes, update, hurt, onKill, harvest, spheres, isThreat, draw, drawProjs, tick, reset, populate, ACID_PRICE, nearestPack: (x, z, r) => Ents.list.filter((e) => e.kind === 'alien' && e.alive && Math.hypot(e.pos.x - x, e.pos.z - z) < r).sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z))[0] || null };
+  return { initMeshes, update, hurt, onKill, harvest, spheres, isThreat, draw, drawProjs, tick, reset, populate, launchRaid, ACID_PRICE, nearestPack: (x, z, r) => Ents.list.filter((e) => e.kind === 'alien' && e.alive && Math.hypot(e.pos.x - x, e.pos.z - z) < r).sort((a, b) => Math.hypot(a.pos.x - x, a.pos.z - z) - Math.hypot(b.pos.x - x, b.pos.z - z))[0] || null };
 })();

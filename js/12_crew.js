@@ -47,7 +47,7 @@ function isThreatTo(t, team) {
   if (t.kind === 'stalker') return t.state !== 'buried';
   if (t.kind === 'kiskja') return true;
   if (t.kind === 'crab') return t.state === 'angry';
-  if (t.kind === 'alien') return t.state === 'hunt';
+  if (t.kind === 'alien') return t.state === 'hunt' || !!t.raid;
   if (t.kind === 'ram') return t.state === 'charge';
   if (t.kind === 'boss') return t.state !== 'sleep';
   if (t.kind === 'human' || t.kind === 'player' || t.kind === 'core' || t.kind === 'rturret') {
@@ -674,6 +674,7 @@ const Crew = (() => {
         break;
       }
       case 'insener': {
+        { const bd = Base.doors.find((d) => d.st.broken || d.st.hp < Base.DOOR_HP * 0.7 || Object.keys(d.st.hack).length); if (bd && G.res.scrap >= 5 && !(Waves.info() && Waves.info().warned && !Waves.info().done)) return { type: 'fixdoor', step: 0, d: bd, t: 0 }; }
         const dmg = [...Base.objs.values()].find((o) => ((o.type === 'kahur' || o.type === 'myyrturel') && o.hp < o.maxHp) || (o.broken && o.type === 'vanagen'));
         if (dmg && G.res.scrap >= 5) return { type: 'repair', step: 0, obj: dmg, t: 0 };
         const wb = nearestObj(e, 'toolaud', (o) => o.on);
@@ -1296,6 +1297,19 @@ const Crew = (() => {
         e.hasGun = true;
         if (k.step === 0) { const h = homeTarget(e); if (h) goObj(e, h); else Ents.goTo(e, 0, 0); k.step = 1; setAct(e, 'Bringing the loot home'); }
         else if (Ents.stepMove(e, dt, sp) || Base.isInside(e.pos.x, e.pos.z) && Math.hypot(e.pos.x, e.pos.z) < 30) { deposit(e); k.done = true; }
+        return;
+      }
+      case 'fixdoor': {   // insener parandab lõhutud/häkitud ukse
+        const d = k.d;
+        if (!d || !Base.doors.includes(d)) { k.done = true; return; }
+        if (k.step === 0) { e._noRide = true; Ents.goTo(e, d.x + d.nx * 1.2, d.z + d.nz * 1.2); e._noRide = false; k.step = 1; setAct(e, 'Going to fix a door'); }
+        else if (k.step === 1) { if (Ents.stepMove(e, dt, sp) || Math.hypot(d.x - e.pos.x, d.z - e.pos.z) < 2) { k.step = 2; k.t = 0; } }
+        else {
+          setAct(e, 'Repairing a door'); e.gesture = 'fix'; e.hasGun = false; Ents.face(e, d.x, d.z, dt);
+          if (Math.random() < 0.25) FX.repair(d.x + rand(-0.5, 0.5), Base.OY + 1.2, d.z + rand(-0.5, 0.5));
+          k.t += dt * workMult(c);
+          if (k.t > 5) { if (G.res.scrap >= 5) { G.res.scrap -= 5; Base.repairDoor(d); } e.gesture = null; k.done = true; }
+        }
         return;
       }
       case 'repair': case 'craft': case 'cook': case 'scan': case 'refine': case 'steal': case 'leisure': {

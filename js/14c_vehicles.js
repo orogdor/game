@@ -5,7 +5,7 @@ const Vehicles = (() => {
   // istmed kohalikus ruumis (+z ette, +x vasakule): 0 = juht, 1 = kuulipildur (bagi) / kõrvalistuja (veok)
   const DEF = {
     buggy: { name: 'Buggy', desc: 'Fast, two seats, rear machine gun, small cargo box.', hp: 450, maxSpeed: 19, rev: 6, accel: 8.5, brake: 20, wheelBase: 2.5, cargoCap: 200, cost: { c: 900, s: 120 },
-      gun: { x: 0, y: 1.92, z: -0.75 }, seats: [{ x: 0.42, y: 0.62, z: 0.15, sit: true }, { x: 0, y: 0.72, z: -1.15, sit: false }],
+      gun: { x: 0, y: 2.3, z: -0.75 }, seats: [{ x: 0.42, y: 0.62, z: 0.15, sit: true }, { x: 0, y: 1.06, z: -1.15, sit: false }],
       wheels: [[0.86, 0.45, 1.18], [-0.86, 0.45, 1.18], [0.86, 0.45, -1.12], [-0.86, 0.45, -1.12]], wheelS: 1, mesh: 'body', len: 0.9 },
     hauler: { name: 'Hauler truck', desc: 'Slow and tough: big cargo bed for hauling diamonds, ore and scrap. Two seats, no gun.', hp: 800, maxSpeed: 14, rev: 5, accel: 6, brake: 16, wheelBase: 3.3, cargoCap: 600, cost: { c: 1400, s: 220 },
       gun: null, seats: [{ x: 0.45, y: 1.0, z: 1.25, sit: true }, { x: -0.45, y: 1.0, z: 1.25, sit: true }],
@@ -93,8 +93,8 @@ const Vehicles = (() => {
     for (let k = 0; k < 4; k++) { const x = -0.42 + k * 0.28; discZ(x, 1.86, 0.52, 0.06, 0.04, [1, 0.97, 0.85], MAT.GLOW); }
     // peeglid, antenn + lipp
     for (const sx of [1, -1]) { tube(sx * 0.68, 1.12, 0.78, sx * 0.86, 1.18, 0.72, 0.02); b.color(DARK, MAT.METAL).box(sx * 0.9, 1.2, 0.72, 0.1, 0.12, 0.05); b.color([0.5, 0.6, 0.65], MAT.METAL).box(sx * 0.9, 1.2, 0.69, 0.08, 0.1, 0.01); }
-    b.color(DARK).cyl(-0.62, 1.72, -0.35, 0.012, 0.008, 1.25, 6, true);
-    b.color(RED, MAT.PAINTED).box(-0.62, 2.85, -0.47, 0.01, 0.16, 0.24); b.color(YEL, MAT.PAINTED).box(-0.622, 2.85, -0.47, 0.012, 0.05, 0.24);
+    b.color(DARK).cyl(-0.72, 0.96, -1.56, 0.012, 0.008, 1.9, 6, true);                         // antenn taga (ei sega laskurit)
+    b.color(RED, MAT.PAINTED).box(-0.72, 2.75, -1.68, 0.01, 0.16, 0.24); b.color(YEL, MAT.PAINTED).box(-0.722, 2.75, -1.68, 0.012, 0.05, 0.24);
     // istmed (kopp-istmed) + rihmad
     for (const x of [0.42, -0.42]) {
       b.color(SEAT, MAT.MATTE).boxB(x, 0.54, 0.08, 0.5, 0.12, 0.52);
@@ -120,8 +120,9 @@ const Vehicles = (() => {
     for (const x of [-0.42, -0.58]) { b.color(RED, MAT.PAINTED).boxB(x, 0.66, -1.38, 0.14, 0.38, 0.26); b.color(DARK).box(x, 1.06, -1.32, 0.04, 0.04, 0.06); }   // kanistrid
     for (const sx of [0.5, -0.5]) { tube(sx, 0.45, -1.45, sx * 1.08, 0.5, -1.72, 0.05, CHROME); tube(sx * 1.08, 0.5, -1.72, sx * 1.08, 1.0, -1.74, 0.05, CHROME); b.color(DARK).cyl(sx * 1.08, 0.98, -1.74, 0.055, 0.06, 0.06, 10, true); }
     for (const x of [0.62, -0.62]) b.color([1, 0.1, 0.05], MAT.GLOW).box(x, 0.78, -1.6, 0.16, 0.08, 0.03);
-    b.color(STEEL, MAT.METAL).cyl(0, 0.66, -0.75, 0.08, 0.06, 1.12, 10, true);                  // kuulipilduja post
-    b.color(DARK, MAT.METAL).cyl(0, 1.7, -0.75, 0.16, 0.16, 0.06, 14, true);
+    b.color(STEEL, MAT.METAL).cyl(0, 0.66, -0.75, 0.08, 0.06, 1.5, 10, true);                   // kuulipilduja post (kõrge: laskur näeb üle katuse)
+    b.color(DARK, MAT.METAL).cyl(0, 2.08, -0.75, 0.16, 0.16, 0.06, 14, true);
+    b.color(GUNM, MAT.METAL).boxB(0, 0.66, -1.15, 0.6, 0.38, 0.5);                             // laskuri astmealus
     b.push().tf(0, 0.86, -1.68, 0, Math.PI / 2, 0).color(DARK, MAT.MATTE).cyl(0, -0.12, 0, 0.36, 0.36, 0.24, 16, true).color(STEEL, MAT.METAL).cyl(0, -0.13, 0, 0.18, 0.18, 0.26, 10, true).pop();   // varuratas
     M.body = b.build();
 
@@ -215,7 +216,7 @@ const Vehicles = (() => {
     b.color(STEEL, MAT.WORN).box(0, 0.02, 0.85, 0.07, 0.07, 0.9);
     b.color(DARK).box(0, 0.02, 1.32, 0.11, 0.11, 0.12);
     b.color([0.3, 0.32, 0.25], MAT.WORN).box(0.17, -0.06, 0.15, 0.16, 0.2, 0.3);   // padrunikast
-    b.color(STEEL, MAT.WORN).box(0, 0.1, -0.12, 0.6, 0.45, 0.04);                  // kilp
+    b.color(STEEL, MAT.WORN).box(0, -0.02, -0.12, 0.6, 0.22, 0.04);                // madal kilp (ei varja vaadet)
     b.color(DARK).box(0, -0.12, -0.32, 0.05, 0.05, 0.3);
     M.gun = b.build();
     // tõstuk (garaaži sisseseade): 4 x 6 m põrand, esikülg +z (garaažiuks)
@@ -275,7 +276,7 @@ const Vehicles = (() => {
       else vF -= Math.sign(vF) * Math.min(Math.abs(vF), (1.4 + Math.abs(vF) * 0.3) * dt);
       if (v.hand) vF -= Math.sign(vF) * Math.min(Math.abs(vF), 4.5 * dt);
       // kalle: ülesmäge aeglustab, allamäge kiirendab
-      vF += 9.8 * Math.sin(v.pitch) * 0.75 * dt;
+      vF += 9.8 * Math.sin(v.pitch) * (v.pitch < 0 && thr > 0.05 ? 0.35 : 0.75) * dt;   // ülesmäge veojõud kompenseerib suurema osa kaldest
       // liiv pidurdab rohkem kui baasi põrand
       vF -= vF * (paved ? 0.02 : 0.06) * dt;
       vF = clamp(vF, -d.rev, d.maxSpeed * sand * 1.1);
@@ -315,7 +316,7 @@ const Vehicles = (() => {
     }
     // järsk kalju: ei sõida üles
     const nh = World.heightAt(nx, nz), hd = Math.hypot(nx - ox, nz - oz);
-    if (!v.air && hd > 1e-4 && nh - oh > hd * 1.0 && !Bases.at(nx, nz)) { nx = ox; nz = oz; v.vx *= 0.3; v.vz *= 0.3; }
+    if (!v.air && hd > 1e-4 && nh - oh > hd * 1.7 && !Bases.at(nx, nz)) { nx = ox; nz = oz; v.vx *= 0.3; v.vz *= 0.3; }
     v.x = clamp(nx, -World.HALF + 14, World.HALF - 14); v.z = clamp(nz, -World.HALF + 14, World.HALF - 14);
     // vertikaal: vedrustus maas, ballistika õhus (düünihüpped)
     const gy = groundAt(v.x, v.z, v.y);

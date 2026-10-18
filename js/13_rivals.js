@@ -160,7 +160,7 @@ const Rivals = (() => {
     // kohad, kuhu tube ei ehitata (tuum, kahurid, masinad)
     r.keep = [[cx, cz, 11]];
     for (const s of r.structs) if (s.mesh !== MODELS.obj.barrikaad) r.keep.push([s.m[12], s.m[14], 5.5]);
-    r.bb = createBase({ ox, oy: cy, oz, player: false, accent: r.id === 'krell' ? [1.0, 0.18, 0.1] : [0.75, 0.3, 1.0], style: r.id === 'krell' ? 6 : 1, doorToward: { x: cx, z: cz } });
+    r.bb = createBase({ ox, oy: cy, oz, player: false, team: r.team, accent: r.id === 'krell' ? [1.0, 0.18, 0.1] : [0.75, 0.3, 1.0], style: r.id === 'krell' ? 6 : 1, doorToward: { x: cx, z: cz } });
     Bases.list.push(r.bb);
     r.buildT = r.buildT || rand(50, 80);
     if (fromSave && r.bbData) { r.bb.deserialize(r.bbData); r.bbData = null; }
@@ -322,6 +322,15 @@ const Rivals = (() => {
         break;
       }
       case 'raid': {
+        if (!e.raidGo && pcore && pcore.alive) {
+          // peamine siht: baasi süda (tuum). Kui see hävib, on mängijal kõik läbi.
+          const a = rand(0, TAU); Ents.goTo(e, pcore.pos.x + Math.sin(a) * 9, pcore.pos.z + Math.cos(a) * 9); e.raidGo = true; e.raidCore = true;
+        }
+        if (e.raidCore && pcore && pcore.alive) {
+          const d = Math.hypot(pcore.pos.x - e.pos.x, pcore.pos.z - e.pos.z);
+          if (d < 14) { e.threat = pcore; e.path = null; } else Ents.stepMove(e, dt, sp);
+          break;
+        }
         if (!e.raidGo) {
           const h = Base.objsOfType('hoidla')[0];
           if (h) { const cells = Base.useCells(h).map((c) => [c[0], c[1]]); e.goalCells = cells; Ents.goTo(e, h.cx, h.cz, cells); e.raidObj = h; }
@@ -546,6 +555,7 @@ const Rivals = (() => {
       if (r.res.cr >= bill) r.res.cr -= bill;
       else { const canPay = Math.floor(r.res.cr / (WAGE + FOOD_CR)); r.res.cr -= canPay * (WAGE + FOOD_CR); const quit = r.men - canPay; r.men = canPay; for (const u of unitsOf(r).slice(0, Math.max(0, unitsOf(r).length - r.men))) u.remove = true; if (quit > 0) UI.msg('Radio: ' + quit + ' of ' + r.short + '\'s unpaid mercenaries walked out.', 'rival'); }
       r.slots = 3;
+      if (r.bb) r.bb.repairAllDoors();   // öösel parandatakse lõhutud/häkitud uksed
       topUpGuards(r);
       buyScrap(r);
     }

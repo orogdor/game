@@ -99,6 +99,26 @@ function createBase(opt) {
   opt = opt || {};
   const N = 40, CS = 2, WH = 3.0, WT = 0.2, FLOOR_Y = 0.1, LOW_H = 0.85;
   const OX = opt.ox || 0, OZ = opt.oz || 0, OY = opt.oy || 0;
+  // ---------- uksed: lukus võõrastele; saab lõhkuda (hp) või häkkida (30 s) ----------
+  const OWNER = opt.team || 'crew', DOOR_HP = 320;
+  const doorSt = new Map();   // ekey -> { hp, broken, hack: {team: true}, hackP: {team: s} }
+  const teamOf = (ent) => (!ent ? null : ent.kind === 'player' || ent.team === 'player' ? 'crew' : ent.team);
+  function doorState(k) { let st = doorSt.get(k); if (!st) { st = { hp: DOOR_HP, broken: false, hack: {}, hackP: {} }; doorSt.set(k, st); } return st; }
+  function doorBlocks(st, ent) {
+    if (st.broken) return false;
+    const tm = teamOf(ent);
+    if (!tm) return true;
+    if (tm === OWNER) return false;
+    return !st.hack[tm];
+  }
+  function damageDoor(st, amt, src) {
+    if (st.broken || amt <= 0) return;
+    st.hp -= amt;
+    if (st.hp <= 0) {
+      st.hp = 0; st.broken = true;
+      if (OWNER === 'crew' && typeof UI !== 'undefined') UI.msg('A door of your base was smashed in!', 'danger');
+    }
+  }
   const X0 = OX - 40, Z0 = OZ - 40;
   const IS_PLAYER = !!opt.player;
   const ACCENT = opt.accent || [1.0, 0.55, 0.16];
@@ -960,10 +980,11 @@ function createBase(opt) {
         }
         const [p0x, p0z] = P(0), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff), [p3x, p3z] = P(L);
         addWallCol(p0x, p0z, p1x, p1z, 0, WH); addWallCol(p2x, p2z, p3x, p3z, 0, WH); addWallCol(p1x, p1z, p2x, p2z, 2.3, WH);
-        const dcol = { t: 's', ax: p1x, az: p1z, bx: p2x, bz: p2z, r: 0.1, y0: OY, y1: OY + 2.3, kind: 'door', door: true, noRay: true };
+        const dst = doorState(key);
+        const dcol = { t: 's', ax: p1x, az: p1z, bx: p2x, bz: p2z, r: 0.1, y0: OY, y1: OY + 2.3, kind: 'door', door: true, noRay: true, st: dst, blocks: (ent) => doorBlocks(dst, ent), hurt: (amt, src) => damageDoor(dst, amt, src), off: dst.broken };
         colliders.push(dcol);
         const ext = extSide;
-        doors.push({ x: mx, z: mz, t, ux, uz, k: dw / 1.4, open: 0, col: dcol, m1: M4.create(), m2: M4.create(), ext, nx: nx * extSide, nz: nz * extSide, lm: M4.create() });
+        doors.push({ x: mx, z: mz, t, ux, uz, k: dw / 1.4, open: 0, col: dcol, st: dst, key, m1: M4.create(), m2: M4.create(), ext, nx: nx * extSide, nz: nz * extSide, lm: M4.create() });
       } else if (op === 'window') {
         const W_ = wide.has(key), ww = W_ ? 1.7 : 1.5, sOff = (L - ww) / 2, y0w = W_ ? 0.6 : 1.0, y1w = W_ ? 2.45 : 2.0;
         seg(0, L, 0, y0w, false); seg(0, L, y1w, WH, false); seg(0, sOff, y0w, y1w, false); seg(L - sOff, L, y0w, y1w, false);
@@ -1311,8 +1332,9 @@ function createBase(opt) {
   function update(dt, humans) {
     if (dirty) rebuild();
     for (const d of doors) {
-      let near = false;
-      for (const h of humans) if (h.alive !== false && Math.abs(h.pos.x - d.x) < 2.4 && Math.abs(h.pos.z - d.z) < 2.4 && Math.abs(h.pos.y - OY) < 3) { near = true; break; }
+      let near = d.st.broken;
+      d.col.off = d.st.broken;
+      if (!near) for (const h of humans) if (h.alive !== false && Math.abs(h.pos.x - d.x) < 2.4 && Math.abs(h.pos.z - d.z) < 2.4 && Math.abs(h.pos.y - OY) < 3 && !doorBlocks(d.st, h)) { near = true; break; }
       const prev = d.open;
       d.open = clamp(d.open + (near ? dt * 3.5 : -dt * 2.2), 0, 1);
       if (prev < 0.05 && d.open >= 0.05 && typeof Audio2 !== 'undefined') Audio2.door(d.x, d.z);
@@ -1330,11 +1352,11 @@ function createBase(opt) {
       o.anim += dt; if (o.cool > 0) o.cool -= dt;
       if (OBJ[o.type].gate) {
         let near = false;
-        const locked = typeof Waves !== 'undefined' && Waves.active() || !o.on, R = 2.5 + o.w * CS * 0.5;
+        const locked = typeof Waves !== 'undefined' && Waves.active(), R = 2.5 + Math.max(o.w, o.h) * CS * 0.5, slowG = o.on === false ? 0.45 : 1;   // ilma vooluta avaneb käsitsi aeglaselt
         if (!locked) for (const h of humans) if (h.alive !== false && (h.kind === 'player' || h.team === 'crew') && Math.abs(h.pos.x - o.cx) < R && Math.abs(h.pos.z - o.cz) < R) { near = true; break; }
         if (!near && !locked && typeof Vehicles !== 'undefined') { const v = Vehicles.near(o.cx, o.cz, R + 5); if (v && v.team === 'crew') near = true; }
         const prev = o.open || 0;
-        o.open = clamp(prev + (near ? dt * 1.6 : -dt * 1.2), 0, 1);
+        o.open = clamp(prev + (near ? dt * 1.6 * slowG : -dt * 1.2), 0, 1);
         if (o.col) o.col.off = o.open > 0.6;
         if ((prev < 0.05 && o.open >= 0.05) || (prev > 0.95 && o.open <= 0.95)) Audio2.door(o.cx, o.cz);
       }
@@ -1481,7 +1503,7 @@ function createBase(opt) {
   function reset() {
     roomJob.clear();
     cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); voids.clear(); upWalls.clear(); upOpen.clear(); upRoomCell.fill(0); upRooms.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
-    nextRoomId = 1; nextObjId = 1; dirty = true;
+    nextRoomId = 1; nextObjId = 1; dirty = true; doorSt.clear();
   }
   function isInside(x, z) { const c = toCell(x, z); return roomAt(c.i, c.j) > 0; }
   // põranda kõrgus; y = olija praegune kõrgus (teise korruse jaoks)
@@ -1587,10 +1609,11 @@ function createBase(opt) {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
     const jobs = []; for (const [rid, k] of roomJob) { const r = rooms.get(rid); if (r) jobs.push([r.cells[0][0], r.cells[0][1], k]); }
-    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], wide: [...wide], upWide: [...upWide], voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
+    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], wide: [...wide], upWide: [...upWide], doors: [...doorSt.entries()].filter(([, v]) => v.broken || v.hp < DOOR_HP || Object.keys(v.hack).length).map(([k, v]) => [k, v.hp, v.broken ? 1 : 0, Object.keys(v.hack)]), voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
+    for (const [k, hp, br, hk] of d.doors || []) { const st = doorState(k); st.hp = hp; st.broken = !!br; for (const t of hk || []) st.hack[t] = true; }
     if (d.v === 2) {
       for (const k of d.walls) walls.add(k);
       computeRooms();
@@ -1626,7 +1649,14 @@ function createBase(opt) {
     computeRooms();
     dirty = true;
   }
+  function lockedDoorNear(ent, r) {
+    for (const d of doors) { if (d.st.broken || Math.abs(d.x - ent.pos.x) > r || Math.abs(d.z - ent.pos.z) > r || Math.abs(ent.pos.y - OY) > 3) continue; if (doorBlocks(d.st, ent)) return d; }
+    return null;
+  }
+  function repairDoor(d) { d.st.hp = DOOR_HP; d.st.broken = false; d.st.hack = {}; d.st.hackP = {}; d.col.off = false; }
+  function repairAllDoors() { for (const st of doorSt.values()) { st.hp = DOOR_HP; st.broken = false; st.hack = {}; st.hackP = {}; } }
   return {
+    OWNER, DOOR_HP, lockedDoorNear, damageDoor, doorBlocks, repairDoor, repairAllDoors,
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
     inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, isWide, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
@@ -1643,6 +1673,42 @@ const Bases = {
   list: [Base],
   at(x, z) { for (const b of this.list) if (b.containsWorld(x, z)) return b; return null; },
   floorAt(x, z, y) { const b = this.at(x, z); return b ? b.floorAt(x, z, y) : -1e9; },
+  // lukus uks, mis takistab olendit (ainult baasi lähedal)
+  blockingDoor(e, r) {
+    for (const b of this.list) {
+      if (!b.lockedDoorNear || Math.abs(e.pos.x - b.OX) > 60 || Math.abs(e.pos.z - b.OZ) > 60) continue;
+      const d = b.lockedDoorNear(e, r);
+      if (d) return { b, d };
+    }
+    return null;
+  },
+  // võõras ukse ees: inimene häkib (30 s) või tulistab, tulnukas kraabib/hammustab
+  attackDoor(e, dd, dt) {
+    const d = dd.d, st = d.st, b = dd.b;
+    e.moveAmt = Math.max(0, (e.moveAmt || 0) - dt * 4);
+    Ents.face(e, d.x, d.z, dt, 8);
+    const tm = e.kind === 'player' || e.team === 'player' ? 'crew' : e.team;
+    if (e.kind === 'human') {
+      if (e.hackPref === undefined) e.hackPref = Math.random() < 0.5;
+      if (e.hackPref && !e.threat) {
+        st.hackP[tm] = (st.hackP[tm] || 0) + dt; e.gesture = 'interact'; e.hasGun = false;
+        if (Math.random() < dt * 2) FX.sparks(d.x, b.OY + 1.2, d.z, [0.4, 0.8, 1], 2, 1.5);
+        if (st.hackP[tm] >= 30) { st.hack[tm] = true; if (b.OWNER === 'crew') UI.msg('Intruders hacked a door lock of your base!', 'danger'); }
+        return;
+      }
+      e.gesture = null; e.hasGun = true; e.aim = 1;
+      e.doorCool = (e.doorCool || 0) - dt;
+      if (e.doorCool <= 0) {
+        e.doorCool = rand(0.45, 0.65);
+        b.damageDoor(st, e.dmg || 11, e);
+        FX.tracer(e.pos.x, e.pos.y + 1.35, e.pos.z, d.x, b.OY + 1.2, d.z, [1, 0.45, 0.3, 0.9]); FX.impact(d.x, b.OY + 1.2, d.z, 'metal');
+        Audio2.shoot('enemy', e.pos.x, e.pos.z);
+      }
+    } else {
+      e.doorCool = (e.doorCool || 0) - dt;
+      if (e.doorCool <= 0) { e.doorCool = 1.2; b.damageDoor(st, e.kind === 'alien' ? 22 : 15, e); e.swing = 0.35; FX.impact(d.x, b.OY + 1.0, d.z, 'metal'); Audio2.land && Audio2.land(); }
+    }
+  },
   isInsideAny(x, z) { const b = this.at(x, z); return !!(b && b.isInside(x, z)); },
   pathWorld(ax, az, bx, bz, goalCells) {
     if (goalCells) return Base.pathWorld(ax, az, bx, bz, goalCells);

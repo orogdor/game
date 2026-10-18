@@ -443,7 +443,7 @@ const World = (() => {
     for (let it = 0; it < 3; it++) {
       for (const c of list) {
         if (c.y1 < y0 || c.y0 > y1 || c.off) continue;
-        if (ignoreDoors && c.door) continue;
+        if (ignoreDoors && c.door && (ignoreDoors === true || !c.blocks || !c.blocks(ignoreDoors))) continue;   // lukus uks peatab võõra
         if (c.t === 'c') {
           const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz), m = r + c.r;
           if (d < m) { const k = d > 0.0001 ? (m - d) / d : 0; p.x += dx * k + (d > 0.0001 ? 0 : m); p.z += dz * k; hit = true; }
@@ -491,7 +491,7 @@ const World = (() => {
     }
     let best = maxT, bc = null;
     for (const c of cand) {
-      if (c.off || c.noRay) continue;
+      if (c.off || (c.noRay && !(c.door && c.hurt && filter && filter.hitDoors))) continue;
       if (filter && !filter(c)) continue;
       let t = -1;
       if (c.t === 'c') {

@@ -67,7 +67,7 @@ const Player = {
     this.vel.z += (wz * spd - this.vel.z) * Math.min(1, dt * acc);
     const ox = this.pos.x, oz = this.pos.z, oh = World.heightAt(ox, oz);
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
-    World.collideCircle(this.pos, this.radius, this.pos.y + 0.35, this.pos.y + 1.75, true);
+    World.collideCircle(this.pos, this.radius, this.pos.y + 0.35, this.pos.y + 1.75, this);
     // järsud kaljuseinad: üles ei saa ronida, kaldalt libised alla
     if (!Base.isInside(this.pos.x, this.pos.z)) {
       const nh = World.heightAt(this.pos.x, this.pos.z), hd = Math.hypot(this.pos.x - ox, this.pos.z - oz);
@@ -185,7 +185,9 @@ const Player = {
     // maailm
     let wt = World.raycastTerrain(e.x, e.y, e.z, dx, dy, dz, st.range);
     let wkind = 'sand';
-    const hc = World.raycastCols(e.x, e.y, e.z, dx, dy, dz, wt >= 0 ? wt : st.range, (c) => !c.door);
+    const doorF = (c) => !c.door || (c.blocks && c.blocks(this)); doorF.hitDoors = true;
+    const hc = World.raycastCols(e.x, e.y, e.z, dx, dy, dz, wt >= 0 ? wt : st.range, doorF);
+    if (hc && hc.col.hurt) { hc.col.hurt(st.dmg, this); UI.hitMarker && UI.hitMarker(false); }
     if (hc) { wt = hc.t; wkind = hc.col.kind === 'rock' ? 'sand' : 'metal'; }
     if (wt < 0) wt = st.range;
     // olemid
@@ -343,6 +345,15 @@ const Player = {
       if (Math.abs(e.pos.x - px) > 3 || Math.abs(e.pos.z - pz) > 3) continue;
       const f = e.crew.follow;
       consider({ key: 'f' + e.id + (f ? 'y' : 'n'), label: f ? 'Send back to work' : 'Ask to follow', sub: e.crew.name + ' · ' + (e.crew.act || ''), act: () => Crew.setFollow(e, !f) }, e.pos.x, e.pos.z, 2.6);
+    }
+    // võõra baasi lukus uks: häki (hoia E 30 s) või tulista katki; oma lõhutud uks: paranda
+    for (const b of Bases.list) {
+      if (!b.doors || Math.abs(px - b.OX) > 60 || Math.abs(pz - b.OZ) > 60) continue;
+      for (const d of b.doors) {
+        if (Math.abs(d.x - px) > 2.6 || Math.abs(d.z - pz) > 2.6) continue;
+        if (b.OWNER !== 'crew' && b.doorBlocks(d.st, this)) consider({ key: 'hk' + d.key, label: 'Hack the door lock', sub: 'Hold E for 30 s (or shoot the door: ' + Math.ceil(d.st.hp) + ' hp)', hold: 30, act: () => { d.st.hack.crew = true; UI.toast('Lock hacked – the door opens for you and your crew'); Audio2.door(d.x, d.z); }, tick: () => { if (Math.random() < 0.15) FX.sparks(d.x, b.OY + 1.2, d.z, [0.4, 0.8, 1], 2, 1.5); } }, d.x, d.z, 2.6);
+        else if (b.OWNER === 'crew' && (d.st.broken || d.st.hp < b.DOOR_HP || Object.keys(d.st.hack).length)) consider({ key: 'rd' + d.key, label: 'Repair the door', sub: (d.st.broken ? 'smashed' : Object.keys(d.st.hack).length ? 'lock hacked' : Math.ceil(d.st.hp) + ' hp') + ' · 5 scrap', hold: 2.5, act: () => { if (G.res.scrap < 5) { UI.toast('Not enough scrap'); Audio2.deny(); return; } G.res.scrap -= 5; b.repairDoor(d); Audio2.repair(); UI.toast('Door repaired and locked'); }, tick: () => FX.repair(d.x + rand(-0.5, 0.5), b.OY + 1.2, d.z + rand(-0.5, 0.5)) }, d.x, d.z, 2.6);
+      }
     }
     // korjused
     for (const e of Ents.list) {
