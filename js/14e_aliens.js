@@ -4,7 +4,7 @@
 // ============================================================
 const Aliens = (() => {
   const ACID_PRICE = 16;               // ₵ tükk (terminalis)
-  const MAX_PACKS = 9, HOME_R = 26, AGGRO_R = 15, LEASH = 70;
+  const MAX_PACKS = 9, HOME_R = 26, AGGRO_R = 22, LEASH = 70;
   let M = null, spawnT = 3;
   const R = M4.create();
 
@@ -58,7 +58,7 @@ const Aliens = (() => {
     const id = 'p' + Math.random().toString(36).slice(2, 7), n = randi(2, 3);
     for (let k = 0; k < n; k++) {
       const a = rand(0, TAU), r = rand(2, 7);
-      Ents.spawn('alien', 'wild', x + Math.cos(a) * r, z + Math.sin(a) * r, { maxHp: 32, radius: 0.9, speed: 0, state: 'roam', home: { x, z }, pack: id, cool: rand(0, 2), hitY: 1.1, hitR: 0.8 });
+      Ents.spawn('alien', 'wild', x + Math.cos(a) * r, z + Math.sin(a) * r, { maxHp: 55, radius: 0.9, speed: 0, state: 'roam', home: { x, z }, pack: id, cool: rand(0, 2), hitY: 1.1, hitR: 0.8 });
     }
   }
   function farFromBases(x, z, d) { if (Math.hypot(x, z) < d) return false; for (const r of Rivals.list) if (r.base && Math.hypot(x - r.base.x, z - r.base.z) < d) return false; return true; }
@@ -89,7 +89,7 @@ const Aliens = (() => {
     e.stateT -= dt;
     if (e.flee > 0) { e.flee -= dt; Ents.stepMove(e, dt, 5); e.speed = 5; return; }
     if (e.state !== 'hunt') {
-      const t = e.hp < e.maxHp * 0.25 ? null : nearestHuman(e, AGGRO_R);
+      const t = e.hp < e.maxHp * 0.25 ? null : nearestHuman(e, e.raid ? 3.5 : AGGRO_R);   // rüüsteretkel: süda on tähtsam kui inimesed
       if (t) { e.state = 'hunt'; e.target = t; e.stateT = 18; Audio2.stalker(e.pos.x, e.pos.z); alertPack(e, t); }
       else {
         // rüüsteretk: kari läheb mõne baasi südame (tuuma) kallale
@@ -126,14 +126,14 @@ const Aliens = (() => {
     e.speed = 5.6;
     if (d > 2.2) { if (!e.path || Math.random() < dt * 2) { e.path = [{ x: t.pos.x, z: t.pos.z }]; e.pathI = 0; } Ents.stepMove(e, dt, d > 9 ? 5.6 : 4.2); }
     else e.moveAmt = Math.max(0, e.moveAmt - dt * 4);
-    if (d < 2.6 && e.cool <= 0) { Ents.damage(t, 7 * G.dk.edmg, e); e.cool = 1.9; e.swing = 0.35; Audio2.crab(e.pos.x, e.pos.z); e.stateT = 18; }
+    if (d < 2.6 && e.cool <= 0) { Ents.damage(t, 11 * G.dk.edmg, e); e.cool = 1.6; e.swing = 0.35; Audio2.crab(e.pos.x, e.pos.z); e.stateT = 18; }
     else if (d > 6 && d < 24 && e.cool <= 0 && Math.random() < dt * 1.5) {
       // happesülg: kaarega klomp, pritsib maandumisel
-      e.cool = rand(3.5, 5); e.spit = 0.4;
+      e.cool = rand(2.4, 3.6); e.spit = 0.4;
       const tx = t.pos.x + (t.vel ? t.vel.x * 0.4 : 0), tz = t.pos.z + (t.vel ? t.vel.z * 0.4 : 0);
       const sx = e.pos.x + Math.sin(e.yaw) * 0.8, sy = e.pos.y + 1.6, sz = e.pos.z + Math.cos(e.yaw) * 0.8;
       const dist = Math.hypot(tx - sx, tz - sz), T = clamp(dist / 18, 0.45, 1.5), ty = Ents.groundY ? Ents.groundY(tx, tz) + 0.9 : World.heightAt(tx, tz) + 0.9;
-      Ents.projs.push({ x: sx, y: sy, z: sz, vx: (tx - sx) / T, vy: (ty - sy) / T + 0.5 * 14 * T, vz: (tz - sz) / T, g: 14, life: 3, dmg: 6 * G.dk.edmg, owner: e, kind: 'acid', r: 0.35, delay: 0 });
+      Ents.projs.push({ x: sx, y: sy, z: sz, vx: (tx - sx) / T, vy: (ty - sy) / T + 0.5 * 14 * T, vz: (tz - sz) / T, g: 14, life: 3, dmg: 9 * G.dk.edmg, owner: e, kind: 'acid', r: 0.35, delay: 0 });
       Audio2.stalker(e.pos.x, e.pos.z);
     }
   }
@@ -192,7 +192,11 @@ const Aliens = (() => {
     const core = pick(cores);
     // lähim kari valitud tuumale
     const al = nearestPack(core.pos.x, core.pos.z, 900); if (!al) return false;
-    const n = Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack);
+    // mängija baasi puhul: mitu karja korraga, sõltuvalt baasi suurusest
+    const packsN = core.playerCore ? 1 + Math.floor(Base.sizeScore() / 45) : 1;
+    const ids = [al.pack];
+    for (let k = 1; k < packsN; k++) { const q = Ents.list.filter((e) => e.kind === 'alien' && e.alive && !e.raid && !ids.includes(e.pack) && Math.hypot(e.pos.x - core.pos.x, e.pos.z - core.pos.z) < 1100).sort((a, b) => Math.hypot(a.pos.x - core.pos.x, a.pos.z - core.pos.z) - Math.hypot(b.pos.x - core.pos.x, b.pos.z - core.pos.z))[0]; if (!q) break; ids.push(q.pack); }
+    const n = Ents.list.filter((o) => o.kind === 'alien' && o.alive && ids.includes(o.pack));
     for (const o of n) { o.raid = { core, t: 0 }; o.home = { x: core.pos.x, z: core.pos.z }; o.state = 'roam'; o.path = null; }
     if (core.playerCore) { UI.msg('The Stoneheart\'s workers are marching on your base heart! (' + n.length + ' acid mantises)', 'danger'); Audio2.alarm && Audio2.alarm(); }
     return true;

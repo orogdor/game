@@ -925,7 +925,7 @@ const UI = (() => {
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>
       <h4>Building</h4><p>Drag out a room on the floor like in The Sims. A door appears by itself; you can add more doors and windows. Put items in rooms: beds, table, stove, workbench, scanner. Cannons, solar panels, radar and floodlights go outside. Every device needs power. Give rooms a <b>Room job</b> (barracks, canteen, workshop, lab …): when only the right items are inside, the room gives a bonus. Build the <b>Ore works</b> and buy an ore drill there to mine the reddish iron ore rocks in the desert; smelt the ore into steel scrap or sell it.</p>
       <h4>Money and food</h4><p>Comets bring raw diamonds. Collect them before the rivals and take them to the base; storage fills when you step inside. Sell them at the terminal. Desert goats give meat, which the stove turns into food. Every hire eats and wants wages every morning.</p>
-      <h4>Threats</h4><p>Sand stalkers come out at night. Spineshields won't attack if you keep your distance, but diamonds grow on their backs. Acid mantises – the Stoneheart's workers – roam in packs and now and then march on a base heart. Rival raiders go for your base heart too. Doors are locked to strangers: they must hack a lock (30 s) or shoot the door in – and so must you at their camps. <b>If a base heart is destroyed, its hum stops and a sandworm swallows the whole base.</b></p>
+      <h4>Threats</h4><p>Sand stalkers come out at night. Spineshields won't attack if you keep your distance, but diamonds grow on their backs. Acid mantises – the Stoneheart's workers – roam in packs and now and then march on a base heart. The night swarms go for the <b>base heart</b> and the <b>loudest machines</b> (generators, factories, cannons) and chew through locked doors – they only bite people who get in their way. The bigger your base, the bigger the swarms and raids. Rival raiders go for your base heart too. Doors are locked to strangers: they must hack a lock (30 s) or shoot the door in – and so must you at their camps. <b>If a base heart is destroyed, its hum stops and a sandworm swallows the whole base.</b></p>
       <h4>Stoneheart</h4><p>Build the deep scanner to find the nest. Do not go alone: you need a full squad – at least <b>8 fighters</b> – and a <b>vehicle with a machine gun</b>. The crystal nodes on its back regrow if you stop shooting them. When they all break, the heart is exposed, but only heavy weapons (the buggy machine gun, railgun or grenade launcher) really crack it. Jump over the shockwave.</p></div>`;
   }
 
@@ -936,26 +936,78 @@ const UI = (() => {
     if (on) { $('bRes').innerHTML = resChips(); }
     else showHUD(true);
   }
-  function buildTools(S) {
-    const tools = [['level', S.level ? 'Floor 2' : 'Floor 1', 'room'], ['look', 'View', 'eye'], ['wall', 'Wall', 'room'], ['door', 'Door', 'door'], ['window', 'Window', 'window'], ['doorW', 'Wide door', 'door'], ['windowW', 'Wide window', 'window'], ['upper', '2nd floor', 'box'], ['tall', 'Tall room', 'room'], ['floor', 'Floor', 'box'], ['obj', 'Items', 'box'], ['job', 'Room job', 'room'], ['paint', 'Paint', 'brush'], ['demolish', 'Demolish', 'trash']]
-      .filter(([k]) => k !== 'floor' || S.level);
-    $('bTools').innerHTML = tools.map(([k, n, ic]) => `<button class="tool ${S.tool === k || (k === 'level' && S.level) ? 'on' : ''}" data-t="${k}">${ICON[ic]}<span>${n}</span></button>`).join('');
-    $('bTools').querySelectorAll('.tool').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));
+  // ehitusmenüü: tööriistad rühmadena (Toad / Uksed ja aknad / Esemed / Kujundus / Lammuta),
+  // esemed võrgustikus, otsing, "kõik" ja "viimati kasutatud", taskukohased eespool
+  const BGROUPS = [['rooms', 'Rooms', 'room', [['wall', 'Room / wall'], ['upper', '2nd floor'], ['tall', 'Tall room'], ['floor', 'Floor']]],
+    ['open', 'Doors & windows', 'door', [['door', 'Door'], ['doorW', 'Wide door'], ['window', 'Window'], ['windowW', 'Wide window']]],
+    ['obj', 'Items', 'box', [['obj', 'Items']]],
+    ['deco', 'Jobs & paint', 'brush', [['job', 'Room job'], ['paint', 'Paint']]],
+    ['demolish', 'Demolish', 'trash', [['demolish', 'Demolish']]]];
+  const bLast = {};
+  function bGroupOf(t) { for (const g of BGROUPS) if (g[3].some(([k]) => k === t)) return g[0]; return null; }
+  function itemMatches(S, k, d) {
+    if (d.fixed) return false;
+    if (S.level && (d.where === 'out' || d.needsUpper)) return false;
+    const q = (S.q || '').trim().toLowerCase();
+    if (q) return (d.name + ' ' + (d.desc || '') + ' ' + k).toLowerCase().includes(q);
+    if (S.cat === 'all') return true;
+    if (S.cat === 'recent') return (S.recent || []).includes(k);
+    return d.cat === S.cat;
+  }
+  function renderItems(S) {
+    const el = $('bItems'); if (!el) return;
+    const list = Object.entries(OBJ).filter(([k, d]) => itemMatches(S, k, d));
+    if (S.cat === 'recent' && !(S.q || '').trim()) list.sort((a, b) => S.recent.indexOf(a[0]) - S.recent.indexOf(b[0]));
+    else list.sort((a, b) => (Build.afford(a[1].cost) ? 1 : 0) - (Build.afford(b[1].cost) ? 1 : 0));   // afford() tagastab puuduse kirjelduse
+    const cs = (have, need, unit) => (need ? `<span class="${have >= need ? 'ok' : 'no'}">${need} ${unit}</span> ` : '');
     let h = '';
+    for (const [k, d] of list) {
+      const af = Build.afford(d.cost);
+      const where = d.where === 'out' ? '<i class="tag out">outdoor</i>' : d.where === 'in' ? '<i class="tag in">indoor</i>' : '';
+      const pw = d.power > 0 ? '<i class="tag pw">' + d.power + '⚡</i>' : d.power < 0 ? '<i class="tag gen">+' + -d.power + '⚡</i>' : '';
+      const th = SIG[k] && (SIG[k][0] + SIG[k][1]) >= 3 ? '<i class="tag th">noise +' + (SIG[k][0] + SIG[k][1] + 1) + '</i>' : '';
+      const catN = (OBJ_CATS.find((c) => c[0] === d.cat) || [, ''])[1];
+      h += `<button class="item ${S.item === k ? 'on' : ''} ${af ? 'na' : ''}" data-i="${k}"><b>${d.name}</b><span class="c">${cs(G.res.scrap, d.cost.s, 'scrap')}${cs(G.res.cr, d.cost.c, '₵')}${cs(G.res.kris, d.cost.k, 'diam.')}</span><span class="tags">${where}${pw}${th}${S.cat === 'all' || S.cat === 'recent' || S.q ? '<i class="tag">' + catN + '</i>' : ''}</span><span class="d">${d.desc}</span></button>`;
+    }
+    if (!list.length) h = `<div class="bEmpty">${S.cat === 'recent' && !S.q ? 'Nothing placed yet. Pick from a category.' : 'Nothing found.'}</div>`;
+    el.innerHTML = h;
+    el.querySelectorAll('.item').forEach((b) => (b.onclick = () => {
+      Audio2.ui(); const k = b.dataset.i;
+      S.recent = [k, ...(S.recent || []).filter((x) => x !== k)].slice(0, 12);
+      try { localStorage.setItem('k73_recent', JSON.stringify(S.recent)); } catch (e) { /* ei salvesta */ }
+      Build.selectItem(k);
+    }));
+  }
+  function buildTools(S) {
+    if (!S.recent) { try { S.recent = JSON.parse(localStorage.getItem('k73_recent') || '[]'); } catch (e) { S.recent = []; } }
+    const grp = bGroupOf(S.tool);
+    if (grp) bLast[grp] = S.tool;
+    // ülemine rida: rühmad + korrus + vaade
+    let t = '<div class="bgroups">' + BGROUPS.map(([k, n, ic]) => `<button class="tool grp ${grp === k ? 'on' : ''}" data-g="${k}">${ICON[ic]}<span>${n}</span></button>`).join('') + '</div>';
+    t += `<div class="butil"><button class="tool ${S.level ? 'on' : ''}" data-t="level">${ICON.room}<span>${S.level ? 'Floor 2' : 'Floor 1'}</span></button><button class="tool ${S.tool === 'look' ? 'on' : ''}" data-t="look">${ICON.eye}<span>View</span></button></div>`;
+    $('bTools').innerHTML = t;
+    $('bTools').querySelectorAll('.grp').forEach((b) => (b.onclick = () => { Audio2.ui(); const g = BGROUPS.find((x) => x[0] === b.dataset.g); const tools = g[3].filter(([k]) => k !== 'floor' || S.level); Build.setTool(bLast[g[0]] && tools.some(([k]) => k === bLast[g[0]]) ? bLast[g[0]] : tools[0][0]); }));
+    $('bTools').querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.t); }));
+    let h = '';
+    const G0 = BGROUPS.find((x) => x[0] === grp);
+    if (G0 && G0[3].length > 1) {
+      const sub = G0[3].filter(([k]) => k !== 'floor' || S.level);
+      h += '<div id="bSub">' + sub.map(([k, n]) => `<button class="cat ${S.tool === k ? 'on' : ''}" data-s="${k}">${n}</button>`).join('') + '</div>';
+    }
     if (S.tool === 'obj') {
-      h += `<div id="bCats">${OBJ_CATS.map(([k, n]) => `<button class="cat ${S.cat === k ? 'on' : ''}" data-c="${k}">${n}</button>`).join('')}</div><div id="bItems">`;
-      for (const [k, d] of Object.entries(OBJ)) {
-        if (d.fixed || d.cat !== S.cat) continue;
-        if (S.level && (d.where === 'out' || d.needsUpper)) continue;
-        const af = Build.afford(d.cost);
-        const cs = (have, need, unit) => (need ? `<span class="${have >= need ? 'ok' : 'no'}">${need} ${unit}</span> ` : '');
-        h += `<button class="item ${S.item === k ? 'on' : ''} ${af ? 'na' : ''}" data-i="${k}"><b>${d.name}</b><span class="c">${cs(G.res.scrap, d.cost.s, 'vr')}${cs(G.res.cr, d.cost.c, '₵')}${cs(G.res.kris, d.cost.k, 'kr')}${d.power > 0 ? '· ' + d.power + '⚡' : d.power < 0 ? '· +' + -d.power + '⚡' : ''}${d.where === 'out' ? ' · outdoor' : ''}${SIG[k] && (SIG[k][0] + SIG[k][1]) >= 3 ? ' · <span style="color:#ffa04a">threat +' + (SIG[k][0] + SIG[k][1] + 1) + '</span>' : ''}</span><span class="d">${d.desc}</span></button>`;
-      }
-      h += '</div>';
+      const cnt = (c) => Object.entries(OBJ).filter(([k, d]) => !d.fixed && d.cat === c && !(S.level && (d.where === 'out' || d.needsUpper))).length;
+      const cats = [['recent', 'Recent'], ['all', 'All'], ...OBJ_CATS];
+      h += `<div id="bCats"><input id="bSearch" type="search" placeholder="Search items…" value="${(S.q || '').replace(/"/g, '&quot;')}" autocomplete="off">${cats.map(([k, n]) => `<button class="cat ${S.cat === k && !S.q ? 'on' : ''}" data-c="${k}">${n}${k !== 'recent' && k !== 'all' ? ' <small>' + cnt(k) + '</small>' : ''}</button>`).join('')}</div><div id="bItems"></div>`;
     }
     $('bBody').innerHTML = h;
-    $('bBody').querySelectorAll('.cat').forEach((b) => (b.onclick = () => { Audio2.ui(); S.cat = b.dataset.c; buildTools(S); }));
-    $('bBody').querySelectorAll('.item').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.selectItem(b.dataset.i); }));
+    $('bBody').querySelectorAll('[data-s]').forEach((b) => (b.onclick = () => { Audio2.ui(); Build.setTool(b.dataset.s); }));
+    $('bBody').querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => { Audio2.ui(); S.cat = b.dataset.c; S.q = ''; buildTools(S); }));
+    if (S.tool === 'obj') {
+      const si = $('bSearch');
+      si.oninput = () => { S.q = si.value; $('bBody').querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('on', !S.q && b.dataset.c === S.cat)); renderItems(S); };
+      si.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Escape') { si.value = ''; S.q = ''; renderItems(S); si.blur(); } };
+      renderItems(S);
+    }
     $('bUndo').disabled = false;
   }
   function buildInfo(t, cls) { const el = $('bInfo'); el.textContent = t || ''; el.className = cls || ''; }

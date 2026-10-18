@@ -30,7 +30,8 @@ const Waves = (() => {
   function spawnBug(big) {
     const a = state.dir + rand(-0.35, 0.35), r = rand(150, 175);
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    const e = Ents.spawn('bug', 'bugs', x, z, { maxHp: big ? 220 : 52, radius: big ? 0.9 : 0.45, yaw: Math.atan2(-x, -z) });
+    const hm = state.hpMul || 1;
+    const e = Ents.spawn('bug', 'bugs', x, z, { maxHp: Math.round((big ? 220 : 52) * hm), radius: big ? 0.9 : 0.45, yaw: Math.atan2(-x, -z) });
     e.big = big; e.scan = 0; e.cool = 0; e.lunge = 0; e.chew = null; e.wave = state.day;
     e.hp = e.maxHp;
     state.spawned++;
@@ -47,15 +48,18 @@ const Waves = (() => {
     if (!state.warned && h >= (cmd ? 17 : 19.8) && h < 21) {
       state.warned = 1;
       // parve suurus sõltub baasi mürast, valgusest ja esemete arvust
+      // suurus sõltub eelkõige baasi suurusest (pind, esemed, meeskond, müra), vähem päevast
       const sg = Base.signature(true); state.sig = sg;
-      state.small = Math.min(70, Math.round(state.small * sg.mult));
-      state.big = state.big + Math.floor(sg.total / 90) + (sg.total >= 120 ? 1 : 0);
+      const S = Base.sizeScore(); state.size = S;
+      state.small = clamp(Math.round((2 + state.n * 0.4 + S * 0.3) * G.dk.raid), 3, 110);
+      state.big = Math.floor(S / 28) + Math.floor(state.n / 3);
+      state.hpMul = 1 + S / 500;
       state.total = state.small + state.big;
       Audio2.alarm();
       if (cmd) UI.banner('Swarm approaching ' + dirName(state.dir) + '!', 'Command post: ' + state.small + ' darters' + (state.big ? ', ' + state.big + ' rammers' : '') + ' · attack at night', 'danger');
       else UI.banner('Radio: the bugs are coming!', 'Direction unknown. Build a command post (map table + radar) to see ahead.', 'danger');
       UI.msg('The Stoneheart\'s swarm is coming. Put the crew on their posts, the gate closes by itself.', 'danger');
-      UI.msg('Base threat level: ' + sg.tier + ' (noise ' + sg.noise + ', light ' + sg.light + ', items ' + sg.count + '). ' + (sg.mult > 1.4 ? 'The swarm is bigger than usual.' : sg.mult < 0.9 ? 'A quiet base attracts fewer bugs.' : ''), sg.mult > 1.4 ? 'danger' : '');
+      UI.msg('Base size ' + state.size + ' · threat ' + sg.tier + ' (noise ' + sg.noise + ', light ' + sg.light + ', items ' + sg.count + '). The swarm goes for the base heart and the loudest machines.', state.size > 90 ? 'danger' : '');
     }
     // algus
     if (!state.active && !state.done && (h >= 21 || h < 5) && state.warned) { state.active = true; state.spawnT = 0; }
@@ -91,60 +95,103 @@ const Waves = (() => {
   }
 
   // ---------- putuka AI ----------
+  // Eesmärk: baasi süda ja häält tegevad masinad (generaatorid, tehased, kahurid). Inimesi rünnatakse ainult,
+  // kui nad on otse tee peal või putukat tulistavad. Lukus uksed lõhutakse (Ents.stepMove -> Bases.attackDoor).
   const probe = { x: 0, z: 0 };
+  function running(o) { const d = OBJ[o.type]; return d.power > 0 ? o.on : d.power < 0 ? !o.broken : true; }
+  function pickTarget(e) {
+    const pc = typeof Rivals !== 'undefined' ? Rivals.playerCore : null, cands = [];
+    if (pc && pc.alive) cands.push({ core: pc, x: pc.pos.x, z: pc.pos.z, w: e.big ? 14 : 5 });
+    for (const o of Base.objs.values()) {
+      if (o.lv) continue;
+      const sg = SIG[o.type]; if (!sg || sg[0] < 2 || !running(o)) continue;
+      const oc = Base.objCenter(o); cands.push({ obj: o, x: oc.x, z: oc.z, w: sg[0] * (e.big ? 0.6 : 1) });
+    }
+    if (!cands.length) return null;
+    let sum = 0; for (const c of cands) { c.w /= 1 + Math.hypot(c.x - e.pos.x, c.z - e.pos.z) / 50; sum += c.w; }
+    let u = Math.random() * sum; for (const c of cands) { u -= c.w; if (u <= 0) return c; }
+    return cands[0];
+  }
+  function tgtValid(t) { return t && (t.core ? t.core.alive : Base.objs.has(t.obj.id)); }
   function bugAI(e, dt) {
     if (e.cool > 0) e.cool -= dt;
     if (e.lunge > 0) e.lunge -= dt;
+    if (e.lastHp === undefined) e.lastHp = e.hp;
+    if (e.hp < e.lastHp) e.hurtAt = G.time.total;
+    e.lastHp = e.hp;
     e.scan -= dt;
     if (e.scan <= 0) {
-      e.scan = 0.4 + Math.random() * 0.3;
-      let best = null, bd = e.big ? 18 : 26;
+      e.scan = 0.45 + Math.random() * 0.3;
+      // enesekaitse: ainult otse kõrval olev inimene või see, kes just tulistas (väiksed putukad)
+      let foe = null, bd = e.big ? 2.9 : 3.2;
       for (const t of Ents.list) {
-        if (!t.alive || !(t.kind === 'human' || t.kind === 'player') || t.team === 'bugs') continue;
+        if (!t.alive || !(t.kind === 'human' || t.kind === 'player') || t.team === 'bugs' || t.inVehicle) continue;
         if (t.kind === 'player' && (Player.dead || G.mode === 'build')) continue;
         const d = Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z);
-        if (d < bd && Math.abs(t.pos.y - e.pos.y) < 3.5) { bd = d; best = t; }
+        if (d < bd && Math.abs(t.pos.y - e.pos.y) < 3) { bd = d; foe = t; }
       }
-      e.target = best;
+      const la = e.lastAttacker;
+      if (!foe && !e.big && la && la.alive && la.pos && e.hurtAt && G.time.total - e.hurtAt < 3 && Math.hypot(la.pos.x - e.pos.x, la.pos.z - e.pos.z) < 9 && Math.random() < 0.5) foe = la;
+      e.target = foe;
+      if (!tgtValid(e.tgt)) { e.tgt = pickTarget(e); e.path = null; e.repath = 0; }
     }
-    const t = e.target && e.target.alive !== false ? e.target : null;
-    let tx = t ? t.pos.x : 0, tz = t ? t.pos.z : 0;
-    if (!t && e.chew && Base.objs.has(e.chew.id)) { tx = e.chew.cx; tz = e.chew.cz; }
-    const dx = tx - e.pos.x, dz = tz - e.pos.z, d = Math.hypot(dx, dz) || 1;
     // okastraat
     let slow = 1;
     const c = Base.toCell(e.pos.x, e.pos.z), oid = Base.objAt(c.i, c.j), oo = oid ? Base.objs.get(oid) : null;
     if (oo && oo.type === 'okas') { slow = e.big ? 0.7 : 0.35; e.hp -= dt * (e.big ? 2 : 6); oo.hp -= dt * 3; if (e.hp <= 0) Ents.damage(e, 1, null); if (oo.hp <= 0) destroyObj(oo); if (!e.alive) return; }
-    const sp = (e.big ? 4.2 : 7.6) * slow * (e.wobble = (e.wobble || rand(0.9, 1.1)));
-    if (t && d < (e.big ? 2.6 : 1.9)) {
-      e.moveAmt = Math.max(0, e.moveAmt - dt * 5);
-      Ents.face(e, tx, tz, dt, 10);
-      if (e.cool <= 0) { Ents.damage(t, (e.big ? 22 : 8) * G.dk.edmg, e); e.cool = e.big ? 1.4 : 0.9; e.lunge = 0.3; Audio2.stalker(e.pos.x, e.pos.z); }
+    const sp = (e.big ? 4.2 : 7.0) * slow * (e.wobble = (e.wobble || rand(0.9, 1.1)));
+    const t = e.target && e.target.alive !== false ? e.target : null;
+    if (t) {
+      const d = Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z);
+      if (d < (e.big ? 2.6 : 1.9)) {
+        e.moveAmt = Math.max(0, e.moveAmt - dt * 5);
+        Ents.face(e, t.pos.x, t.pos.z, dt, 10);
+        if (e.cool <= 0) { Ents.damage(t, (e.big ? 22 : 8) * G.dk.edmg, e); e.cool = e.big ? 1.4 : 0.9; e.lunge = 0.3; Audio2.stalker(e.pos.x, e.pos.z); }
+        return;
+      }
+      e.path = [{ x: t.pos.x, z: t.pos.z }]; e.pathI = 0; e.goal = null;
+      Ents.stepMove(e, dt, sp); e.repath = 0;
       return;
     }
-    // liikumine otse; kui ees on ehitis, näri läbi
+    const g = e.tgt;
+    if (!g) { e.path = [{ x: 0, z: 0 }]; e.pathI = 0; Ents.stepMove(e, dt, sp); return; }
+    // sihtmärgi kõrval: näri / hammusta
+    const o = g.obj, reach = g.core ? 2.2 + e.radius + 0.7 : Math.max(o.w || 1, o.h || 1) * Base.CS / 2 + e.radius + 0.7;
+    const dT = Math.hypot(g.x - e.pos.x, g.z - e.pos.z);
+    if (dT < reach) {
+      e.moveAmt = Math.max(0, e.moveAmt - dt * 5);
+      Ents.face(e, g.x, g.z, dt, 10);
+      if (e.cool <= 0) {
+        e.cool = e.big ? 1.2 : 0.8; e.lunge = 0.25;
+        if (g.core) { Ents.damage(g.core, (e.big ? 6 : 1.0) * G.dk.edmg, e); if (G.time.total - (state.coreMsgT || -99) > 25) { state.coreMsgT = G.time.total; UI.msg('Bugs are chewing on the base heart! (' + Math.round(g.core.hp) + ' / ' + g.core.maxHp + ')', 'danger'); Audio2.alarm && Audio2.alarm(); } FX.sparks(g.x, e.pos.y + 1.5, g.z, [0.6, 1, 0.4], 4, 2); }
+        else { o.hp -= (e.big ? 45 : 9) * G.dk.edmg; FX.sparks(g.x, e.pos.y + 0.8, g.z, [0.9, 0.7, 0.4], 4, 2); if (o.hp <= 0) { destroyObj(o); e.tgt = null; } }
+        Audio2.stalker(e.pos.x, e.pos.z);
+      }
+      return;
+    }
+    // tee sihini läbi baasi (uksed lõhutakse stepMove'is)
+    e.repath = (e.repath || 0) - dt;
+    if (!e.path || Ents.arrived(e) || e.repath <= 0) {
+      e.repath = rand(6, 9);
+      if (g.core) Ents.goTo(e, g.x + rand(-1.5, 1.5), g.z + rand(-1.5, 1.5));
+      else { const cells = Base.useCells(o); Ents.goTo(e, g.x, g.z, cells.length ? cells : null); }
+    }
     const ox = e.pos.x, oz = e.pos.z;
-    let mx = dx / d, mz = dz / d;
-    if (e.side) { const px = -mz * e.side, pz = mx * e.side; mx = mx * 0.4 + px; mz = mz * 0.4 + pz; const L = Math.hypot(mx, mz); mx /= L; mz /= L; e.sideT -= dt; if (e.sideT <= 0) e.side = 0; }
-    e.pos.x += mx * sp * dt; e.pos.z += mz * sp * dt;
-    World.collideCircle(e.pos, e.radius, e.pos.y + 0.2, e.pos.y + 1.2, false);
-    e.pos.y = Ents.groundY(e.pos.x, e.pos.z);
-    e.yaw += angDiff(e.yaw, Math.atan2(mx, mz)) * Math.min(1, dt * 8);
-    e.moveAmt = Math.min(1, e.moveAmt + dt * 5); e.speed = sp;
+    Ents.stepMove(e, dt, sp);
+    // väljas ette jäänud ehitis (vall, värav, okastraat): näri läbi
     const moved = Math.hypot(e.pos.x - ox, e.pos.z - oz);
-    if (moved < sp * dt * 0.35) {
+    if (moved < sp * dt * 0.3 && e.moveAmt > 0.2) {
       e.blockT = (e.blockT || 0) + dt;
-      probe.x = e.pos.x + mx * (e.radius + 0.8); probe.z = e.pos.z + mz * (e.radius + 0.8);
-      const pc = Base.toCell(probe.x, probe.z), bid = Base.objAt(pc.i, pc.j), bo = bid ? Base.objs.get(bid) : null;
-      if (bo && OBJ[bo.type].where !== 'in') {
-        e.chew = bo;
-        e.moveAmt = 0.3;
-        if (e.cool <= 0) {
+      if (e.blockT > 0.6) {
+        const nx = e.path && e.path[e.pathI] || g, dx = nx.x - e.pos.x, dz = nx.z - e.pos.z, L = Math.hypot(dx, dz) || 1;
+        probe.x = e.pos.x + dx / L * (e.radius + 0.8); probe.z = e.pos.z + dz / L * (e.radius + 0.8);
+        const pc = Base.toCell(probe.x, probe.z), bid = Base.objAt(pc.i, pc.j), bo = bid ? Base.objs.get(bid) : null;
+        if (bo && OBJ[bo.type].where !== 'in' && e.cool <= 0) {
           bo.hp -= (e.big ? 45 : 9) * G.dk.edmg; e.cool = e.big ? 1.2 : 0.8; e.lunge = 0.25;
           FX.sparks(probe.x, e.pos.y + 0.8, probe.z, [0.9, 0.7, 0.4], 4, 2);
-          if (bo.hp <= 0) destroyObj(bo);
+          if (bo.hp <= 0) { destroyObj(bo); e.repath = 0; }
         }
-      } else if (e.blockT > 1.2) { e.side = Math.random() < 0.5 ? -1 : 1; e.sideT = rand(1, 2.5); e.blockT = 0; }
+      }
     } else e.blockT = 0;
   }
   function destroyObj(o) {

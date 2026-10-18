@@ -233,9 +233,9 @@ const Crew = (() => {
     if (!c.bed) L.push('Sleeping on the floor wrecks your back.');
     return L.length ? pick(L) : null;
   }
-  function workMult(c) { return (0.75 + c.skill * 0.25) * (c.trait === 'laisk' ? 0.7 : 1); }
-  function crewDmg(c) { const base = c.role === 'valvur' ? 11 : c.role === 'jahimees' ? 11 : 6; return base * (c.trait === 'tapne' ? 1.4 : 1) * (c.trait === 'veteran' ? 1.35 : 1); }
-  function crewAcc(c) { return (roomTypes && [...(rtCache || new Map()).values()].includes('Armoury') ? 1.1 : 1) * ((c.role === 'valvur' || c.role === 'jahimees' ? 0.62 : 0.45) + (c.trait === 'tapne' ? 0.2 : 0) + (c.trait === 'veteran' ? 0.12 : 0)) * (Base.objsOfType('relvakapp').length ? 1.15 : 1); }
+  function workMult(c) { return (0.95 + c.skill * 0.3) * (c.trait === 'laisk' ? 0.75 : 1); }
+  function crewDmg(c) { const base = c.role === 'valvur' ? 15 : c.role === 'jahimees' ? 15 : 9; return base * (c.trait === 'tapne' ? 1.4 : 1) * (c.trait === 'veteran' ? 1.35 : 1); }
+  function crewAcc(c) { return (roomTypes && [...(rtCache || new Map()).values()].includes('Armoury') ? 1.1 : 1) * ((c.role === 'valvur' || c.role === 'jahimees' ? 0.7 : 0.55) + (c.trait === 'tapne' ? 0.2 : 0) + (c.trait === 'veteran' ? 0.12 : 0)) * (Base.objsOfType('relvakapp').length ? 1.15 : 1); }
   function setAct(e, s) { e.crew.act = s; }
   // kaasas käimise juht: mängija või kaasmängija (co-op)
   function leaderOf(c) { const L = c.leader; return L && L !== Player ? L : Player; }
@@ -1239,7 +1239,7 @@ const Crew = (() => {
       case 'mine': {
         e.hasGun = true;
         const s = k.site;
-        const cap = c.trait === 'tugev' ? 16 : 8;
+        const cap = c.trait === 'tugev' ? 32 : 20;
         if (k.step === 0) {
           const cl = s.clusters.filter((q) => q.amount > 0).sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
           if (!cl) { k.done = true; return; }
@@ -1253,9 +1253,9 @@ const Crew = (() => {
           e.hasGun = false;
           if (Math.random() < 0.3) FX.beam(e.pos.x, e.pos.y + 1.2, e.pos.z, k.cl.x, k.cl.y + 0.5, k.cl.z);
           k.t += dt * workMult(c);
-          if (k.t > 2.4) {
+          if (k.t > 1.8) {
             k.t = 0;
-            const got = Comets.takeUnits(k.cl, 1);
+            const got = Comets.takeUnits(k.cl, 2);
             if (got) { c.carry += got; c.carryKind = 'kris'; Audio2.crystal(); }
             if (c.carry >= cap) k.done = true;
             else if (k.cl.amount <= 0) k.step = 0;
@@ -1274,7 +1274,7 @@ const Crew = (() => {
           setAct(e, k.buddy ? 'Stripping a wreck with ' + first(k.buddy) : 'Stripping a wreck'); e.hasGun = false; e.gesture = 'fix';
           k.t += dt * workMult(c);
           if (Math.random() < 0.2) FX.repair(w.x + rand(-1, 1), w.y + 1, w.z + rand(-1, 1));
-          if (k.t > 6) { const n = Math.min(10, w.scrap); w.scrap -= n; c.carry = n; c.carryKind = 'scrap'; k.done = true; }
+          if (k.t > 4.5) { k.t = 0; const n = Math.min(12, w.scrap); w.scrap -= n; c.carry += n; c.carryKind = 'scrap'; if (c.carry >= (c.trait === 'tugev' ? 50 : 34) || w.scrap <= 0) k.done = true; }   // täis kott, siis koju
         }
         return;
       }
@@ -1289,7 +1289,7 @@ const Crew = (() => {
           setAct(e, 'Drilling iron ore'); e.hasGun = false; e.gesture = 'mine'; Ents.face(e, w.x, w.z, dt);
           k.t += dt * workMult(c);
           if (Math.random() < 0.25) FX.sparks(w.x + rand(-0.5, 0.5), w.y + 0.8, w.z + rand(-0.5, 0.5), [1, 0.6, 0.3], 2, 2);
-          if (k.t > 7) { const n = Math.min(c.trait === 'tugev' ? 10 : 6, w.amount); w.amount -= n; c.carry = n; c.carryKind = 'ore'; k.done = true; }
+          if (k.t > 5) { k.t = 0; const n = Math.min(c.trait === 'tugev' ? 10 : 7, w.amount); w.amount -= n; c.carry += n; c.carryKind = 'ore'; if (c.carry >= (c.trait === 'tugev' ? 30 : 21) || w.amount <= 0) k.done = true; }
         }
         return;
       }

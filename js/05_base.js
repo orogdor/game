@@ -742,6 +742,12 @@ function createBase(opt) {
     sigCache = { noise, light, count, crew, total, tier: tier[1], col: tier[2], mult: Math.min(3.5, 0.55 + total / 70) };
     sigT = now; return sigCache;
   }
+  // baasi suurus (tubade pind + esemed + meeskond + müra) -> rünnakute suurus
+  function sizeScore() {
+    let cells = 0; for (const r of rooms.values()) cells += r.cells.length;
+    const sg = signature();
+    return Math.round(cells / 4 + sg.count + sg.crew * 2 + sg.noise * 0.5);
+  }
   function objsOfType(type) { const out = []; for (const o of objs.values()) if (o.type === type) out.push(o); return out; }
   function countBeds() { let n = 0; for (const o of objs.values()) n += OBJ[o.type].beds || 0; return n; }
 
@@ -1660,7 +1666,7 @@ function createBase(opt) {
     N, CS, X0, Z0, OX, OY, OZ, WH, FLOOR_Y, IS_PLAYER, rooms, objs, openings, walls, power, doors, sconces,
     inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, isWide, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
-    canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, countBeds, updatePower, roomAccess, escapeCell,
+    canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, sizeScore, countBeds, updatePower, roomAccess, escapeCell,
     findPath, pathWorld, vehiclePath, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
     serialize, deserialize, markDirty: () => { dirty = true; }, rebuildNow: () => rebuild(), computeRooms,
     get viewLevel() { return viewLevel; }, set viewLevel(v) { viewLevel = v ? 1 : 0; },
@@ -1706,7 +1712,7 @@ const Bases = {
       }
     } else {
       e.doorCool = (e.doorCool || 0) - dt;
-      if (e.doorCool <= 0) { e.doorCool = 1.2; b.damageDoor(st, e.kind === 'alien' ? 22 : 15, e); e.swing = 0.35; FX.impact(d.x, b.OY + 1.0, d.z, 'metal'); Audio2.land && Audio2.land(); }
+      if (e.doorCool <= 0) { e.doorCool = e.kind === 'bug' ? (e.big ? 1.1 : 0.8) : 1.2; b.damageDoor(st, e.kind === 'alien' ? 22 : e.kind === 'bug' ? (e.big ? 48 : 12) * G.dk.edmg : 15, e); if (e.kind === 'bug') { e.lunge = 0.25; FX.sparks(d.x, b.OY + 1.0, d.z, [0.9, 0.7, 0.4], 3, 2); } e.swing = 0.35; FX.impact(d.x, b.OY + 1.0, d.z, 'metal'); Audio2.land && Audio2.land(); }
     }
   },
   isInsideAny(x, z) { const b = this.at(x, z); return !!(b && b.isInside(x, z)); },

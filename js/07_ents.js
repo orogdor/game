@@ -380,7 +380,7 @@ const Ents = (() => {
       }
       stepMove(e, dt, d < 8 ? 10.5 : 8.5);
       if (d < 2.3 && e.cool <= 0 && Math.abs(t.pos.y - e.pos.y) < 2) {
-        damage(t, 11 * G.dk.edmg, e); e.cool = 1.05; e.lunge = 0.3; Audio2.stalker(e.pos.x, e.pos.z);
+        damage(t, 15 * G.dk.edmg, e); e.cool = 1.0; e.lunge = 0.3; Audio2.stalker(e.pos.x, e.pos.z);
       }
     } else {
       // komeedi meelitus: liigub kraatri juurde ja tiirleb seal
@@ -425,7 +425,7 @@ const Ents = (() => {
     const d = Math.hypot(t.pos.x - e.pos.x, t.pos.z - e.pos.z);
     face(e, t.pos.x, t.pos.z, dt, 3);
     if (d > 7) { e.path = [{ x: t.pos.x, z: t.pos.z }]; e.pathI = 0; stepMove(e, dt, 2.4); } else e.moveAmt = Math.max(0, e.moveAmt - dt * 3);
-    if (d < 3.2 && e.cool <= 0) { damage(t, 16 * G.dk.edmg, e); e.cool = 1.6; e.claw = 0.4; Audio2.crab(e.pos.x, e.pos.z); }
+    if (d < 3.2 && e.cool <= 0) { damage(t, 22 * G.dk.edmg, e); e.cool = 1.5; e.claw = 0.4; Audio2.crab(e.pos.x, e.pos.z); }
     else if (d < 30 && e.cool <= 0) {
       e.cool = 2.6; Audio2.crab(e.pos.x, e.pos.z);
       for (let k = 0; k < 3; k++) {

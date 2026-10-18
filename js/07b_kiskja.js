@@ -23,7 +23,7 @@ const Kiskja = (() => {
   const rel = (a, b) => [P[a].piv[0] - P[b].piv[0], P[a].piv[1] - P[b].piv[1], P[a].piv[2] - P[b].piv[2]];
 
   function spawn(x, z, o = {}) {
-    return Ents.spawn('kiskja', 'wild', x, z, Object.assign({ radius: 0.7, state: 'roam', stateT: 4, maxHp: 320, hitY: 1.3, onHurt }, o));
+    return Ents.spawn('kiskja', 'wild', x, z, Object.assign({ radius: 0.7, state: 'roam', stateT: 4, maxHp: 420, hitY: 1.3, onHurt }, o));
   }
   function spheres(e, s) {
     const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw), x = e.pos.x, y = e.pos.y, z = e.pos.z;
@@ -106,7 +106,7 @@ const Kiskja = (() => {
     }
     if (d < 4) Ents.face(e, t.pos.x, t.pos.z, dt, 10);
     if (d < 3.1 && e.cool <= 0 && Math.abs(t.pos.y - e.pos.y) < 2.2) {
-      Ents.damage(t, 22 * G.dk.edmg, e); e.cool = 1.25; e.lunge = 0.45;
+      Ents.damage(t, 28 * G.dk.edmg, e); e.cool = 1.15; e.lunge = 0.45;
       if (Audio2.kiskja && Math.random() < 0.4) Audio2.kiskja(e.pos.x, e.pos.z);
     }
     if (e.stateT <= 0 && d > 30) { e.state = 'stalk'; e.stateT = rand(4, 8); }

@@ -169,10 +169,10 @@ const Comets = (() => {
 // ============================================================
 const Spawner = (() => {
   function stalker(x, z, state = 'roam') {
-    return Ents.spawn('stalker', 'wild', x, z, { radius: 0.6, state, stateT: 10, daySpawned: state === 'buried' ? false : undefined, maxHp: 55 });
+    return Ents.spawn('stalker', 'wild', x, z, { radius: 0.6, state, stateT: 10, daySpawned: state === 'buried' ? false : undefined, maxHp: 85 });
   }
   function crab(x, z) {
-    return Ents.spawn('crab', 'wild', x, z, { radius: 1.3, state: 'idle', home: { x, z }, maxHp: 170 });
+    return Ents.spawn('crab', 'wild', x, z, { radius: 1.3, state: 'idle', home: { x, z }, maxHp: 240 });
   }
   function jelly() {
     const LIM = Math.min(World.HALF - 80, 1700), x = rand(-LIM, LIM), z = rand(-LIM, LIM);
