@@ -232,6 +232,10 @@ const Econ = (() => {
     n = Math.min(n, G.res.ore || 0); if (n <= 0) return 0;
     const v = n * 9; G.res.ore -= n; G.res.cr += v; Audio2.cash(); return v;
   }
+  function sellAcid(n) {
+    n = Math.min(n, G.res.acid || 0); if (n <= 0) return 0;
+    const v = n * Aliens.ACID_PRICE; G.res.acid -= n; G.res.cr += v; Audio2.cash(); return v;
+  }
   function sellMeat(n) {
     n = Math.min(n, G.res.meat); if (n <= 0) return 0;
     const v = n * 4; G.res.meat -= n; G.res.cr += v; Audio2.cash(); return v;
@@ -277,7 +281,7 @@ const Econ = (() => {
     G.candidates = out;
   }
 
-  return { hour, isNight, clockStr, sunElev, updateEnv, update, newDay, dayLine, sleep, sellKris, sellLihv, sellMeat, sellOre, buy, payDebtEarly, genCandidates, debtAmount };
+  return { hour, isNight, clockStr, sunElev, updateEnv, update, newDay, dayLine, sleep, sellKris, sellLihv, sellMeat, sellOre, sellAcid, buy, payDebtEarly, genCandidates, debtAmount };
 })();
 
 // ---------- ilm: tolmutormid ----------

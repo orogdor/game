@@ -47,6 +47,7 @@ function isThreatTo(t, team) {
   if (t.kind === 'stalker') return t.state !== 'buried';
   if (t.kind === 'kiskja') return true;
   if (t.kind === 'crab') return t.state === 'angry';
+  if (t.kind === 'alien') return t.state === 'hunt';
   if (t.kind === 'ram') return t.state === 'charge';
   if (t.kind === 'boss') return t.state !== 'sleep';
   if (t.kind === 'human' || t.kind === 'player' || t.kind === 'core' || t.kind === 'rturret') {
@@ -538,6 +539,7 @@ const Crew = (() => {
     if (c.carryKind === 'kris') { note('kris', c.carry); G.res.kris += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' diamonds'); }
     if (c.carryKind === 'scrap') { G.res.scrap += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' scrap'); }
     if (c.carryKind === 'ore') { G.res.ore = (G.res.ore || 0) + c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' iron ore'); }
+    if (c.carryKind === 'acid') { G.res.acid = (G.res.acid || 0) + c.carry; G.flags.acid = true; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' acid glands'); }
     if (c.carryKind === 'meat') { G.res.meat += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' meat'); }
     c.carry = 0; c.carryKind = null;
   }
@@ -638,6 +640,11 @@ const Crew = (() => {
         if (night) break;
         const need = (G.res.food + G.res.meat) < count() * 4 + 8;
         { const o = outingOf(e, 'hunt', (g) => g.alive && Math.hypot(g.pos.x, g.pos.z) < 420); if (o) return { type: 'hunt', step: 0, target: o.crew.task.target, t: 0, buddy: o, goal: o.crew.task.target }; }
+        // tulnukajaht: happenäärmed on hea raha (kui toitu on piisavalt)
+        if (!need && Math.random() < 0.55) {
+          const al = Aliens.nearestPack(0, 0, 420);
+          if (al) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
+        }
         if (need || Math.random() < 0.4) {
           let best = null, bd = 240;
           for (const g of Ents.list) if (g.alive && (g.kind === 'goat' || g.kind === 'ram')) { const d = Math.hypot(g.pos.x, g.pos.z); const dd = Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z); if (d < 420 && dd < bd) { bd = dd; best = g; } }
@@ -1187,7 +1194,7 @@ const Crew = (() => {
         const g = k.target;
         if (k.step < 3 && (k.t > 150 || Econ.isNight())) { k.step = 4; }
         if (k.step === 0 || k.step === 1) {
-          if (!g || !g.alive) { if (g && g.butcherable) { k.step = 2; Ents.goTo(e, g.pos.x, g.pos.z); } else k.done = true; return; }
+          if (!g || !g.alive) { if (g && (g.butcherable || g.harvestable)) { k.step = 2; Ents.goTo(e, g.pos.x, g.pos.z); } else k.done = true; return; }
           const d = Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z);
           setAct(e, 'Hunting');
           if (d > 30) { if (!e.path || Ents.arrived(e) || Math.random() < dt * 0.7) { e.path = [{ x: g.pos.x, z: g.pos.z }]; e.pathI = 0; } Ents.stepMove(e, dt, groupSpeed(e, k, sp * 1.25)); e.aim = 0; }
@@ -1204,12 +1211,12 @@ const Crew = (() => {
             }
           }
         } else if (k.step === 2) {
-          if (!g || !g.butcherable) { k.step = 4; return; }
+          if (!g || !(g.butcherable || g.harvestable)) { k.step = 4; return; }
           e.aim = 0; setAct(e, 'Butchering meat');
           if (Ents.stepMove(e, dt, sp)) { k.step = 3; k.t2 = 0; }
         } else if (k.step === 3) {
           k.t2 += dt; e.hasGun = false; e.gesture = 'fix'; if (Math.random() < 0.2) FX.goo(g.pos.x, g.pos.y + 0.4, g.pos.z, [0.5, 0.15, 0.12], 1);
-          if (k.t2 > 2.5) { c.carry = g.meat; c.carryKind = 'meat'; g.meat = 0; g.butcherable = false; g.remove = true; k.step = 4; }
+          if (k.t2 > 2.5) { if (g.kind === 'alien') { c.carry = Aliens.harvest(g); c.carryKind = 'acid'; } else { c.carry = g.meat; c.carryKind = 'meat'; g.meat = 0; g.butcherable = false; g.remove = true; } k.step = 4; }
         } else {
           k.done = true;
         }

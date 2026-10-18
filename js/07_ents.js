@@ -26,7 +26,7 @@ const Ents = (() => {
   const FOE_HP = 2;
   function isFoe(kind, team) {
     if (kind === 'human') return false;   // inimvastased: samad elud mis mängijal / meeskonnal
-    return kind === 'stalker' || kind === 'kiskja' || kind === 'crab' || kind === 'bug';   // konkurentide ehitised: samad elud mis mängija omadel
+    return kind === 'stalker' || kind === 'kiskja' || kind === 'crab' || kind === 'bug' || kind === 'alien';   // konkurentide ehitised: samad elud mis mängija omadel
   }
   function defaultHp(kind) { return { human: 70, goat: 30, ram: 60, stalker: 55, kiskja: 320, crab: 170, jelly: 15, boss: 4000, core: 900, rturret: 260 }[kind] || 50; }
   function remove(e) { const i = list.indexOf(e); if (i >= 0) list.splice(i, 1); }
@@ -206,6 +206,8 @@ const Ents = (() => {
         s.push([x, y + 0.55, z, 0.62, 1]); s.push([x + fx * 0.9, y + 0.55, z + fz * 0.9, 0.42, 1.5]); s.push([x - fx * 0.8, y + 0.5, z - fz * 0.8, 0.45, 0.8]); break;
       case 'crab':
         s.push([x, y + 0.75, z, 1.35, 1]); break;
+      case 'alien':
+        Aliens.spheres(e, s); break;
       case 'kiskja':
         Kiskja.spheres(e, s); break;
       case 'jelly':
@@ -257,6 +259,7 @@ const Ents = (() => {
     if (e.kind === 'ram') { e.state = 'charge'; e.stateT = 12; e.target = src; }
     if (e.kind === 'stalker') { if (e.state === 'buried') emerge(e); e.state = 'hunt'; e.target = src; e.stateT = 20; }
     if (e.kind === 'crab') { e.state = 'angry'; e.target = src; e.stateT = 15; }
+    if (e.kind === 'alien') Aliens.hurt(e, src);
   }
   function kill(e, src) {
     e.alive = false; e.hp = 0; e.deathT = 0; e.pose = 'dead'; stopMove(e);
@@ -272,6 +275,7 @@ const Ents = (() => {
     }
     if (e.kind === 'bug') Waves.onKill(e);
     if (e.kind === 'kiskja') Kiskja.onKill(e);
+    if (e.kind === 'alien') Aliens.onKill(e);
     if (e.kind === 'stalker') { Audio2.stalker(fx.x, fx.z); FX.goo(fx.x, fx.y + 0.5, fx.z, [0.55, 0.75, 0.2], 16); }
     if (e.kind === 'crab') {
       Audio2.crab(fx.x, fx.z);
@@ -286,7 +290,7 @@ const Ents = (() => {
       if (e.team === 'crew' && typeof Crew !== 'undefined') Crew.onDeath(e, src);
       else if (typeof Rivals !== 'undefined') Rivals.onUnitDeath(e, src);
     }
-    if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'human') UI.hitMarker(true); }
+    if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'alien' || e.kind === 'human') UI.hitMarker(true); }
   }
 
   // ---------- olendite AI ----------
@@ -502,6 +506,7 @@ const Ents = (() => {
         case 'stalker': updateStalker(e, dt); break;
         case 'kiskja': Kiskja.update(e, dt); break;
         case 'crab': updateCrab(e, dt); break;
+        case 'alien': Aliens.update(e, dt); break;
         case 'jelly': updateJelly(e, dt); break;
         case 'bug': Waves.bugAI(e, dt); break;
         case 'human': if (e.ai) e.ai(e, dt); break;
@@ -748,6 +753,7 @@ const Ents = (() => {
         case 'stalker': drawStalker(e); break;
         case 'kiskja': Kiskja.draw(e); break;
         case 'crab': drawCrab(e); break;
+        case 'alien': Aliens.draw(e); break;
         case 'jelly': drawJelly(e); break;
         case 'bug': Waves.draw(e); break;
         case 'boss': Boss.draw(e); break;

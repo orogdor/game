@@ -128,6 +128,7 @@ const UI = (() => {
     return `<span class="chip cr" title="Krediidid">${ICON.coin}<span class="num">${fmtInt(G.res.cr)}</span></span>
       <span class="chip sc" title="Scrap">${ICON.scrap}<span class="num">${G.res.scrap}</span></span>
       <span class="chip kr" title="Toorteemandid hoidlas (+ lihvitud)">${ICON.crystal}<span class="num">${G.res.kris}${G.res.lihv ? '<small style="opacity:.75"> +' + G.res.lihv + '</small>' : ''}</span></span>
+      ${(G.res.acid || 0) > 0 ? `<span class="chip" title="Acid glands" style="color:#9dff4a">${ICON.scrap}<span class="num">${G.res.acid}</span></span>` : ''}
       ${(G.res.ore || 0) > 0 || G.flags.drill ? `<span class="chip or" title="Iron ore" style="color:#d98a62">${ICON.scrap}<span class="num">${G.res.ore || 0}</span></span>` : ''}
       <span class="chip fd" title="Toit (toores liha)">${ICON.food}<span class="num">${G.res.food}${G.res.meat ? '<small style="opacity:.75"> +' + G.res.meat + '</small>' : ''}</span></span>` + pw + threatChip();
   }
@@ -550,6 +551,7 @@ const UI = (() => {
       h += `<div class="kv"><div><div class="k">Diamond price today</div><div class="v" style="color:var(--crystal)">${p} ₵/pc</div></div><div><div class="k">Money</div><div class="v" style="color:var(--brass)">${fmtInt(G.res.cr)} ₵</div></div><div><div class="k">Next debt payment</div><div class="v">${fmtInt(G.debt.amount)} ₵</div></div></div>`;
       h += `<div class="row"><div class="grow"><div class="t">Raw diamonds · ${G.res.kris}</div><div class="s">${p} ₵ each. The price changes every morning.</div></div>${btn('sell:10', 'Sell 10', { disabled: G.res.kris < 1 })}${btn('sell:all', 'Sell all · ' + fmtInt(G.res.kris * p) + ' ₵', { primary: true, disabled: G.res.kris < 1 })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">Polished diamonds · ${G.res.lihv}</div><div class="s">${pl} ₵ each. Build a diamond polisher to polish them.</div></div>${btn('selll', 'Sell all · ' + fmtInt(G.res.lihv * pl) + ' ₵', { primary: true, disabled: G.res.lihv < 1 })}</div>`;
+      if ((G.res.acid || 0) > 0 || G.flags.acid) h += `<div class="row"><div class="grow"><div class="t">Acid glands · ${G.res.acid || 0}</div><div class="s">${Aliens.ACID_PRICE} ₵ each. Hunt acid mantises in the desert and harvest their glands.</div></div>${btn('sella', 'Sell all · ' + fmtInt((G.res.acid || 0) * Aliens.ACID_PRICE) + ' ₵', { disabled: !(G.res.acid > 0) })}</div>`;
       if ((G.res.ore || 0) > 0 || G.flags.drill) h += `<div class="row"><div class="grow"><div class="t">Iron ore · ${G.res.ore || 0}</div><div class="s">9 ₵ each. Smelting it at the Ore works gives steel scrap instead.</div></div>${btn('sello', 'Sell all · ' + fmtInt((G.res.ore || 0) * 9) + ' ₵', { disabled: !(G.res.ore > 0) })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">Raw meat · ${G.res.meat}</div><div class="s">4 ₵ each. The crew needs meat for food.</div></div>${btn('sellm', 'Sell all', { disabled: G.res.meat < 1 })}</div>`;
       h += `<div class="row"><div class="grow"><div class="t">20 scrap</div><div class="s">The cargo shuttle delivers right away. In storage: ${G.res.scrap}.</div></div>${btn('buy:scrap', 'Buy · 45 ₵', { disabled: G.res.cr < 45 })}</div>`;
@@ -606,6 +608,7 @@ const UI = (() => {
     bindActs(body, {
       sell: (a) => { const n = a === 'all' ? G.res.kris : 10; const v = Econ.sellKris(n); if (v) { toast('+' + fmtInt(v) + ' ₵'); G.flags.sold = true; Objectives.check(); } renderPanel(true); },
       selll: () => { const v = Econ.sellLihv(G.res.lihv); if (v) { toast('+' + fmtInt(v) + ' ₵'); G.flags.sold = true; Objectives.check(); } renderPanel(true); },
+      sella: () => { const v = Econ.sellAcid(G.res.acid); if (v) toast('+' + v + ' ₵'); renderPanel(true); },
       sello: () => { const v = Econ.sellOre(G.res.ore); if (v) toast('+' + v + ' ₵'); renderPanel(true); },
       sellm: () => { const v = Econ.sellMeat(G.res.meat); if (v) toast('+' + v + ' ₵'); renderPanel(true); },
       buy: (k) => { if (Econ.buy(k)) toast(k === 'scrap' ? '+20 scrap' : k === 'food' ? '+5 meals' : SHOP[k].name + ' is in storage'); renderPanel(true); },

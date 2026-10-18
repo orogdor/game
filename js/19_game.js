@@ -215,7 +215,7 @@ const Game = (() => {
     if (!ok) { const L = document.getElementById('loading'); L.style.cssText += ';font-size:14px;letter-spacing:0;padding:20px;text-align:center'; L.textContent = initErr ? 'Graphics failed to start: ' + initErr : 'This device doesn\'t support WebGL2 graphics. Try a newer browser.'; return; }
     canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); document.getElementById('loading').hidden = false; document.getElementById('loading').textContent = 'Graphics reset. Reload the page.'; });
     buildModels();
-    Vehicles.initMeshes();
+    Vehicles.initMeshes(); Aliens.initMeshes();
     Gadgets.initMeshes();
     Chars.init();
     Input.init(canvas);
@@ -248,7 +248,7 @@ const Game = (() => {
 
   function resetState() {
     G.time = { day: 1, t: 0.03, total: 0 };
-    G.res = { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0 };
+    G.res = { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
     G.carry = { kris: 0, scrap: 0, meat: 0, stones: 0 };
     G.dk = DIFFS[G.diff] || DIFFS.tavaline;
     G.debt = { left: Math.round(30000 * G.dk.debt), nextDay: 4, amount: 0, idx: 0, grace: false, warned: false };
@@ -268,7 +268,7 @@ const Game = (() => {
     World.generate(seed);
     GFX.setTerrain(null, false); World.setTerrainShadow(Q[qKey].terrainShadow);
     UI.buildMapCanvas();
-    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Objectives.reset(); Vehicles.reset();
+    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Aliens.reset(); Objectives.reset(); Vehicles.reset();
     Ents.list.push(Player);
   }
   function newGame() {
@@ -300,7 +300,7 @@ const Game = (() => {
     resetState();
     G.diff = d.diff || 'tavaline'; G.dk = DIFFS[G.diff];
     setupWorld(d.seed);
-    Object.assign(G.time, d.time); Object.assign(G.res, d.res); if (G.res.ore == null) G.res.ore = 0; Object.assign(G.carry, d.carry); Object.assign(G.debt, d.debt);
+    Object.assign(G.time, d.time); Object.assign(G.res, d.res); if (G.res.ore == null) G.res.ore = 0; if (G.res.acid == null) G.res.acid = 0; Object.assign(G.carry, d.carry); Object.assign(G.debt, d.debt);
     Object.assign(G.up, d.up); Object.assign(G.scan, d.scan); G.flags = d.flags || {}; Object.assign(G.stats, d.stats); Object.assign(G.market, d.market);
     G.candidates = d.candidates || []; G.log = d.log || [];
     if (d.look) G.look = d.look; if (d.pname) G.pname = d.pname;
@@ -422,6 +422,7 @@ const Game = (() => {
     Base.update(dt, humans);
     Rivals.updateBases(dt, humans);
     Herds.update(dt);
+    Aliens.tick(dt);
     Ents.update(dt);
     Crew.update(dt);
     Waves.update(dt);
@@ -509,7 +510,7 @@ const Game = (() => {
     World.draw();
     if (G.mode === 'title') { Base.power.lightsOn = true; GFX.addLight(-1, 2.6, 6.2, 9, 1, 0.75, 0.45, 2.2); }
     Base.draw(G.mode === 'build', GFX.env.night > 0.5 || G.mode === 'title', G.time.total);
-    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else Ents.drawTitleFigure();
+    if (G.mode !== 'title') { Rivals.drawBases(GFX.env.night > 0.5, G.time.total); Ents.draw(); Aliens.drawProjs(); Vehicles.draw(); Net.drawExtra(); Crew.torchLights(); Comets.draw(); Rivals.draw(); } else Ents.drawTitleFigure();
     Build.draw();
     if (G.mode === 'play') Player.drawViewmodel(dt);
     GFX.render(sc);

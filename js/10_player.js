@@ -346,6 +346,7 @@ const Player = {
     }
     // korjused
     for (const e of Ents.list) {
+      if (e.kind === 'alien' && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
       if (e.alive || !e.butcherable) continue;
       if (Math.abs(e.pos.x - px) > 3 || Math.abs(e.pos.z - pz) > 3) continue;
       consider({ key: 'c' + e.id, label: 'Butcher meat', sub: e.meat + ' pieces', hold: 1.4, act: () => butcher(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.4, e.pos.z, [0.5, 0.15, 0.12], 1); } }, e.pos.x, e.pos.z, 2.6);
@@ -540,6 +541,12 @@ function mineOre(o) {
   o.amount -= n;
   Audio2.pickup(); UI.toast('+' + n + ' iron ore into the backpack');
   FX.dust(o.x, o.y + 0.6, o.z, 4, 1.2);
+}
+function harvestAcid(e) {
+  const room = Inv.room('acid');
+  if (room <= 0) { UI.toast('Backpack is full.'); Audio2.deny(); return; }
+  const n = Inv.add('acid', Aliens.harvest(e, Math.min(e.acid, room)));
+  G.flags.acid = true; Audio2.pickup(); UI.toast('+' + n + ' acid glands into the backpack – sell them at the terminal');
 }
 function butcher(e) {
   const room = Inv.room('meat');

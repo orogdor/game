@@ -90,6 +90,12 @@ const Rivals = (() => {
     r.res.cr -= packs * 45; r.res.scrap += packs * 20;
     r.res.scrap -= s; r.res.cr -= c; r.res.kris -= k; return true;
   }
+  // raha on, vanarauda pole: ostab turult (20 vr = 45 ₵, sama hind mis mängijal), et ehitus ja remont ei seisaks
+  function buyScrap(r) {
+    let n = 0;
+    while (r.res.scrap < 60 && r.res.cr - 45 >= reserve(r) + 60 && n < 4) { r.res.cr -= 45; r.res.scrap += 20; n++; }
+    return n;
+  }
   function sellKris(r) {
     const keep = r.bb && !r.bb.objsOfType('skanner').length && r.res.cr >= 250 ? Math.min(r.res.kris, OBJ.skanner.cost.k || 0) : 0;   // kui raha on, hoiab skänneri jaoks teemandid alles
     const n = r.res.kris - keep; if (n > 0) { r.res.cr += n * G.market.price; r.res.kris = keep; }
@@ -123,6 +129,17 @@ const Rivals = (() => {
     const c = commanderOf(r); if (!c || c.mission !== 'guard') return false;
     Object.assign(c, { mission, path: null, carry: 0, scavCl: null, salvGo: false }, extra || {});
     return true;
+  }
+  // kas retk jõuab enne pimedat kohale (päeval ~220 s valgust); liiga kaugele ei minda
+  const TRIP_MAX = 1100;
+  function daylightLeft() { const h = Econ.hour(); return h >= 5.4 && h < 20.6 ? (20.6 - h) / 24 * DAY_LEN : 0; }
+  function tripOK(r, x, z) {
+    const d = Math.hypot(x - r.base.x, z - r.base.z);
+    if (d > TRIP_MAX) return false;
+    const fast = typeof Vehicles !== 'undefined' && Vehicles.teamVehicles(r.team).some((v) => !v.seats[0]);
+    // lähedale ainult siis, kui jõuab enne pimedat; kaugele (kui midagi lähemal pole) minnakse hommikul ja ollakse vajadusel öö väljas
+    const t = d / (fast ? 14 : UNIT.speed);
+    return daylightLeft() > t + 15 || daylightLeft() > DAY_LEN * 0.45;
   }
   function hireTick(r, dt) {
     r.hireT = (r.hireT || 0) - dt;
@@ -206,6 +223,7 @@ const Rivals = (() => {
       r.buildT -= dt;
       if (r.buildT > 0) continue;
       r.buildT = rand(100, 160);
+      buyScrap(r);
       // sõiduk samadel tingimustel: garaaž (tõstuk) + sõiduk, kui raha jätkub ja mehi on
       if (typeof Vehicles !== 'undefined' && !Vehicles.teamVehicles(r.team).length && (r.men || 0) >= 3) {
         const vc = Vehicles.DEF.buggy.cost, gc = r.hasGarage ? { s: 0, c: 0 } : OBJ.tostuk.cost;
@@ -262,7 +280,7 @@ const Rivals = (() => {
     if (e.inVehicle) return;   // sõidab (Vehicles juhib)
     if (e.cool > 0) e.cool -= dt;
     // haavatud korjaja/ründaja taandub koju (palgatud inimesi on vähe)
-    if ((e.mission === 'scav' || e.mission === 'raid') && e.hp < e.maxHp * 0.4) { e.mission = 'flee'; e.path = null; }
+    if ((e.mission === 'scav' || e.mission === 'raid' || e.mission === 'hunt') && e.hp < e.maxHp * 0.4) { e.mission = 'flee'; e.path = null; }
     e.scanT -= dt;
     if (e.scanT <= 0) {
       e.scanT = 0.4 + Math.random() * 0.3;
@@ -340,11 +358,12 @@ const Rivals = (() => {
           const rv = e.rival;
           if (rv.alive) {
             if (e.carryKris) rv.res.kris += e.carry;
+            if (e.carryAcid) rv.res.cr += e.carry * Aliens.ACID_PRICE;
             if (e.stoleKris) rv.res.kris += e.stoleKris;
             if (e.carryScrap) rv.res.scrap += e.carryScrap;
             sellKris(rv);
           }
-          if (e.commander) { Object.assign(e, { mission: 'guard', carry: 0, carryKris: false, carryScrap: 0, stoleKris: 0, path: null, site: null, scavCl: null, wreck: null, salvGo: false, stateT: 0 }); }
+          if (e.commander) { Object.assign(e, { mission: 'guard', carry: 0, carryKris: false, carryAcid: false, prey: null, carryScrap: 0, stoleKris: 0, path: null, site: null, scavCl: null, wreck: null, salvGo: false, stateT: 0 }); }
           else e.remove = true;
         }
         break;
@@ -354,6 +373,22 @@ const Rivals = (() => {
         if (!b || !b.alive) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
         if (!e.path || Ents.arrived(e) || Math.random() < dt * 0.3) Ents.goTo(e, b.pos.x + rand(-20, 20), b.pos.z + rand(-20, 20));
         Ents.stepMove(e, dt, sp);
+        break;
+      }
+      case 'hunt': {   // tulnukajaht: tapa, lõika happenäärmed, vii koju (müüakse nagu mängijal)
+        const g = e.prey;
+        if (!g || (!g.alive && !g.harvestable) || e.carry > 0) { e.mission = 'return'; Ents.goTo(e, e.home.x, e.home.z); break; }
+        const d = Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z);
+        if (g.alive) {
+          if (d > 18) { if (!e.path || Ents.arrived(e) || Math.random() < dt * 0.8) { e.path = [{ x: g.pos.x, z: g.pos.z }]; e.pathI = 0; } Ents.stepMove(e, dt, sp); }
+          else {
+            Ents.face(e, g.pos.x, g.pos.z, dt, 8); e.aim = Math.min(1, e.aim + dt * 4); e.moveAmt = Math.max(0, e.moveAmt - dt * 4);
+            if (e.cool <= 0 && World.lineOfSight(e.pos.x, e.pos.y + 1.4, e.pos.z, g.pos.x, g.pos.y + 1, g.pos.z)) { fireAt(e, g, e.dmg, e.acc, 'enemy'); e.cool = rand(0.45, 0.6); }
+          }
+        } else {
+          if (d > 2.4) { if (!e.path || Ents.arrived(e)) Ents.goTo(e, g.pos.x, g.pos.z); Ents.stepMove(e, dt, sp); }
+          else { e.hasGun = false; e.mineT = (e.mineT || 0) + dt; if (e.mineT > 2.5) { e.mineT = 0; e.carry = Aliens.harvest(g); e.carryAcid = true; e.hasGun = true; } }
+        }
         break;
       }
       case 'salvage': {
@@ -386,7 +421,7 @@ const Rivals = (() => {
       if (!r.alive) continue;
       (r.sites = r.sites || []).push(site);   // meeles: komandör/mehed lähevad kohale, kui vabanevad
       pending.push({ t: G.time.total + rand(16, 38), fn: () => {
-        if (!r.alive || Comets.siteTotal(site) <= 0) return;
+        if (!r.alive || Comets.siteTotal(site) <= 0 || !tripOK(r, site.x, site.z)) return;
         // väike seltskond: komandör läheb ise (nagu mängija), suurem saadab 2–3 meest
         const n = (r.men || 0) >= 3 ? takeMen(r, 3, 1) : 0;
         if (n < 2 && !sendCommander(r, 'scav', { site })) { if (!n) return; }
@@ -434,16 +469,30 @@ const Rivals = (() => {
       r.siteT = (r.siteT || 0) - dt;
       if (r.siteT <= 0) {
         r.siteT = 20;
-        r.sites = (r.sites || []).filter((q) => Comets.siteTotal(q) > 0);
+        r.sites = (r.sites || []).filter((q) => Comets.siteTotal(q) > 0 && Math.hypot(q.x - r.base.x, q.z - r.base.z) < TRIP_MAX);
         const site = r.sites.sort((a, b) => Math.hypot(a.x - r.base.x, a.z - r.base.z) - Math.hypot(b.x - r.base.x, b.z - r.base.z))[0];
-        if (site && !Econ.isNight() && !unitsOf(r).some((u) => u.mission === 'scav') && !(commanderOf(r) && commanderOf(r).mission === 'scav')) {
+        if (site && !Econ.isNight() && tripOK(r, site.x, site.z) && !unitsOf(r).some((u) => u.mission === 'scav') && !(commanderOf(r) && commanderOf(r).mission === 'scav')) {
           const k = (r.men || 0) >= 3 ? takeMen(r, 2, 1) : 0;
           for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-6, 6), r.base.z + rand(-6, 6), 'scav', { site });
           if (!k) sendCommander(r, 'scav', { site });
         }
       }
+      // tulnukajaht (happenäärmed), kui lähedal komeete pole
+      r.huntT = (r.huntT || rand(30, 60)) - dt;
+      if (r.huntT <= 0) {
+        r.huntT = rand(40, 70);
+        const busy = unitsOf(r).some((u) => u.mission === 'hunt') || (commanderOf(r) && commanderOf(r).mission !== 'guard');
+        const hasSite = (r.sites || []).some((q) => tripOK(r, q.x, q.z));
+        const al = !busy && !Econ.isNight() ? Aliens.nearestPack(r.base.x, r.base.z, 500) : null;
+        if (al && tripOK(r, al.pos.x, al.pos.z) && (!hasSite || (r.men || 0) >= 4)) {
+          const packN = Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack).length;
+          const k = (r.men || 0) >= 3 ? takeMen(r, Math.min(3, packN + 1), 1) : 0;
+          for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-6, 6), r.base.z + rand(-6, 6), 'hunt', { prey: al });
+          if (!k && packN <= 2 && !hasSite) sendCommander(r, 'hunt', { prey: al });
+        }
+      }
       // öösel tulevad korjajad koju (hiilijad)
-      if (Econ.isNight()) for (const u of Ents.list) if (u.alive && u.team === r.team && (u.mission === 'scav' || u.mission === 'salvage') && !u.carry) { u.mission = 'return'; u.path = null; }
+      if (Econ.isNight()) for (const u of Ents.list) if (u.alive && u.team === r.team && (u.mission === 'scav' || u.mission === 'salvage' || u.mission === 'hunt') && !u.carry && !u.inVehicle) { const g = u.site || u.wreck || u.prey; if (!g || (Math.hypot(g.x - u.pos.x, g.z - u.pos.z) > 80 && Math.hypot(u.home.x - u.pos.x, u.home.z - u.pos.z) < 120)) { u.mission = 'return'; u.path = null; } }
       // süvaskänner on esimene suur ost (pesa leidmiseks), nagu mängijal
       if (r.bb && !r.bb.objsOfType('skanner').length && r.res.kris >= (OBJ.skanner.cost.k || 0) && r.res.cr >= (OBJ.skanner.cost.c || 0) + reserve(r)) {
         for (const room of r.bb.rooms.values()) { const before = r.bb.objsOfType('skanner').length; furnish(r, room, ['skanner'], true); if (r.bb.objsOfType('skanner').length > before) { r.bb.rebuildNow(); break; } }
@@ -452,12 +501,13 @@ const Rivals = (() => {
       r.salvT -= dt;
       if (r.salvT <= 0) {
         r.salvT = DAY_LEN * rand(0.2, 0.35);
-        if (r.res.scrap < 80 && !(r.sites || []).length && World.wrecks) {
-          const w = World.wrecks.filter((q) => q.scrap > 0 && !q.gone && Math.hypot(q.x - r.base.x, q.z - r.base.z) < 420).sort((a, b) => Math.hypot(a.x - r.base.x, a.z - r.base.z) - Math.hypot(b.x - r.base.x, b.z - r.base.z))[0];
+        const hasSites = (r.sites || []).some((q) => tripOK(r, q.x, q.z));
+        if (r.res.scrap < (r.men >= 3 ? 160 : 80) && (!hasSites || (r.men || 0) >= 3) && World.wrecks && !Econ.isNight()) {
+          const w = World.wrecks.filter((q) => q.scrap > 0 && !q.gone && Math.hypot(q.x - r.base.x, q.z - r.base.z) < 420 && tripOK(r, q.x, q.z)).sort((a, b) => Math.hypot(a.x - r.base.x, a.z - r.base.z) - Math.hypot(b.x - r.base.x, b.z - r.base.z))[0];
           if (w) {
             const k = (r.men || 0) >= 3 ? takeMen(r, 2, 1) : 0;
             for (let i = 0; i < k; i++) spawnUnit(r, r.base.x + rand(-6, 6), r.base.z + rand(-6, 6), 'salvage', { wreck: w });
-            if (!k) sendCommander(r, 'salvage', { wreck: w });
+            if (!k && !hasSites) sendCommander(r, 'salvage', { wreck: w });
           }
         }
       }
@@ -493,6 +543,7 @@ const Rivals = (() => {
       else { const canPay = Math.floor(r.res.cr / (WAGE + FOOD_CR)); r.res.cr -= canPay * (WAGE + FOOD_CR); const quit = r.men - canPay; r.men = canPay; for (const u of unitsOf(r).slice(0, Math.max(0, unitsOf(r).length - r.men))) u.remove = true; if (quit > 0) UI.msg('Radio: ' + quit + ' of ' + r.short + '\'s unpaid mercenaries walked out.', 'rival'); }
       r.slots = 3;
       topUpGuards(r);
+      buyScrap(r);
     }
   }
   // mängija baasi tuum: sama mis konkurentidel (900 elu); kui see hävib, on mäng läbi

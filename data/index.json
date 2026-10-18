@@ -1,5 +1,5 @@
 {
- "version": "v60",
+ "version": "v61",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -104,6 +104,7 @@
   "js/14b_waves.js",
   "js/14c_vehicles.js",
   "js/14d_gadgets.js",
+  "js/14e_aliens.js",
   "js/15_objectives.js",
   "js/16_input.js",
   "js/17_build.js",
