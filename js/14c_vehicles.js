@@ -243,7 +243,7 @@ const Vehicles = (() => {
     M.lift = b.build();
     // ---- mech: raske kõndiv tööülikond. Küürus kere suure kabiiniklaasiga, massiivsed õlakapslid,
     //      jämedad jalad, mõlema käega hoitav pöörlevate torudega kahur (oma disain) ----
-    { const OL = [0.33, 0.35, 0.33], OL2 = [0.23, 0.245, 0.24], HZ = [0.9, 0.68, 0.12], BK = [0.07, 0.075, 0.08], ST = [0.46, 0.47, 0.49], GL = [1.0, 0.55, 0.15], GLS = [0.12, 0.2, 0.24];
+    { const OL = [0.7, 0.44, 0.15], OL2 = [0.3, 0.31, 0.32], HZ = [0.9, 0.68, 0.12], BK = [0.07, 0.075, 0.08], ST = [0.46, 0.47, 0.49], GL = [1.0, 0.55, 0.15], GLS = [0.12, 0.2, 0.24];
       const md0 = MB.detail; MB.detail = true;
       b = new MB(); b.jit = 0;   // vaagen (0 = puusatelg)
       b.color(OL2, MAT.WORN).box(0, 0.05, 0, 1.7, 0.75, 1.2); b.color(BK, MAT.METAL).box(0, -0.35, 0.05, 1.2, 0.3, 0.9);
@@ -290,6 +290,8 @@ const Vehicles = (() => {
         b.color(ST, MAT.METAL).sphere(sx * 1.7, -1.4, 0.25, 0.36, 10, 6, 1);                                               // küünarnukk
         limb(sx * 1.65, -1.45, 0.3, sx * 0.6, -1.4, 1.45, 0.52, OL);                                                        // küünarvars
         b.color(BK, MAT.METAL).box(sx * 0.55, -1.35, 1.5, 0.4, 0.5, 0.45);                                                  // käsi
+        for (let f = 0; f < 3; f++) b.color(OL2, MAT.METAL).push().tf(sx * 0.42, -1.12 - f * 0.17, 1.62, 0, 0, sx * 0.5).box(-sx * 0.12, 0, 0, 0.32, 0.12, 0.14).pop();   // sõrmed ümber kahuri
+        b.color(OL2, MAT.METAL).box(sx * 0.32, -1.5, 1.55, 0.12, 0.25, 0.14);   // pöial
       }
       b.color(OL2, MAT.WORN).box(0.15, -1.1, 1.6, 0.75, 0.75, 1.9);                                                       // kahuri korpus
       b.color(BK, MAT.METAL).box(0.15, -1.55, 1.3, 0.55, 0.45, 0.9);                                                      // padrunisalv

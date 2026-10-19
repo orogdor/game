@@ -248,6 +248,11 @@ body.touch #hudBL { bottom: calc(10px + var(--sb)); width: 150px; }
 #bCats small { opacity: .6; font-family: var(--font-num); }
 #bSearch { height: 30px; min-width: 150px; flex: 0 1 200px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .35); color: var(--bone); font-size: 13.5px; }
 .bEmpty { padding: 12px; color: var(--muted); font-size: 13.5px; }
+.lvls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 6px 0; }
+.lvls .lv { position: relative; overflow: hidden; font-size: 11.5px; padding: 3px 5px 5px; border: 1px solid var(--line); border-radius: 3px; background: rgba(0,0,0,.25); white-space: nowrap; }
+.lvls .lv b { color: var(--muted); font-weight: 600; margin-right: 2px; }
+.lvls .lv i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--rust-hi); }
+.lvcard { margin-bottom: 10px; }
 .item .tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .item .tag { font-style: normal; font-size: 10.5px; padding: 1px 5px; border-radius: 8px; background: rgba(255, 255, 255, .08); color: var(--muted); }
 .item .tag.out { color: #e8d06a; } .item .tag.in { color: #9fd0ff; } .item .tag.pw { color: #ffcf7a; } .item .tag.gen { color: #97d276; } .item .tag.th { color: #ffa04a; }

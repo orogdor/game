@@ -1,5 +1,5 @@
 {
- "version": "v75",
+ "version": "v76",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -97,6 +97,7 @@
   "js/08_fx.js",
   "js/09_econ.js",
   "js/09b_inv.js",
+  "js/09c_levels.js",
   "js/10_player.js",
   "js/11_comets.js",
   "js/12_crew.js",

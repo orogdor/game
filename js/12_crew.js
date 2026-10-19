@@ -213,7 +213,7 @@ const Crew = (() => {
     Ents.goTo(e, o.cx, o.cz, e.goalCells);
     return true;
   }
-  function speedOf(e) { const c = e.crew; return (c.trait === 'kiire' ? 5.4 : 4.4) * (c.trait === 'laisk' ? 0.85 : 1) * (e.hp < e.maxHp * 0.5 ? 0.72 : 1) * (c.energy < 20 ? 0.85 : 1) * (c.carry > 0 && c.trait !== 'tugev' ? 0.85 : 1) * (e.downed ? 0 : 1) * Inv.gearSpd(c.look && c.look.eq); }
+  function speedOf(e) { const c = e.crew; return (c.trait === 'kiire' ? 5.4 : 4.4) * (c.trait === 'laisk' ? 0.85 : 1) * (e.hp < e.maxHp * 0.5 ? 0.72 : 1) * (c.energy < 20 ? 0.85 : 1) * (c.carry > 0 && c.trait !== 'tugev' ? 0.85 : 1) * (e.downed ? 0 : 1) * Inv.gearSpd(c.look && c.look.eq) * Levels.crewSpeed(c); }
   // mida inimene aeg-ajalt ütleb
   function sayLine(e) {
     const c = e.crew, k = c.task, n = (s) => s;
@@ -234,9 +234,9 @@ const Crew = (() => {
     if (!c.bed) L.push('Sleeping on the floor wrecks your back.');
     return L.length ? pick(L) : null;
   }
-  function workMult(c) { return (0.95 + c.skill * 0.3) * (c.trait === 'laisk' ? 0.75 : 1); }
+  function workMult(c) { return (0.95 + c.skill * 0.3) * (c.trait === 'laisk' ? 0.75 : 1) * Levels.crewWork(c); }
   function crewDmg(c) { const base = c.role === 'valvur' ? 15 : c.role === 'jahimees' ? 15 : 9; return base * (c.trait === 'tapne' ? 1.4 : 1) * (c.trait === 'veteran' ? 1.35 : 1); }
-  function crewAcc(c) { return (roomTypes && [...(rtCache || new Map()).values()].includes('Armoury') ? 1.1 : 1) * ((c.role === 'valvur' || c.role === 'jahimees' ? 0.7 : 0.55) + (c.trait === 'tapne' ? 0.2 : 0) + (c.trait === 'veteran' ? 0.12 : 0)) * (Base.objsOfType('relvakapp').length ? 1.15 : 1); }
+  function crewAcc(c) { return (roomTypes && [...(rtCache || new Map()).values()].includes('Armoury') ? 1.1 : 1) * ((c.role === 'valvur' || c.role === 'jahimees' ? 0.7 : 0.55) + (c.trait === 'tapne' ? 0.2 : 0) + (c.trait === 'veteran' ? 0.12 : 0) + Levels.crewAcc(c)) * (Base.objsOfType('relvakapp').length ? 1.15 : 1); }
   function setAct(e, s) { e.crew.act = s; }
   // kaasas käimise juht: mängija või kaasmängija (co-op)
   function leaderOf(c) { const L = c.leader; return L && L !== Player ? L : Player; }
@@ -537,6 +537,7 @@ const Crew = (() => {
   function deposit(e) {
     const c = e.crew;
     if (!c.carry) return;
+    Levels.add(c, 'haul', c.carry);
     if (c.carryKind === 'kris') { note('kris', c.carry); G.res.kris += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' diamonds'); }
     if (c.carryKind === 'scrap') { G.res.scrap += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' scrap'); }
     if (c.carryKind === 'ore') { G.res.ore = (G.res.ore || 0) + c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' iron ore'); }
@@ -761,7 +762,11 @@ const Crew = (() => {
   function roomTypeAt(x, z) { const c = Base.toCell(x, z); return roomTypes().get(Base.roomAt(c.i, c.j)) || null; }
   function crewAI(e, dt) {
     const c = e.crew; if (!c) return;
-    if (e.inVehicle) return;   // istub bagis (Vehicles juhib)
+    if (e.inVehicle) return;
+    // oskuste kogemus: töö ja kõndimine
+    if (e.gesture === 'mine' || e.gesture === 'fix' || e.gesture === 'interact' || e.gesture === 'build') Levels.add(c, 'work', dt);
+    if (e._lx !== undefined) { const dm = Math.hypot(e.pos.x - e._lx, e.pos.z - e._lz); if (dm < 2) Levels.add(c, 'legs', dm); }
+    e._lx = e.pos.x; e._lz = e.pos.z;   // istub bagis (Vehicles juhib)
     const sleeping = e.pose === 'lie';
     // vajadused
     if (c.thirst === undefined) c.thirst = 90;
@@ -1240,7 +1245,7 @@ const Crew = (() => {
       case 'mine': {
         e.hasGun = true;
         const s = k.site;
-        const cap = c.trait === 'tugev' ? 32 : 20;
+        const cap = Math.round((c.trait === 'tugev' ? 32 : 20) * Levels.crewCarry(c));
         if (k.step === 0) {
           const cl = s.clusters.filter((q) => q.amount > 0).sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
           if (!cl) { k.done = true; return; }
@@ -1275,7 +1280,7 @@ const Crew = (() => {
           setAct(e, k.buddy ? 'Stripping a wreck with ' + first(k.buddy) : 'Stripping a wreck'); e.hasGun = false; e.gesture = 'fix';
           k.t += dt * workMult(c);
           if (Math.random() < 0.2) FX.repair(w.x + rand(-1, 1), w.y + 1, w.z + rand(-1, 1));
-          if (k.t > 4.5) { k.t = 0; const n = Math.min(12, w.scrap); w.scrap -= n; c.carry += n; c.carryKind = 'scrap'; if (c.carry >= (c.trait === 'tugev' ? 50 : 34) || w.scrap <= 0) k.done = true; }   // täis kott, siis koju
+          if (k.t > 4.5) { k.t = 0; const n = Math.min(12, w.scrap); w.scrap -= n; c.carry += n; c.carryKind = 'scrap'; if (c.carry >= (c.trait === 'tugev' ? 50 : 34) * Levels.crewCarry(c) || w.scrap <= 0) k.done = true; }   // täis kott, siis koju
         }
         return;
       }
@@ -1290,7 +1295,7 @@ const Crew = (() => {
           setAct(e, 'Drilling iron ore'); e.hasGun = false; e.gesture = 'mine'; Ents.face(e, w.x, w.z, dt);
           k.t += dt * workMult(c);
           if (Math.random() < 0.25) FX.sparks(w.x + rand(-0.5, 0.5), w.y + 0.8, w.z + rand(-0.5, 0.5), [1, 0.6, 0.3], 2, 2);
-          if (k.t > 5) { k.t = 0; const n = Math.min(c.trait === 'tugev' ? 10 : 7, w.amount); w.amount -= n; c.carry += n; c.carryKind = 'ore'; if (c.carry >= (c.trait === 'tugev' ? 30 : 21) || w.amount <= 0) k.done = true; }
+          if (k.t > 5) { k.t = 0; const n = Math.min(c.trait === 'tugev' ? 10 : 7, w.amount); w.amount -= n; c.carry += n; c.carryKind = 'ore'; if (c.carry >= (c.trait === 'tugev' ? 30 : 21) * Levels.crewCarry(c) || w.amount <= 0) k.done = true; }
         }
         return;
       }

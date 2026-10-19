@@ -83,16 +83,18 @@ const Inv = (() => {
     idxKey = k; return idxCache;
   }
   function nSlots() { return idx().length; }
+  // ressursside virn kasvab tassimise tasemega
+  function stk(id) { const d = ITEMS[id]; return d.cat === 'res' && typeof Levels !== 'undefined' ? Math.round(d.stack * Levels.pStack()) : d.stack; }
   function count(id) { const v = ensure(); let n = 0; for (const i of idx()) { const s = v.slots[i]; if (s && s.id === id) n += s.n; } return n; }
   function used() { const v = ensure(); let n = 0; for (const i of idx()) if (v.slots[i]) n++; return n; }
   // kui palju mahub
   function room(id) {
-    const v = ensure(), st = ITEMS[id].stack; let r = 0;
+    const v = ensure(), st = stk(id); let r = 0;
     for (const i of idx()) { const s = v.slots[i]; if (!s) r += st; else if (s.id === id) r += st - s.n; }
     return r;
   }
   function add(id, n) {
-    const v = ensure(), st = ITEMS[id].stack; let left = n;
+    const v = ensure(), st = stk(id); let left = n;
     for (const i of idx()) { if (left <= 0) break; const s = v.slots[i]; if (s && s.id === id && s.n < st) { const k = Math.min(st - s.n, left); s.n += k; left -= k; } }
     for (const i of idx()) { if (left <= 0) break; if (!v.slots[i]) { const k = Math.min(st, left); v.slots[i] = { id, n: k }; left -= k; } }
     if (n - left > 0 && typeof UI !== 'undefined') UI.invDirty();
@@ -178,7 +180,7 @@ const Inv = (() => {
   function moveSlot(a, b) {
     const v = ensure(); if (a === b) return;
     const A = v.slots[a], B = v.slots[b];
-    if (A && B && A.id === B.id && ITEMS[A.id].stack > 1) { const k = Math.min(ITEMS[A.id].stack - B.n, A.n); B.n += k; A.n -= k; if (A.n <= 0) v.slots[a] = null; }
+    if (A && B && A.id === B.id && stk(A.id) > 1) { const k = Math.min(stk(A.id) - B.n, A.n); B.n += k; A.n -= k; if (A.n <= 0) v.slots[a] = null; }
     else { v.slots[a] = B; v.slots[b] = A; }
     UI.invDirty();
   }

@@ -646,6 +646,7 @@ const UI = (() => {
     $('pTitle').textContent = 'Crew'; $('pTabs').innerHTML = '';
     const ms = Crew.members();
     let h = `<div class="kv"><div><div class="k">People</div><div class="v">${ms.length} / 10</div></div><div><div class="k">Free beds</div><div class="v">${Crew.freeBeds()}</div></div><div><div class="k">Food</div><div class="v">${G.res.food} <small style="font-size:12px;color:var(--muted)">+${G.res.meat} meat</small></div></div></div>`;
+    h += `<div class="card lvcard"><h4>You · skills</h4>${Levels.badges('player', true)}<div class="note">Skills grow by doing: carry loot home, fight, work (hold-E jobs) and walk. Each level gives a bonus – hover a badge.</div></div>`;
     if (ms.length) h += `<div class="row"><div class="grow note">Companions come with you and protect you. Key <kbd>V</kbd> calls everyone nearby.</div>${btn('folall', ms.some((m) => !m.crew.follow) ? 'Everyone follow me' : 'Everyone back to work')}</div>`;
     if (!ms.length) h += `<div class="empty">You're still alone here.<br>Hire helpers at the comms terminal. Every person needs a bed.</div>`;
     h += '<div class="cards">';
@@ -656,6 +657,7 @@ const UI = (() => {
         <div class="act">Now: ${esc(c.act || '—')}</div>
         <div class="bars"><span>Health</span>${bar((m.hp / m.maxHp) * 100)}<span>Hunger</span>${bar(c.hunger)}<span>Thirst</span>${bar(c.thirst === undefined ? 90 : c.thirst)}<span>Hygiene</span>${bar(c.hygiene === undefined ? 80 : c.hygiene)}<span>Sleep</span>${bar(c.energy)}<span>Morale</span>${bar(c.morale)}</div>
         <div class="trait"><b>${TRAITS[c.trait].name}.</b> ${TRAITS[c.trait].desc} <span style="color:var(--muted)">Courage: ${fearName(fearOf(c))}</span></div>
+        ${Levels.badges(c, false)}
         <div class="money">${c.wage} ₵ per day${c.bed ? '' : ' · <span style="color:var(--danger)">no bed</span>'}</div>
         ${crewGear(m)}
         <div class="row">${btn('fol:' + m.id, c.follow ? 'Send back to work' : 'Ask to follow', c.follow ? { primary: true } : {})}${btn('fire:' + m.id, fireConfirm === m.id ? 'Kinnita: vallanda' : 'Dismiss')}</div></div>`;

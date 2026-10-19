@@ -106,7 +106,7 @@ function rollFear(trait) {
   const base = { argpyks: 0.88, veteran: 0.12, tapne: 0.3, tugev: 0.32, vintske: 0.35, roomus: 0.4 }[trait];
   return clamp(base !== undefined ? base + rand(-0.08, 0.08) : rand(0.2, 0.75), 0, 1);
 }
-function fearOf(c) { if (c.fear === undefined) c.fear = rollFear(c.trait); return c.fear; }
+function fearOf(c) { if (c.fear === undefined) c.fear = rollFear(c.trait); return c.fear * (typeof Levels !== 'undefined' ? Levels.crewFear(c) : 1); }
 function fearName(f) { return f < 0.22 ? 'Fearless' : f < 0.42 ? 'Brave' : f < 0.62 ? 'Steady' : f < 0.8 ? 'Nervous' : 'Easily scared'; }
 const STORIES = [
   'Left two kids and a debt at home. Just like you.', 'Once mined on Titan and talks about it far too much.', 'Can\'t remember the last time they saw the sun.',

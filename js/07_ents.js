@@ -298,6 +298,7 @@ const Ents = (() => {
       if (e.team === 'crew' && typeof Crew !== 'undefined') Crew.onDeath(e, src);
       else if (typeof Rivals !== 'undefined') Rivals.onUnitDeath(e, src);
     }
+    if (src && e.kind !== 'goat' && e.kind !== 'ram' && e.kind !== 'jelly' && typeof Levels !== 'undefined') { if (src.kind === 'player') Levels.add('player', 'fight', e.kind === 'beast' || e.kind === 'kiskja' ? 3 : 1); else if (src.crew) Levels.add(src.crew, 'fight', e.kind === 'beast' || e.kind === 'kiskja' ? 3 : 1); }
     if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'alien' || e.kind === 'beast' || e.kind === 'human') UI.hitMarker(true); }
   }
 

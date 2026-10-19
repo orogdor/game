@@ -59,7 +59,8 @@ const Player = {
     let wx = fw.x * inp.moveY + rt.x * inp.moveX, wz = fw.z * inp.moveY + rt.z * inp.moveX;
     const wl = Math.hypot(wx, wz); if (wl > 1) { wx /= wl; wz /= wl; }
     const sprint = (inp.sprint || inp.moveMag > 0.93) && inp.moveY > 0.3;
-    let spd = (sprint && !this.zoom ? 8.6 : 5.3) * Inv.speedMul() * (this.zoom ? 0.6 : 1) * (weaponStats(this.weapon).slow || 1);
+    this.maxHp = Levels.pHp();
+    let spd = (sprint && !this.zoom ? 8.6 * Levels.pSprint() : 5.3) * Inv.speedMul() * (this.zoom ? 0.6 : 1) * (weaponStats(this.weapon).slow || 1);
     if (this.reloadT > 0) spd *= 0.85;
     // kallakul aeglasemalt üles
     const ahead = World.heightAt(this.pos.x + wx * 1.2, this.pos.z + wz * 1.2) - World.heightAt(this.pos.x, this.pos.z);
@@ -90,6 +91,7 @@ const Player = {
     } else if (this.onGround && this.pos.y - gy < 0.6 && this.vel.y <= 0) { this.pos.y = gy; this.vel.y = 0; }
     else this.onGround = false;
     this.speedNow = Math.hypot(this.vel.x, this.vel.z);
+    if (this.onGround && this.speedNow > 0.5) Levels.add('player', 'legs', this.speedNow * dt);
     this.moveAmt = clamp(this.speedNow / 5, 0, 1);
     // jalasammud ja kõikumine
     if (this.onGround && this.speedNow > 0.5) {
@@ -109,6 +111,7 @@ const Player = {
   },
 
   deposit() {
+    { let n = 0; for (const id of ['kris', 'scrap', 'meat', 'ore', 'acid']) n += Inv.count(id); Levels.add('player', 'haul', n); }
     const parts = Inv.depositResources();
     Audio2.pickup();
     UI.toast(parts.join(' · ') + ' to storage');
@@ -228,7 +231,7 @@ const Player = {
     if (!last) return;
     FX.muzzle(mz.x, mz.y, mz.z, dx, dy, dz, st.pierce);
     Audio2.shoot(st.snd || (st.pierce ? 'rail' : 'rifle'));
-    this.recoil = Math.min(1.5, this.recoil + (st.recoil !== undefined ? st.recoil : st.pierce ? 1.2 : 0.35));
+    this.recoil = Math.min(1.5, this.recoil + (st.recoil !== undefined ? st.recoil : st.pierce ? 1.2 : 0.35) * (1 - Levels.level('player', 'fight') * 0.06));
     this.kick = st.kick !== undefined ? st.kick : st.pierce ? 1 : 0.5;
     this.pitch = Math.min(1.45, this.pitch + (st.pierce ? 0.035 : st.pellets ? 0.03 : 0.006) * (1 - (this.adsT || 0) * 0.4));
     if (st.pellets) UI.shake && UI.shake(0.25);
@@ -249,7 +252,7 @@ const Player = {
   },
   applyHit(hr, st, e, dx, dy, dz) {
     const t = hr.e;
-    let dmg = st.dmg * hr.mult;
+    let dmg = st.dmg * hr.mult * Levels.pDmg();
     const hx = e.x + dx * hr.t, hy = e.y + dy * hr.t, hz = e.z + dz * hr.t;
     if (t.kind === 'boss') { Boss.hit(t, dmg, this, hr.idx, hx, hy, hz); return; }
     Ents.damage(t, dmg, this);
@@ -306,7 +309,7 @@ const Player = {
       if (inp.actHeld) {
         this.interT += dt;
         if (it.tick) it.tick(dt);
-        if (this.interT >= it.hold) { this.interT = 0; it.act(); this.interScan = 0; }
+        if (this.interT >= it.hold * Levels.pHold()) { Levels.add('player', 'work', it.hold); this.interT = 0; it.act(); this.interScan = 0; }
       } else this.interT = Math.max(0, this.interT - dt * 2);
     } else if (inp.act) { it.act(); this.interScan = 0; }
   },
