@@ -225,27 +225,27 @@ const Econ = (() => {
   // ---------- turg ----------
   function sellKris(n) {
     n = Math.min(n, G.res.kris); if (n <= 0) return 0;
-    const v = n * G.market.price;
+    const v = Math.round(n * G.market.price * (hasTech('relay') ? 1.15 : 1));
     G.res.kris -= n; G.res.cr += v; Audio2.cash();
     return v;
   }
   function sellLihv(n) {
     n = Math.min(n, G.res.lihv); if (n <= 0) return 0;
-    const v = Math.round(n * G.market.price * 1.6);
+    const v = Math.round(n * G.market.price * 1.6 * (hasTech('relay') ? 1.15 : 1));
     G.res.lihv -= n; G.res.cr += v; Audio2.cash();
     return v;
   }
   function sellOre(n) {
     n = Math.min(n, G.res.ore || 0); if (n <= 0) return 0;
-    const v = n * 9; G.res.ore -= n; G.res.cr += v; Audio2.cash(); return v;
+    const v = Math.round(n * 9 * (hasTech('relay') ? 1.15 : 1)); G.res.ore -= n; G.res.cr += v; Audio2.cash(); return v;
   }
   function sellAcid(n) {
     n = Math.min(n, G.res.acid || 0); if (n <= 0) return 0;
-    const v = n * Aliens.ACID_PRICE; G.res.acid -= n; G.res.cr += v; Audio2.cash(); return v;
+    const v = Math.round(n * Aliens.ACID_PRICE * (hasTech('relay') ? 1.15 : 1)); G.res.acid -= n; G.res.cr += v; Audio2.cash(); return v;
   }
   function sellMeat(n) {
     n = Math.min(n, G.res.meat); if (n <= 0) return 0;
-    const v = n * 4; G.res.meat -= n; G.res.cr += v; Audio2.cash(); return v;
+    const v = Math.round(n * 4 * (hasTech('relay') ? 1.15 : 1)); G.res.meat -= n; G.res.cr += v; Audio2.cash(); return v;
   }
   function buy(kind) {
     const offers = { scrap: { cost: 45, give: () => { G.res.scrap += 20; } }, food: { cost: 40, give: () => { G.res.food += 5; } } };

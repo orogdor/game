@@ -248,6 +248,14 @@ body.touch #hudBL { bottom: calc(10px + var(--sb)); width: 150px; }
 #bCats small { opacity: .6; font-family: var(--font-num); }
 #bSearch { height: 30px; min-width: 150px; flex: 0 1 200px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .35); color: var(--bone); font-size: 13.5px; }
 .bEmpty { padding: 12px; color: var(--muted); font-size: 13.5px; }
+.xwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .xwrap { grid-template-columns: 1fr; } }
+.xcol { background: rgba(0,0,0,.22); border: 1px solid var(--line); border-radius: 5px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.xcol h4 { margin: 0 0 4px; } .xcol h4 small { color: var(--muted); font-weight: 500; margin-left: 6px; }
+.xrow { display: grid; grid-template-columns: 22px 1fr auto auto; align-items: center; gap: 6px; padding: 3px 2px; border-bottom: 1px solid rgba(255,255,255,.05); font-size: 13.5px; }
+.xrow .xi svg { width: 20px; height: 20px; } .xrow b { font-family: var(--font-num); }
+.xb { display: flex; gap: 3px; } .xm, .xall { padding: 3px 7px; border: 1px solid var(--line-2); border-radius: 3px; background: transparent; font-size: 12px; }
+.xall { margin-top: 6px; padding: 6px; font-weight: 600; }
 .lvls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 6px 0; }
 .lvls .lv { position: relative; overflow: hidden; font-size: 11.5px; padding: 3px 5px 5px; border: 1px solid var(--line); border-radius: 3px; background: rgba(0,0,0,.25); white-space: nowrap; }
 .lvls .lv b { color: var(--muted); font-weight: 600; margin-right: 2px; }

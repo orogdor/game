@@ -44,3 +44,20 @@ const Levels = (() => {
   const pSprint = () => 1 + level('player', 'legs') * 0.02;
   return { SK, KEYS, level, progress, add, badges, perkText, crewCarry, crewWork, crewSpeed, crewFear, crewAcc, pStack, pDmg, pHold, pHp, pSprint };
 })();
+// ============================================================
+//  KÜLADE TEHNOLOOGIA: igast küla tüübist leiab ühe ainulaadse seadme (püsiv täiendus)
+// ============================================================
+const TECH = {
+  cook: { name: 'Pressure-cooker module', where: 'farmstead', desc: 'Stoves cook twice as fast and get 3 meals from a piece of meat; hydroponics grow 50% faster.' },
+  drill: { name: 'Diamond drill head', where: 'mining camp', desc: 'You and the crew mine diamonds and ore much faster and take more per swing.' },
+  cutter: { name: 'Plasma cutter', where: 'workshop outpost', desc: 'Wrecks are stripped twice as fast and give more scrap.' },
+  med: { name: 'Auto-doctor unit', where: 'medical station', desc: 'The medical bay heals twice as fast and your own wounds heal 50% faster.' },
+  relay: { name: 'Trade uplink', where: 'relay station', desc: 'The terminal pays 15% more for everything you sell.' },
+};
+function hasTech(k) { return !!(G.flags.tech && G.flags.tech[k]); }
+function grantTech(k) {
+  G.flags.tech = G.flags.tech || {}; if (G.flags.tech[k]) return;
+  G.flags.tech[k] = true;
+  if (typeof UI !== 'undefined') { UI.banner('New technology: ' + TECH[k].name, TECH[k].desc, 'good'); UI.msg('Found in an abandoned ' + TECH[k].where + ': ' + TECH[k].name + '. ' + TECH[k].desc, 'money'); }
+  if (typeof Audio2 !== 'undefined') Audio2.cash();
+}

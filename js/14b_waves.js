@@ -54,6 +54,7 @@ const Waves = (() => {
       state.small = clamp(Math.round((2 + state.n * 0.4 + S * 0.3) * G.dk.raid), 3, 110);
       state.big = Math.floor(S / 28) + Math.floor(state.n / 3);
       state.hpMul = 1 + S / 500;
+      state.beetles = Math.floor(S / 45);   // suurt baasi piiravad ka happemortiiriga mardikad
       state.total = state.small + state.big;
       Audio2.alarm();
       if (cmd) UI.banner('Swarm approaching ' + dirName(state.dir) + '!', 'Command post: ' + state.small + ' darters' + (state.big ? ', ' + state.big + ' rammers' : '') + ' · attack at night', 'danger');
@@ -64,6 +65,7 @@ const Waves = (() => {
     // algus
     if (!state.active && !state.done && (h >= 21 || h < 5) && state.warned) { state.active = true; state.spawnT = 0; }
     if (state.active) {
+      if (state.beetles && !state.beetlesOut) { state.beetlesOut = true; for (let k = 0; k < state.beetles; k++) { const a = state.dir + rand(-0.5, 0.5), r = rand(140, 165); Fauna.spawnBeetle(Math.cos(a) * r + Base.OX, Math.sin(a) * r + Base.OZ, true); } }
       state.spawnT -= dt;
       if (state.spawned < state.total && state.spawnT <= 0) {
         state.spawnT = 2.2;

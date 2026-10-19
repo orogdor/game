@@ -528,8 +528,11 @@ const City = (() => {
     // ---- väikesed mahajäetud asulad: 2–4 koloonia maja, vallijupid, vanaraud, veidi varustust ----
     b = new MB(); b.jit = 0; gl = new MB(); gl.jit = 0; dm = new MB(); dm.jit = 0;
     vLoot.length = 0;
-    const vNames = ['Abandoned outpost', 'Deserted farmstead', 'Empty relay station', 'Dead settlement'];
+    // küla tüübid: igaühest leiab oma tehnoloogia (TECH), raha (krediidikiibid) ja vanarauda
+    const VTYPES = [['farm', 'Abandoned farmstead', 'cook'], ['mine', 'Old mining camp', 'drill'], ['shop', 'Workshop outpost', 'cutter'], ['med', 'Medical station', 'med'], ['relay', 'Relay station', 'relay']];
+    const vNames = VTYPES.map((q) => q[1]);
     (World.sites.villages || []).forEach((v, vi) => {
+      const VT = VTYPES[vi % VTYPES.length]; v.type = VT[0]; v.tech = vi < VTYPES.length ? VT[2] : null;
       const nH = 2 + Math.floor(rng() * 3), a0 = rng() * TAU;
       const before = lootSpots.length;
       for (let q = 0; q < nH; q++) {
@@ -539,8 +542,17 @@ const City = (() => {
         const doorSide = Math.abs(gx) > Math.abs(gz) ? (gx > 0 ? 1 : 3) : (gz > 0 ? 0 : 2);
         hab(hx, hz, R(7, 11), R(6, 9), 1, doorSide, rng);
       }
-      for (let k = before; k < lootSpots.length; k++) vLoot.push(lootSpots[k]);
+      for (let k = before; k < lootSpots.length; k++) vLoot.push(Object.assign(lootSpots[k], { vtype: v.type }));
+      if (v.tech && lootSpots.length > before) v.techSpot = lootSpots[before];
       lootSpots.length = before;
+      // küla iseloom: talu – kasvuhoone ja peenrad; kaevandus – tõstetorn ja maagikärud; töökoda – kraana ja romu; meditsiinijaam – valge kuppel; side – taldrik
+      { const ang = a0 + Math.PI / Math.max(2, nH), px = v.x + Math.cos(ang) * 17, pz = v.z + Math.sin(ang) * 17;
+        if (v.type === 'farm') { greenhouse(px, pz, 7); for (let r2 = 0; r2 < 5; r2++) { const qx = v.x + Math.cos(ang + 1.6) * 20 + r2 * 1.8, qz = v.z + Math.sin(ang + 1.6) * 20; b.color([0.34, 0.26, 0.18], MAT.WORN).boxB(qx, Y(qx, qz) - 0.1, qz, 1.1, 0.3, 9); for (let q = 0; q < 6; q++) b.color([0.35, 0.45, 0.22], MAT.MATTE).cyl(qx, Y(qx, qz) + 0.2, qz - 4 + q * 1.6, 0.25, 0.05, 0.6, 5, true); } }
+        else if (v.type === 'mine') { const y0 = Y(px, pz); for (const [qx, qz] of [[-1.6, -1.6], [1.6, -1.6], [1.6, 1.6], [-1.6, 1.6]]) beam(px + qx, y0, pz + qz, px + qx * 0.3, y0 + 13, pz + qz * 0.3, 0.3, 0.3, [0.6, 0.4, 0.15]); b.color(FRAME, MAT.METAL).cyl(px, y0 + 13, pz, 1.4, 1.4, 0.4, 12, true); b.color([0.25, 0.25, 0.26], MAT.METAL).push().tf(px, y0 + 13.6, pz, 0, 0, Math.PI / 2).cyl(0, -0.5, 0, 1.0, 1.0, 1.0, 14, true).pop(); for (let q = 0; q < 3; q++) { const qx = px + 5 + q * 2.6, qz = pz + 3; b.color(RUSTC, MAT.RUST).boxB(qx, Y(qx, qz), qz, 1.6, 1.0, 1.1); b.color([0.55, 0.3, 0.22], MAT.WORN).sphere(qx, Y(qx, qz) + 1.0, qz, 0.6, 8, 4, 0.5); } World.addCol({ t: 'c', x: px, z: pz, r: 2.2, y0: y0 - 1, y1: y0 + 14, kind: 'struct' }); }
+        else if (v.type === 'shop') { crane(px, pz); rubble(b, px + 6, pz - 4, 3, rng, Y(px + 6, pz - 4)); }
+        else if (v.type === 'med') { dm.color([0.82, 0.84, 0.82], MAT.METAL).sphere(px, Y(px, pz), pz, 6, 16, 8, 0.6); b.color([0.3, 0.3, 0.31], MAT.METAL).cyl(px, Y(px, pz) - 0.2, pz, 6.3, 6.3, 0.4, 20, true); gl.color([0.3, 1.0, 0.45], MAT.GLOW).box(px, Y(px, pz) + 3.7, pz, 1.8, 0.5, 0.5).box(px, Y(px, pz) + 3.7, pz, 0.5, 1.8, 0.5); World.addCol({ t: 'c', x: px, z: pz, r: 6, y0: Y(px, pz) - 1, y1: Y(px, pz) + 3.6, kind: 'struct' }); }
+        else dish(px, pz);
+      }
       // lagunenud piirdevalli jupid
       for (let k = 0; k < 6; k++) {
         if (rng() < 0.45) continue;
@@ -551,10 +563,10 @@ const City = (() => {
       // vanaraua hunnik
       const x = v.x + R(-6, 6), z = v.z + R(-6, 6), y = Y(x, z);
       const pb = new MB(); pb.jit = 0; rubble(pb, 0, 0, R(2.2, 3), rng, 0, true);
-      const w = { id: 1100 + vi, x, z, y, yaw: 0, type: -1, m: M4.compose(M4.create(), x, y, z, R(0, TAU)), rad: 2.4, scrap: Math.floor(R(40, 75)), name: vNames[vi % vNames.length], known: false, mesh: pb.build(), city: true };
+      const w = { id: 1100 + vi, x, z, y, yaw: 0, type: -1, m: M4.compose(M4.create(), x, y, z, R(0, TAU)), rad: 2.4, scrap: Math.floor(R(40, 75)), name: VT[1], known: false, mesh: pb.build(), city: true };
       w.col = World.addCol({ t: 'c', x, z, r: 2.0, y0: y - 2, y1: y + 2, kind: 'wreck' });
       World.wrecks.push(w);
-      v.name = vNames[vi % vNames.length];
+      v.name = VT[1];
     });
     // maanteed asulate vahel: asfaltplaadid järgivad maastikku, suur osa lagunenud või liiva all
     for (const r of World.sites.roads || []) {
@@ -595,7 +607,18 @@ const City = (() => {
   function spawnLoot() {
     const parts = ['legs', 'torso', 'gun', 'reactor', 'cpu'], c = World.sites.city;
     (c.mechParts || []).forEach((q, k) => { if (parts[k]) Ents.pickups.push({ kind: 'mechpart', x: q.x, y: Ents.groundY(q.x, q.z), z: q.z, data: { part: parts[k] }, id: Math.random(), city: true }); });
-    for (const s of vLoot) if (Math.random() < 0.6) { const items = []; for (let q = 0; q < randi(1, 3); q++) { const [id, a, bb] = LOOT[Math.floor(Math.random() * 9)]; if (ITEMS[id]) items.push([id, randi(a, bb)]); } Ents.pickups.push({ kind: 'bag', x: s.x, y: Ents.groundY(s.x, s.z), z: s.z, data: { items }, id: Math.random(), city: true }); }
+    const VL = { farm: [['meat', 3, 6], ['ration', 2, 5]], mine: [['kris', 3, 8], ['ore', 6, 14]], shop: [['scrap', 20, 40], ['grenade', 1, 3]], med: [['medkit', 1, 3], ['stim', 1, 2], ['trauma', 1, 1]], relay: [['cred', 4, 10], ['ammo_pl', 20, 40]] };
+    for (const s of vLoot) if (Math.random() < 0.75) {
+      const items = [['cred', randi(1, 5)], ['scrap', randi(8, 20)]];
+      for (const [id, a, bb] of VL[s.vtype] || []) if (Math.random() < 0.7) items.push([id, randi(a, bb)]);
+      if (Math.random() < 0.4) { const [id, a, bb] = LOOT[Math.floor(Math.random() * LOOT.length)]; items.push([id, randi(a, bb)]); }
+      Ents.pickups.push({ kind: 'bag', x: s.x, y: Ents.groundY(s.x, s.z), z: s.z, data: { items: items.filter(([id]) => ITEMS[id]) }, id: Math.random(), city: true });
+    }
+    spawnTech();
+  }
+  function spawnTech() {
+    G.flags.vtech = true;
+    for (const v of World.sites.villages || []) if (v.tech && v.techSpot && !hasTech(v.tech)) { const q = v.techSpot; Ents.pickups.push({ kind: 'tech', x: q.x + 1, y: Ents.groundY(q.x + 1, q.z), z: q.z, data: { tech: v.tech }, id: Math.random(), city: true }); }
     const used = new Set();
     for (let k = 0; k < 18 && lootSpots.length; k++) {
       let s, t = 0; do { s = lootSpots[Math.floor(Math.random() * lootSpots.length)]; } while (used.has(s) && t++ < 20);
@@ -606,7 +629,8 @@ const City = (() => {
       Ents.pickups.push({ kind: 'bag', x: s.x, y: Ents.groundY(s.x, s.z), z: s.z, data: { items }, id: Math.random(), city: true });
     }
   }
+  function ensureTech() { if (!G.flags.vtech) spawnTech(); }
   function randomSpot() { return spots.length ? spots[Math.floor(Math.random() * spots.length)] : null; }
   function near(x, z, r) { const c = World.sites.city; return Math.hypot(x - c.x, z - c.z) < (r || c.r + 40); }
-  return { build, draw, spawnLoot, randomSpot, near, get spots() { return spots; } };
+  return { build, draw, spawnLoot, ensureTech, randomSpot, near, get spots() { return spots; } };
 })();

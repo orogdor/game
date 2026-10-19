@@ -49,6 +49,8 @@ function isThreatTo(t, team) {
   if (t.kind === 'crab') return t.state === 'angry';
   if (t.kind === 'alien') return t.state === 'hunt' || !!t.raid;
   if (t.kind === 'beast') return t.state === 'hunt';
+  if (t.kind === 'glider') return t.state !== 'circle';
+  if (t.kind === 'bloat' || t.kind === 'beetle') return true;
   if (t.kind === 'ram') return t.state === 'charge';
   if (t.kind === 'boss') return t.state !== 'sleep';
   if (t.kind === 'human' || t.kind === 'player' || t.kind === 'core' || t.kind === 'rturret') {
@@ -797,7 +799,7 @@ const Crew = (() => {
     c.energy = clamp(c.energy + (sleeping ? dt * 0.9 * (roomTypeAt(e.pos.x, e.pos.z) === 'Barracks' ? 1.3 : 1) : -dt * 0.2), 0, 100);
     if (c.hunger <= 0) c.morale = Math.max(0, c.morale - dt * 0.03);
     if (G.flags.music && Base.isInside(e.pos.x, e.pos.z) && Base.objsOfType('jukebox').some((o) => o.on)) c.morale = Math.min(100, c.morale + dt * 0.02);
-    if (!e.threat && e.hp < e.maxHp && Base.isInside(e.pos.x, e.pos.z)) e.hp = Math.min(e.maxHp, e.hp + dt * (Base.objsOfType('ravila').some((o) => o.on) ? 2.5 : 0.8) * (roomTypeAt(e.pos.x, e.pos.z) === 'Infirmary' ? 1.6 : 1));
+    if (!e.threat && e.hp < e.maxHp && Base.isInside(e.pos.x, e.pos.z)) e.hp = Math.min(e.maxHp, e.hp + dt * (Base.objsOfType('ravila').some((o) => o.on) ? 2.5 * (hasTech('med') ? 2 : 1) : 0.8) * (roomTypeAt(e.pos.x, e.pos.z) === 'Infirmary' ? 1.6 : 1));
     // ohud
     if (e.cool > 0) e.cool -= dt;
     e.scanT -= dt;
@@ -1259,9 +1261,9 @@ const Crew = (() => {
           e.hasGun = false;
           if (Math.random() < 0.3) FX.beam(e.pos.x, e.pos.y + 1.2, e.pos.z, k.cl.x, k.cl.y + 0.5, k.cl.z);
           k.t += dt * workMult(c);
-          if (k.t > 1.8) {
+          if (k.t > (hasTech('drill') ? 1.0 : 1.8)) {
             k.t = 0;
-            const got = Comets.takeUnits(k.cl, 2);
+            const got = Comets.takeUnits(k.cl, hasTech('drill') ? 3 : 2);
             if (got) { c.carry += got; c.carryKind = 'kris'; Audio2.crystal(); }
             if (c.carry >= cap) k.done = true;
             else if (k.cl.amount <= 0) k.step = 0;
@@ -1280,7 +1282,7 @@ const Crew = (() => {
           setAct(e, k.buddy ? 'Stripping a wreck with ' + first(k.buddy) : 'Stripping a wreck'); e.hasGun = false; e.gesture = 'fix';
           k.t += dt * workMult(c);
           if (Math.random() < 0.2) FX.repair(w.x + rand(-1, 1), w.y + 1, w.z + rand(-1, 1));
-          if (k.t > 4.5) { k.t = 0; const n = Math.min(12, w.scrap); w.scrap -= n; c.carry += n; c.carryKind = 'scrap'; if (c.carry >= (c.trait === 'tugev' ? 50 : 34) * Levels.crewCarry(c) || w.scrap <= 0) k.done = true; }   // täis kott, siis koju
+          if (k.t > (hasTech('cutter') ? 2.2 : 4.5)) { k.t = 0; const n = Math.min(hasTech('cutter') ? 18 : 12, w.scrap); w.scrap -= n; c.carry += n; c.carryKind = 'scrap'; if (c.carry >= (c.trait === 'tugev' ? 50 : 34) * Levels.crewCarry(c) || w.scrap <= 0) k.done = true; }   // täis kott, siis koju
         }
         return;
       }
@@ -1295,7 +1297,7 @@ const Crew = (() => {
           setAct(e, 'Drilling iron ore'); e.hasGun = false; e.gesture = 'mine'; Ents.face(e, w.x, w.z, dt);
           k.t += dt * workMult(c);
           if (Math.random() < 0.25) FX.sparks(w.x + rand(-0.5, 0.5), w.y + 0.8, w.z + rand(-0.5, 0.5), [1, 0.6, 0.3], 2, 2);
-          if (k.t > 5) { k.t = 0; const n = Math.min(c.trait === 'tugev' ? 10 : 7, w.amount); w.amount -= n; c.carry += n; c.carryKind = 'ore'; if (c.carry >= (c.trait === 'tugev' ? 30 : 21) * Levels.crewCarry(c) || w.amount <= 0) k.done = true; }
+          if (k.t > (hasTech('drill') ? 2.8 : 5)) { k.t = 0; const n = Math.min((c.trait === 'tugev' ? 10 : 7) + (hasTech('drill') ? 3 : 0), w.amount); w.amount -= n; c.carry += n; c.carryKind = 'ore'; if (c.carry >= (c.trait === 'tugev' ? 30 : 21) * Levels.crewCarry(c) || w.amount <= 0) k.done = true; }
         }
         return;
       }
@@ -1347,7 +1349,7 @@ const Crew = (() => {
           } else if (k.type === 'cook') {
             setAct(e, 'Cooking'); o.data.cooking = 1; e.gesture = 'interact';
             if (Math.random() < 0.2) FX.smoke(o.cx, 1.3, o.cz);
-            if (k.w > 7) { k.w = 0; if (G.res.meat > 0) { G.res.meat--; G.res.food += 2; } if (G.res.meat <= 0 || (k.n = (k.n || 0) + 1) >= 4) { k.done = true; o.data.cooking = 0; } }
+            if (k.w > (hasTech('cook') ? 3.5 : 7)) { k.w = 0; if (G.res.meat > 0) { G.res.meat--; G.res.food += hasTech('cook') ? 3 : 2; } if (G.res.meat <= 0 || (k.n = (k.n || 0) + 1) >= 4) { k.done = true; o.data.cooking = 0; } }
           } else if (k.type === 'scan') {
             setAct(e, 'Studying scanner data');
             if (!o.on || G.scan.found || k.w > 40 || isSleepTime(c)) k.done = true;
@@ -1642,7 +1644,7 @@ const Crew = (() => {
     for (const o of Base.objs.values()) {
       if (o.data && o.data.watch > 0) o.data.watch -= dt;
       if (o.type !== 'kasvu' || !o.on) continue;
-      o.data.grow = (o.data.grow || 0) + dt / (DAY_LEN / 12) * (members().some((m) => m.crew.role === 'kokk') ? 1.25 : 1);
+      o.data.grow = (o.data.grow || 0) + dt / (DAY_LEN / 12) * (members().some((m) => m.crew.role === 'kokk') ? 1.25 : 1) * (hasTech('cook') ? 1.5 : 1);
       if (o.data.grow >= 1) { o.data.grow = 0; G.res.food += 1; if (Math.random() < 0.3) UI.toast('Hydroponics produced one meal'); }
     }
     // tuju hoiatus

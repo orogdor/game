@@ -191,7 +191,7 @@ const UI = (() => {
     for (const r of Rivals.list) if (r.base) out.push({ x: r.base.x, z: r.base.z, icon: 'flag', col: r.alive ? (r.id === 'krell' ? '#ff6d55' : '#b796ff') : '#6f604f', label: r.short, kind: 'rival' });
     if (World.sites.city && World.sites.city.x < 1e4) out.push({ x: World.sites.city.x, z: World.sites.city.z, icon: 'house', col: '#a9a39a', label: 'Old colony city', kind: 'city' });
     for (const v of World.sites.villages || []) out.push({ x: v.x, z: v.z, icon: 'house', col: '#8f877c', label: v.name || 'Abandoned settlement', kind: 'city' });
-    for (const p of Ents.pickups) if (!p.gone && !(p.city && !p.seen)) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : p.kind === 'mechpart' ? '#ff8a2a' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : p.kind === 'mechpart' ? 'Mech part' : 'Items', kind: 'bag' });
+    for (const p of Ents.pickups) if (!p.gone && !(p.city && !p.seen)) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : p.kind === 'mechpart' ? '#ff8a2a' : p.kind === 'tech' ? '#7dff9a' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : p.kind === 'mechpart' ? 'Mech part' : p.kind === 'tech' ? TECH[p.data.tech].name : 'Items', kind: 'bag' });
     { const mb = Vehicles.bayMarker(); if (mb) out.push(mb); }
     const cur = Objectives.current();
     if (cur && cur.id === 'salv') {
@@ -531,6 +531,7 @@ const UI = (() => {
     else if (panelKind === 'coop') Net.renderPanel(body);
     else if (panelKind === 'saves') renderSaves(body);
     else if (panelKind === 'garage') renderGarage(body);
+    else if (panelKind === 'cargo') renderCargo(body);
     else if (panelKind === 'roomjob') renderRoomJob(body);
     if (soft) body.scrollTop = scroll;
   }
@@ -844,6 +845,26 @@ const UI = (() => {
   // ---------- garaaž: sõidukite ostmine, parandamine, müük ----------
   let garageObj = null;
   function openGarage(o) { garageObj = o; openPanel('garage'); }
+  // ---------- sõiduki kast: kaks inventari kõrvuti ----------
+  let cargoV = null;
+  function openCargo(v) { cargoV = v; openPanel('cargo'); }
+  function renderCargo(body) {
+    const v = cargoV; if (!v) { closePanel(); return; }
+    $('pTitle').textContent = Vehicles.nameOf(v) + ' · cargo'; $('pTabs').innerHTML = '';
+    const cap = Vehicles.DEF[v.type].cargoCap, used = Vehicles.cargoCount(v);
+    const inv = Inv.ensure(), pack = {};
+    for (const i of Inv.idx()) { const s = inv.slots[i]; if (s) pack[s.id] = (pack[s.id] || 0) + s.n; }
+    const row = (id, n, side) => { const d = ITEMS[id] || { name: id, col: '#ccc' }; const arrow = side === 'L' ? '→' : '←';
+      return `<div class="xrow"><span class="xi" style="color:${d.col}">${d.icon || ''}</span><span class="xn">${esc(d.name)}</span><b>${n}</b><span class="xb">${n > 1 ? `<button class="xm" data-s="${side}" data-i="${id}" data-n="1">${arrow} 1</button>` : ''}${n > 10 ? `<button class="xm" data-s="${side}" data-i="${id}" data-n="${Math.ceil(n / 2)}">${arrow} ½</button>` : ''}<button class="xm" data-s="${side}" data-i="${id}" data-n="all">${arrow} all</button></span></div>`; };
+    let h = `<div class="xwrap"><div class="xcol"><h4>Backpack <small>${Inv.used()} / ${Inv.nSlots()} slots</small></h4>`;
+    const pk = Object.keys(pack); h += pk.length ? pk.map((id) => row(id, pack[id], 'L')).join('') : '<div class="empty">Empty</div>';
+    h += `<button class="xall" data-all="L">Load everything →</button></div><div class="xcol"><h4>${esc(Vehicles.nameOf(v))} <small>${used} / ${cap}</small></h4><div class="bar"><i style="width:${Math.round(used / cap * 100)}%"></i></div>`;
+    const ck = Object.keys(v.cargo).filter((k) => v.cargo[k] > 0); h += ck.length ? ck.map((id) => row(id, v.cargo[id], 'R')).join('') : '<div class="empty">Empty</div>';
+    h += `<button class="xall" data-all="R">← Take everything</button></div></div><div class="note">The cargo is unloaded into base storage automatically when the vehicle drives into the base.</div>`;
+    body.innerHTML = h;
+    body.querySelectorAll('.xm').forEach((b) => (b.onclick = () => { const n = b.dataset.n === 'all' ? Infinity : +b.dataset.n, id = b.dataset.i; const got = b.dataset.s === 'L' ? Vehicles.moveToCargo(v, id, n) : Vehicles.moveToPack(v, id, n); if (!got) { Audio2.deny(); toast(b.dataset.s === 'L' ? 'The cargo box is full' : 'No room in your backpack'); } renderPanel(true); }));
+    body.querySelectorAll('.xall').forEach((b) => (b.onclick = () => { if (b.dataset.all === 'L') Vehicles.loadPack(v); else Vehicles.unloadToPack(v); renderPanel(true); }));
+  }
   function renderGarage(body) {
     $('pTitle').textContent = 'Garage'; $('pTabs').innerHTML = '';
     const o = garageObj, onLift = o ? Vehicles.vehicleOnLift(o) : null;
@@ -923,7 +944,7 @@ const UI = (() => {
     body.innerHTML = `<div class="help">
       <h4>The story</h4><p>This was a colony world getting rich fast. Then a huge ship that was refuelling in orbit came down in the desert – and out of the wreck crawled the <b>Stoneheart</b>, a giant alien. Its workers, the acid mantises and the bug swarms, took the planet over. The colonists fled and left everything behind.</p>
       <p>Now someone has invented the <b>base heart</b>: a device whose hum keeps the sandworms away from buildings. People can settle here again. Whoever brings in the Stoneheart's heartstones – the proof that it is dead – gets the colonisation rights to the whole planet. That proof is worth a fortune.</p>
-      <p>The ruins of the <b>old colony city</b> lie at the edge of the map, farther out than any camp. The noise and the lights draw aliens there, but the city is full of scrap and abandoned gear. Old <b>road tunnels</b> lead through the mountains – hippo-sized burrow beasts live in them, but the tunnel crews left gear behind that you can't buy anywhere (an arc thrower and an exo rig). A half-built work <b>mech</b> stands in a gantry on the city plaza: find its five parts in the city buildings, fit them and you get a walking armour with a minigun.</p>
+      <p>The ruins of the <b>old colony city</b> lie at the edge of the map, farther out than any camp. The noise and the lights draw aliens there, but the city is full of scrap and abandoned gear. Abandoned <b>villages</b> each hide one colony technology: the farmstead a pressure cooker (faster cooking), the mining camp a diamond drill head, the workshop a plasma cutter, the medical station an auto-doctor and the relay station a trade uplink – plus credit chips and scrap. Watch out for acid gliders that dive from the sky, poison bloaters that burst when they get close (shoot them from afar) and armoured siege beetles that shell buildings with acid – hit them from the side or back. Old <b>road tunnels</b> lead through the mountains – hippo-sized burrow beasts live in them, but the tunnel crews left gear behind that you can't buy anywhere (an arc thrower and an exo rig). A half-built work <b>mech</b> stands in a gantry on the city plaza: find its five parts in the city buildings, fit them and you get a walking armour with a minigun.</p>
       <h4>Objective</h4><p>Keep the station and its heart alive, pay the bank its instalments and kill the Stoneheart. Its heartstones prove the kill and wipe out the whole debt. Two rivals are hunting the same thing.</p>
       <h4>Phone controls</h4><ul><li>Left thumb: move. Push all the way to run.</li><li>Right side: look around. Slide your finger on the fire button to aim at the same time.</li><li>The action button appears when there's something to do. Some actions must be held.</li><li>The hammer opens building, the minimap opens the big map.</li></ul>
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>
@@ -1068,7 +1089,7 @@ const UI = (() => {
   return {
     bubble, init, msg, toast, banner, damage, hitMarker, armorHit, whiz, shake, getShake, joy, lockHint, showHUD, update, updateObjective,
     openTerminal, openCrew, openMap, openMenu, openHelp, openInv, invDirty, closePanel, isPanelOpen, openPanel, btn, bindActs, esc, tabs,
-    openRoomJob, openGarage, showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,
+    openRoomJob, openGarage, openCargo, showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,
     get panelKind() { return panelKind; }, get panelTab() { return panelTab; },
     get waypoint() { return waypoint; }, set waypoint(v) { waypoint = v; },
   };

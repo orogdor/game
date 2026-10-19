@@ -50,7 +50,7 @@ const Player = {
     // sõidukis: eraldi juhtimine
     if (this.vehicle) { Vehicles.playerUpdate(this, dt, inp); return; }
     // taastumine
-    if (this.lastHurt > 4 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + dt * 6 * Inv.regenMul());
+    if (this.lastHurt > 4 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + dt * 6 * Inv.regenMul() * (hasTech('med') ? 1.5 : 1));
     Inv.update(dt);
     // vaatamine
     this.yaw -= inp.lookX; this.pitch = clamp(this.pitch - inp.lookY, -1.45, 1.45);
@@ -104,7 +104,7 @@ const Player = {
     this.updateInteract(dt, inp);
     // ladustamine baasis
     const inside = Base.isInside(this.pos.x, this.pos.z);
-    if (inside && (Inv.count('kris') || Inv.count('scrap') || Inv.count('meat') || Inv.count('stones'))) this.deposit();
+    if (inside && (Inv.count('kris') || Inv.count('scrap') || Inv.count('meat') || Inv.count('stones') || Inv.count('cred') || Inv.count('ore') || Inv.count('acid'))) this.deposit();
     if (inside && !this.wasInside) G.flags.visitedInside = true;
     this.wasInside = inside;
     Audio2.setListener(this.pos.x, this.pos.z, this.yaw);
@@ -376,7 +376,7 @@ const Player = {
     }
     // korjused
     for (const e of Ents.list) {
-      if ((e.kind === 'alien' || e.kind === 'beast') && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
+      if ((e.kind === 'alien' || e.kind === 'beast' || e.kind === 'beetle') && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
       if (e.alive || !e.butcherable) continue;
       if (Math.abs(e.pos.x - px) > 3 || Math.abs(e.pos.z - pz) > 3) continue;
       consider({ key: 'c' + e.id, label: 'Butcher meat', sub: e.meat + ' pieces', hold: 1.4, act: () => butcher(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.4, e.pos.z, [0.5, 0.15, 0.12], 1); } }, e.pos.x, e.pos.z, 2.6);
@@ -386,6 +386,7 @@ const Player = {
       if (p.gone) continue;
       if (p.city && !p.seen && Math.abs(p.x - px) < 45 && Math.abs(p.z - pz) < 45) p.seen = true;
       if (!p.id) p.id = Math.floor(Math.random() * 1e9);
+      if (p.kind === 'tech') { consider({ key: 'p' + p.id, label: 'Take the ' + TECH[p.data.tech].name, sub: 'Colony technology · ' + TECH[p.data.tech].desc, hold: 1.2, act: () => { p.gone = true; grantTech(p.data.tech); } }, p.x, p.z, 2.6); continue; }
       if (p.kind === 'mechpart') { consider({ key: 'p' + p.id, label: 'Take the ' + Vehicles.partName(p.data.part), sub: 'Mech part · take it to the unfinished mech in the city', hold: 1.2, act: () => Vehicles.takePart(p) }, p.x, p.z, 2.6); continue; }
       consider({ key: 'p' + p.id, label: p.kind === 'stones' ? 'Take the heartstones' : 'Pick up bag', hold: p.kind === 'stones' ? 1.5 : 0.6, act: () => pickupBag(p) }, p.x, p.z, 2.4);
     }
@@ -561,7 +562,7 @@ function repairObj(o, cost, after, partial) {
 function salvage(w) {
   const room = Inv.room('scrap');
   if (room <= 0) { UI.toast('Backpack is full. Take your things to the base.'); Audio2.deny(); return; }
-  const n = Inv.add('scrap', Math.min(8, w.scrap, room));
+  const n = Inv.add('scrap', Math.min(hasTech('cutter') ? 14 : 8, w.scrap, room));
   w.scrap -= n;
   Audio2.pickup(); UI.toast('+' + n + ' scrap into the backpack');
   G.flags.salvaged = true; Objectives.check();

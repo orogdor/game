@@ -725,9 +725,7 @@ const Vehicles = (() => {
       if (!v.seats[0]) consider({ key: 've' + v.id, label: (v.team === 'crew' ? 'Drive the ' : 'Steal the ') + nm, sub: 'hp ' + Math.round(v.hp) + '/' + v.maxHp + ' · cargo: ' + cargoText(v), act: () => enter(v, 0) }, dp.x, dp.z, 3.4);
       if (!v.seats[1] && GN && v.team === 'crew') consider({ key: 'vg' + v.id, label: 'Man the machine gun', sub: 'ammo in cargo ' + (v.cargo.ammo_r || 0), act: () => enter(v, 1) }, rp.x + Math.sin(v.yaw) * 0.6, rp.z + Math.cos(v.yaw) * 0.6, 2.6);
       if (v.team !== 'crew') continue;
-      const packN = Inv.idx().reduce((n, i) => n + (Inv.ensure().slots[i] ? 1 : 0), 0);
-      if (packN) consider({ key: 'vl' + v.id, label: 'Load backpack into the ' + nm, sub: 'cargo ' + cargoCount(v) + '/' + DEF[v.type].cargoCap + ' · unloads to storage at the base', hold: 0.8, act: () => loadPack(v) }, rp.x, rp.z, 2.4);
-      else if (cargoCount(v)) consider({ key: 'vu' + v.id, label: 'Take from the ' + nm, sub: cargoText(v), act: () => unloadToPack(v) }, rp.x, rp.z, 2.4);
+      consider({ key: 'vc' + v.id, label: 'Open the ' + nm + ' cargo', sub: 'cargo ' + cargoCount(v) + '/' + DEF[v.type].cargoCap + ' · swap items between your backpack and the vehicle', act: () => UI.openCargo(v) }, rp.x, rp.z, 2.4);
     }
   }
   function loadPack(v) {
@@ -739,6 +737,15 @@ const Vehicles = (() => {
       if (got) { v.cargo[s.id] = (v.cargo[s.id] || 0) + got; moved += got; }
     }
     if (moved) { Audio2.pickup(); UI.toast('Loaded into the ' + nameOf(v).toLowerCase() + ': ' + cargoText(v)); } else UI.toast('The cargo box is full');
+  }
+  // vahetus: üks ese kahe inventari vahel (n = arv; Infinity = kõik)
+  function moveToCargo(v, id, n) {
+    const room = DEF[v.type].cargoCap - cargoCount(v); n = Math.min(n, Inv.count(id), room); if (n <= 0) return 0;
+    const got = Inv.take(id, n); if (got) { v.cargo[id] = (v.cargo[id] || 0) + got; Audio2.pickup(); } return got;
+  }
+  function moveToPack(v, id, n) {
+    n = Math.min(n, v.cargo[id] || 0, Inv.room(id)); if (n <= 0) return 0;
+    const r = Inv.add(id, n), got = typeof r === 'number' ? r : n; if (!got) return 0; v.cargo[id] -= got; if (v.cargo[id] <= 0) delete v.cargo[id]; Audio2.pickup(); return got;
   }
   function unloadToPack(v) {
     let moved = 0;
@@ -997,5 +1004,5 @@ const Vehicles = (() => {
   function reset() { for (const v of list) for (const e of v.seats) if (e && e !== Player) { e.inVehicle = null; e.ride = null; } list.length = 0; if (typeof Player !== 'undefined') { Player.vehicle = null; Player.seat = 0; } }
 
   return { DEF, list, initMeshes, spawn, near, update, draw, enter, leave, playerUpdate, camera, interactions, liftInteraction, serialize, deserialize, reset, cargoCount, sound,
-    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, walkStep, releaseClaim, freeGunPost, manGun, rivalBuy, teamVehicles, nameOf, cargoText, partName, partMesh, takePart, bayMarker, installParts };
+    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, walkStep, releaseClaim, freeGunPost, manGun, rivalBuy, teamVehicles, nameOf, cargoText, loadPack, unloadToPack, moveToCargo, moveToPack, partName, partMesh, takePart, bayMarker, installParts };
 })();

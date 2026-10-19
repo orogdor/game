@@ -139,7 +139,7 @@ const Comets = (() => {
     if (cl.amount <= 0) return;
     if (who === Player) {
       if (Inv.room('kris') <= 0) { UI.toast('Backpack full! Take your things to the base.'); Audio2.deny(); return; }
-      Inv.add('kris', 1); G.stats.crystals++; Save.auto();
+      const nk = Math.min(hasTech('drill') ? 2 : 1, cl.amount, Inv.room('kris')); Inv.add('kris', nk); cl.amount -= nk - 1; G.stats.crystals += nk; Save.auto();
       Audio2.crystal();
       Objectives.check();
     }

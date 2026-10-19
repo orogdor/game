@@ -4,6 +4,7 @@
 const ITEMS = (() => {
   const s = (d) => `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   return {
+    cred: { name: 'Credit chip', cat: 'res', stack: 20, col: '#ffd76a', desc: 'An old colony credit chip. Worth 25 ₵ each – they are cashed in when you bring them to the base.', icon: s('<rect x="5" y="9" width="22" height="14" rx="2"/><path d="M9 14h6v4H9zM18 14h5M18 18h5"/>') },
     kris: { name: 'Raw diamond', cat: 'res', stack: 10, col: '#92d9ff', desc: 'A raw diamond from a comet. Sell it at the comms terminal or polish it to raise its value.', icon: s('<path d="M16 3l7 9-7 17-7-17z"/><path d="M9 12h14M13 12l3 17M19 12l-3 17"/>') },
     scrap: { name: 'Scrap', cat: 'res', stack: 20, col: '#c9b9a2', desc: 'Building material. Used for building, repairs and making ammo.', icon: s('<path d="M16 4l10 6v12l-10 6-10-6V10z"/><circle cx="16" cy="16" r="4"/><path d="M6 10l10 6 10-6"/>') },
     meat: { name: 'Raw meat', cat: 'res', stack: 5, col: '#e7b98a', desc: 'Desert goat meat. The cook turns it into food.', icon: s('<path d="M8 20c-3-5 1-13 9-13 6 0 9 4 8 8-1 5-7 8-12 8-2 0-4-1-5-3z"/><circle cx="12" cy="21" r="3"/><path d="M10 23l-4 4"/>') },
@@ -249,6 +250,7 @@ const Inv = (() => {
   // baasi sisenedes: ressursid hoidlasse
   function depositResources() {
     const parts = [];
+    { const n = count('cred'); if (n) { take('cred', n); G.res.cr += n * 25; parts.push('+' + n * 25 + ' ₵ from credit chips'); } }
     for (const id of ['kris', 'scrap', 'meat', 'ore', 'acid', 'stones']) { const n = count(id); if (!n) continue; toStash(id, n); parts.push(id === 'stones' ? 'The heartstones are home!' : '+' + n + ' ' + ITEMS[id].name.toLowerCase()); }
     return parts;
   }

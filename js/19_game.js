@@ -268,7 +268,7 @@ const Game = (() => {
     World.generate(seed);
     GFX.setTerrain(null, false); World.setTerrainShadow(Q[qKey].terrainShadow);
     UI.buildMapCanvas();
-    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Aliens.reset(); Sandworm.reset(); Objectives.reset(); Vehicles.reset();
+    Ents.clear(); Herds.clear(); Comets.reset(); Rivals.reset(); Aliens.reset(); Sandworm.reset(); if (typeof Fauna !== 'undefined') Fauna.reset(); Objectives.reset(); Vehicles.reset();
     Ents.list.push(Player);
   }
   function newGame() {
@@ -460,6 +460,7 @@ const Game = (() => {
     Herds.update(dt);
     Aliens.tick(dt);
     if (typeof Tunnels !== 'undefined') Tunnels.tick(dt);
+    if (typeof Fauna !== 'undefined') Fauna.tick(dt);
     Sandworm.update(dt);
     Ents.update(dt);
     Crew.update(dt);
