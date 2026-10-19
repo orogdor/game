@@ -683,6 +683,50 @@ function buildObjectModels() {
   b.color([0.65, 0.68, 0.72]).boxB(0, 0.035, 0, 1.8, 0.02, 0.02);
   b.pop();
   O.paike = b.build();
+  // ---- uued vooluallikad ----
+  b = new MB(); b.jit = 0.02; // tuulik: mast + gondel (rootor eraldi)
+  b.color(PAL.metalDark).boxB(0, 0, 0, 1.1, 0.4, 1.1);
+  b.color([0.7, 0.7, 0.68], MAT.WORN).cyl(0, 0.4, 0, 0.26, 0.14, 8.3, 10);
+  b.color(PAL.hazard).cyl(0, 0.4, 0, 0.28, 0.28, 0.5, 10);
+  b.color([0.75, 0.75, 0.72], MAT.WORN).push().tf(0, 8.9, -0.2, 0, Math.PI / 2, 0).cyl(0, -0.7, 0, 0.32, 0.26, 1.5, 10).pop();
+  b.color([1, 0.2, 0.1], MAT.GLOW).boxB(0, 9.2, -0.4, 0.1, 0.1, 0.1);
+  O.tuulik = b.build();
+  b = new MB(); b.jit = 0; // tuuliku rootor: kolm laba XY-tasandil
+  b.color([0.6, 0.6, 0.58], MAT.METAL).push().tf(0, 0, 0, 0, Math.PI / 2, 0).cyl(0, -0.1, 0, 0.3, 0.05, 0.5, 10).pop();
+  for (let k = 0; k < 3; k++) b.push().tf(0, 0, 0, 0, 0, k / 3 * Math.PI * 2).color([0.86, 0.86, 0.84], MAT.WORN).boxB(0, 0.2, 0, 0.36, 3.3, 0.06).color([0.8, 0.3, 0.15]).boxB(0, 3.1, 0, 0.3, 0.4, 0.07).pop();
+  O.tuulikRotor = b.build();
+  b = new MB(); b.jit = 0.02; // kütuseelement
+  b.color([0.32, 0.36, 0.4], MAT.METAL).boxB(0, 0, 0, 1.4, 1.7, 1.2);
+  for (let k = 0; k < 5; k++) b.color([0.2, 0.22, 0.25]).boxB(0, 0.25 + k * 0.28, 0.61, 1.2, 0.18, 0.03);
+  b.color([0.3, 0.75, 1.0], MAT.GLOW).boxB(0.45, 1.45, 0.62, 0.2, 0.12, 0.02);
+  b.color([0.5, 0.5, 0.5], MAT.METAL).cyl(-0.45, 1.7, -0.3, 0.12, 0.12, 0.3, 8).cyl(0.45, 1.7, -0.3, 0.12, 0.12, 0.3, 8);
+  O.kytus = b.build();
+  b = new MB(); b.jit = 0.03; // raske generaator 2x2
+  b.color([0.36, 0.38, 0.33], MAT.RUST).boxB(0, 0, 0, 3.4, 1.8, 3.2);
+  b.color(PAL.metalDark).boxB(0, 1.8, 0, 3.0, 0.2, 2.8);
+  for (let k = 0; k < 4; k++) b.color([0.3, 0.32, 0.3], MAT.RUST).cyl(-1.0 + k * 0.66, 2.0, -0.6, 0.22, 0.22, 0.5, 8);
+  b.color([0.42, 0.42, 0.4], MAT.RUST).cyl(1.1, 1.8, 0.9, 0.2, 0.2, 0.8, 8);
+  for (let i = 0; i < 12; i++) b.color(PAL.metalDark).boxB(-1.5 + i * 0.27, 0.3, 1.61, 0.06, 1.2, 0.05);
+  b.color(PAL.hazard).boxB(0, 1.62, 0, 3.42, 0.1, 3.22);
+  b.color([1.0, 0.55, 0.2], MAT.GLOW).boxB(-1.2, 1.2, 1.62, 0.3, 0.15, 0.03);
+  O.raskegen = b.build();
+  b = new MB(); b.jit = 0.03; // geotermiline puurauk 2x2
+  b.color([0.3, 0.3, 0.31], MAT.METAL).boxB(0, 0, 0, 3.6, 0.5, 3.6);
+  b.color([0.5, 0.45, 0.38], MAT.RUST).cyl(0, 0.5, 0, 1.0, 0.8, 2.6, 12);
+  for (const [x, z] of [[-1.4, -1.4], [1.4, -1.4], [1.4, 1.4], [-1.4, 1.4]]) b.color(PAL.metalDark).push().tf(x * 0.5, 2.1, z * 0.5, 0, 0, 0).boxB(x * 0.5, -1.6, z * 0.5, 0.15, 3.6, 0.15).pop();
+  b.color([0.45, 0.3, 0.2], MAT.RUST).push().tf(1.3, 1.0, 0, 0, 0, Math.PI / 2).cyl(0, -0.2, 0, 0.3, 0.3, 1.0, 10).pop();
+  b.color([1.0, 0.45, 0.15], MAT.GLOW).cyl(0, 3.1, 0, 0.6, 0.6, 0.06, 12);
+  b.color(PAL.hazard).cyl(0, 0.5, 0, 1.05, 1.05, 0.15, 12);
+  O.geo = b.build();
+  b = new MB(); b.jit = 0.01; // fusioonreaktor 2x2, kõrge
+  b.color([0.24, 0.25, 0.27], MAT.METAL).cyl(0, 0, 0, 1.9, 1.9, 0.7, 16);
+  b.color([0.55, 0.58, 0.62], MAT.METAL).cyl(0, 0.7, 0, 1.3, 1.3, 3.6, 16);
+  for (let k = 0; k < 4; k++) b.color([0.2, 0.21, 0.23], MAT.METAL).cyl(0, 1.0 + k * 0.85, 0, 1.6, 1.6, 0.28, 16);
+  b.color([0.4, 0.8, 1.0], MAT.GLOW).cyl(0, 1.5, 0, 1.33, 1.33, 1.9, 16, false);
+  b.color([0.24, 0.25, 0.27], MAT.METAL).cyl(0, 4.3, 0, 1.5, 0.8, 0.9, 16);
+  for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + Math.PI / 4; b.color(PAL.hazard).boxB(Math.cos(a) * 1.6, 0, Math.sin(a) * 1.6, 0.3, 4.9, 0.3); }
+  b.color([1.0, 0.3, 0.2], MAT.GLOW).boxB(0, 5.2, 0, 0.15, 0.15, 0.15);
+  O.fusioon = b.build();
   b = new MB(); b.jit = 0.03; // kahuri alus
   b.color(PAL.metalDark).cyl(0, 0, 0, 0.75, 0.6, 0.45, 8);
   b.color([0.45, 0.46, 0.42], MAT.RUST).cyl(0, 0.45, 0, 0.3, 0.3, 0.8, 8);

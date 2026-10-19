@@ -938,8 +938,9 @@ const UI = (() => {
   }
   // ehitusmenüü: tööriistad rühmadena (Toad / Uksed ja aknad / Esemed / Kujundus / Lammuta),
   // esemed võrgustikus, otsing, "kõik" ja "viimati kasutatud", taskukohased eespool
-  const BGROUPS = [['rooms', 'Rooms', 'room', [['wall', 'Room / wall'], ['upper', '2nd floor'], ['tall', 'Tall room'], ['floor', 'Floor']]],
-    ['open', 'Doors & windows', 'door', [['door', 'Door'], ['doorW', 'Wide door'], ['window', 'Window'], ['windowW', 'Wide window']]],
+  const BGROUPS = [['rooms', 'Rooms', 'room', [['wall', 'Room / wall'], ['upper', '2nd floor'], ['tall', 'Tall room']]],
+    ['open', 'Doors & windows', 'door', [['door', 'Door'], ['doorW', 'Wide door'], ['window', 'Window'], ['windowW', 'Wide window'], ['windowT', 'Tall window 2×2']]],
+    ['floor', 'Balcony & floor', 'box', [['floor', 'Balcony / floor']]],
     ['obj', 'Items', 'box', [['obj', 'Items']]],
     ['deco', 'Jobs & paint', 'brush', [['job', 'Room job'], ['paint', 'Paint']]],
     ['demolish', 'Demolish', 'trash', [['demolish', 'Demolish']]]];
@@ -983,7 +984,7 @@ const UI = (() => {
     const grp = bGroupOf(S.tool);
     if (grp) bLast[grp] = S.tool;
     // ülemine rida: rühmad + korrus + vaade
-    let t = '<div class="bgroups">' + BGROUPS.map(([k, n, ic]) => `<button class="tool grp ${grp === k ? 'on' : ''}" data-g="${k}">${ICON[ic]}<span>${n}</span></button>`).join('') + '</div>';
+    let t = '<div class="bgroups">' + BGROUPS.filter((g) => g[0] !== 'floor' || S.level).map(([k, n, ic]) => `<button class="tool grp ${grp === k ? 'on' : ''}" data-g="${k}">${ICON[ic]}<span>${n}</span></button>`).join('') + '</div>';
     t += `<div class="butil"><button class="tool ${S.level ? 'on' : ''}" data-t="level">${ICON.room}<span>${S.level ? 'Floor 2' : 'Floor 1'}</span></button><button class="tool ${S.tool === 'look' ? 'on' : ''}" data-t="look">${ICON.eye}<span>View</span></button></div>`;
     $('bTools').innerHTML = t;
     $('bTools').querySelectorAll('.grp').forEach((b) => (b.onclick = () => { Audio2.ui(); const g = BGROUPS.find((x) => x[0] === b.dataset.g); const tools = g[3].filter(([k]) => k !== 'floor' || S.level); Build.setTool(bLast[g[0]] && tools.some(([k]) => k === bLast[g[0]]) ? bLast[g[0]] : tools[0][0]); }));

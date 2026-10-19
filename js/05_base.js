@@ -16,6 +16,11 @@ const OBJ = {
   ravila: { name: 'Medical bay', cat: 'too', cost: { s: 40, c: 100 }, size: [1, 1], where: 'in', power: 1, h: 2.0, desc: 'Heals the wounded. You wake up here after an accident.' },
   skanner: { name: 'Deep scanner', cat: 'too', cost: { s: 120, c: 300, k: 15 }, size: [2, 2], where: 'in', power: 4, h: 3.9, desc: 'Searches for the location of the Stoneheart\'s nest. A scientist speeds up the search.' },
   generaator: { name: 'Generator', cat: 'energia', cost: { s: 70, c: 120 }, size: [2, 1], where: 'in', power: -6, h: 2.1, desc: 'Gives 6 units of power.' },
+  tuulik: { name: 'Wind turbine', cat: 'energia', cost: { s: 45, c: 90 }, size: [1, 1], where: 'out', power: -3, h: 9.5, hp: 220, desc: 'Gives 3 units of power day and night. A tall mast – quiet, but seen from afar.' },
+  kytus: { name: 'Fuel cell stack', cat: 'energia', cost: { s: 40, c: 170 }, size: [1, 1], where: 'in', power: -4, h: 1.9, desc: 'Gives 4 units of power and makes almost no noise. Expensive.' },
+  raskegen: { name: 'Heavy generator', cat: 'energia', cost: { s: 130, c: 260 }, size: [2, 2], where: 'in', power: -12, h: 2.6, desc: 'Gives 12 units of power. Very loud – it draws the swarms.' },
+  geo: { name: 'Geothermal tap', cat: 'energia', cost: { s: 120, c: 320, k: 4 }, size: [2, 2], where: 'out', power: -10, h: 4.2, hp: 600, desc: 'Drills into the hot rock: 10 units of power, steady and fairly quiet.' },
+  fusioon: { name: 'Fusion reactor', cat: 'energia', cost: { s: 280, c: 900, k: 14 }, size: [2, 2], where: 'in', power: -30, h: 5.4, needsTall: true, desc: 'The biggest power source: 30 units. So big it needs a two-storey tall room (tool Tall room).' },
   paike: { name: 'Solar panel', cat: 'energia', cost: { s: 35, c: 60 }, size: [1, 1], where: 'out', power: -2, solar: true, h: 1.8, desc: 'Gives 2 units of power during the day.' },
   radar: { name: 'Radar mast', cat: 'kaitse', cost: { s: 50, c: 80 }, size: [1, 1], where: 'out', power: 1, h: 4.5, desc: 'Shows the exact comet impact site and attackers on the map.' },
   kahur: { name: 'Autocannon', cat: 'kaitse', cost: { s: 60, c: 150 }, size: [1, 1], where: 'out', power: 1, h: 1.6, hp: 220, desc: 'Shoots enemies within 34 m.' },
@@ -71,7 +76,7 @@ const ROOM_PURPOSES = {
 };
 // baasi müra ja valgus: [müra, valgus] töötavana. Iga ese lisab ka 1 punkti lihtsalt olemasoluga.
 const SIG = {
-  generaator: [10, 1], vanagen: [12, 1], lihvija: [6, 1], jukebox: [5, 1], teler: [2, 1], pliit: [2, 1], kasvu: [2, 3], toolaud: [2, 0],
+  generaator: [10, 1], vanagen: [12, 1], tuulik: [2, 1], kytus: [1, 1], raskegen: [16, 2], geo: [6, 2], fusioon: [7, 7], lihvija: [6, 1], jukebox: [5, 1], teler: [2, 1], pliit: [2, 1], kasvu: [2, 3], toolaud: [2, 0],
   skanner: [5, 3], radar: [3, 1], kahur: [3, 1], myyrturel: [3, 1], varav: [2, 1], varav3: [2, 1], suurvarav: [3, 1], vesi: [1, 0], dush: [1, 0], trenn: [1, 0],
   ravila: [1, 1], kaardilaud: [1, 1], prozektor: [1, 9], torn: [1, 6], paike: [0, 0], maagitehas: [7, 2],
 };
@@ -175,6 +180,62 @@ function createBase(opt) {
   const upAt = (i, j) => hiAt(i, j) && !voids.has(i + ':' + j);              // teise korruse põrand olemas
   const tallAt = (i, j) => roomAt(i, j) > 0 && hiAt(i, j) && voids.has(i + ':' + j);   // vahelagi kustutatud -> kõrge ruum
   const lowDistAt = (i, j) => (inGrid(i, j) ? lowDist[j * N + i] : 99);
+  // RÕDUD JA KATUSED: teise korruse kõrgusel saab käia ka esimese korruse katusel ja rõdul (põrand vastu seina)
+  const decks = new Set();
+  const deckAt = (i, j) => decks.has(i + ':' + j);
+  const roofAt = (i, j) => roomAt(i, j) > 0 && !hiAt(i, j);
+  const walkUp = (i, j) => inGrid(i, j) && (upAt(i, j) || roofAt(i, j) || deckAt(i, j));
+  const upFloorY = (i, j) => (roofAt(i, j) ? WH + 0.16 : WH + FLOOR_Y);
+  const DECK_REACH = 2;
+  function canDeck(i, j) {
+    if (!inArea(i, j)) return { ok: false, why: 'Outside the build area.' };
+    if (deckAt(i, j)) return { ok: false, why: 'There\'s already a balcony here.' };
+    if (hiAt(i, j)) return { ok: false, why: 'There\'s already an upper floor here.' };
+    if (roomAt(i, j)) return { ok: false, why: 'This is a roof – you can already walk on it. Add a door from an upstairs room.' };
+    if (lowDistAt(i, j) > DECK_REACH) return { ok: false, why: 'A balcony may reach at most ' + DECK_REACH + ' tiles from the building.' };
+    if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([di, dj]) => hiAt(i + di, j + dj) || roomAt(i + di, j + dj) || deckAt(i + di, j + dj))) return { ok: false, why: 'Build it against an upstairs wall, a roof or another balcony tile.' };
+    const id = objAt(i, j), o = id && objs.get(id);
+    if (o && (OBJ[o.type].h || 0) > WH - 0.3) return { ok: false, why: 'Something tall stands below.' };
+    return { ok: true };
+  }
+  function setDeck(i, j, on) { const k = i + ':' + j; if (on) { if (!canDeck(i, j).ok) return false; decks.add(k); } else decks.delete(k); dirty = true; return true; }
+  // kahekorruseline aken (2 ruutu lai): kõrge toa välisseinas, kaks kõrvuti seinalõiku
+  function tallWinPair(t, i, j) {
+    const ok1 = (tt, ii, jj) => {
+      const k = ekey(tt, ii, jj); if (!walls.has(k) || !upWalls.has(k)) return false;
+      const cur = openings.get(k); if (cur === 'door' || cur === 'garage') return false;
+      const [[ai, aj], [bi, bj]] = edgeCells(tt, ii, jj), ra = roomAt(ai, aj), rb = roomAt(bi, bj);
+      if (!!ra === !!rb) return false;
+      return ra ? tallAt(ai, aj) && !hiAt(bi, bj) : tallAt(bi, bj) && !hiAt(ai, aj);
+    };
+    if (!ok1(t, i, j)) return null;
+    const nb = t === 'v' ? [[t, i, j + 1], [t, i, j - 1]] : [[t, i + 1, j], [t, i - 1, j]];
+    for (const e of nb) if (ok1(...e) && openings.get(ekey(...e)) !== 'tallwin') return [[t, i, j], e];
+    return null;
+  }
+  function canTallWin(t, i, j) {
+    const k = ekey(t, i, j);
+    if (!walls.has(k)) return { ok: false, why: 'There\'s no wall here.' };
+    if (openings.get(k) === 'tallwin') return { ok: false, why: 'There\'s already a tall window here.' };
+    const p = tallWinPair(t, i, j);
+    if (!p) return { ok: false, why: 'A two-storey window goes in the outer wall of a tall room (tool Tall room), 2 wall tiles side by side, no door there.' };
+    return { ok: true, edges: p };
+  }
+  function setTallWin(edges, on) {
+    for (const [t, i, j] of edges) { const k = ekey(t, i, j); wide.delete(k); upWide.delete(k); if (on) { openings.set(k, 'tallwin'); upOpen.set(k, 'tallwin'); } else { openings.delete(k); if (upOpen.get(k) === 'tallwin') upOpen.delete(k); } }
+    dirty = true;
+  }
+  // kahekorruselise akna mõlemad lõigud (eemaldamiseks)
+  function tallWinAt(t, i, j) {
+    if (openings.get(ekey(t, i, j)) !== 'tallwin') return null;
+    const out = [[t, i, j]];
+    // paarid: loe järjest, kahekaupa piki joont
+    const along = t === 'v' ? (d) => [t, i, j + d] : (d) => [t, i + d, j];
+    let n0 = 0; while (openings.get(ekey(...along(-(n0 + 1)))) === 'tallwin') n0++;
+    const partner = n0 % 2 === 0 ? along(1) : along(-1);
+    if (openings.get(ekey(...partner)) === 'tallwin') out.push(partner);
+    return out;
+  }
   function upWallAt(t, i, j) { return upWalls.has(t + ':' + i + ':' + j); }
   function upOpening(t, i, j) { const k = t + ':' + i + ':' + j; return upWalls.has(k) ? (upOpen.get(k) || null) : null; }
   // teise korruse toad (nagu computeRooms, aga upWalls põhjal); tuba kehtib, kui kõik rakud on esimesest korrusest <= 3 ruudu kaugusel
@@ -221,6 +282,7 @@ function createBase(opt) {
       id++;
     }
     for (const k of [...voids]) { const [i, j] = k.split(':').map(Number); if (!(roomAt(i, j) && hiAt(i, j))) voids.delete(k); }
+    for (const k of [...decks]) { const [i, j] = k.split(':').map(Number); if (roomAt(i, j) || hiAt(i, j) || lowDistAt(i, j) > DECK_REACH) decks.delete(k); }
   }
   function canPlaceUpWall(t, i, j) {
     const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
@@ -240,7 +302,10 @@ function createBase(opt) {
     const [[ai, aj], [bi, bj]] = t === 'v' ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
     const inA = hiAt(ai, aj), inB = hiAt(bi, bj);
     if (type === 'window' && inA && inB) return { ok: false, why: 'Windows only go in outer walls.' };
-    if (type === 'door' && !(inA && inB)) return { ok: false, why: 'An upstairs door has to lead into another upstairs room.' };
+    if (type === 'door' && !(inA && inB)) {
+      const outA = roofAt(ai, aj) || deckAt(ai, aj), outB = roofAt(bi, bj) || deckAt(bi, bj);
+      if (!((inA && outB) || (inB && outA))) return { ok: false, why: 'An upstairs door must lead into another upstairs room, out onto a roof or onto a balcony.' };
+    }
     return { ok: true };
   }
   function setUpOpening(t, i, j, type, w) { const k = t + ':' + i + ':' + j; if (type && type !== 'wall') upOpen.set(k, type); else upOpen.delete(k); if (w && type && type !== 'wall') upWide.add(k); else upWide.delete(k); dirty = true; }
@@ -290,7 +355,7 @@ function createBase(opt) {
     if (di === 1) return ['v', i + 1, j]; if (di === -1) return ['v', i, j];
     if (dj === 1) return ['h', i, j + 1]; return ['h', i, j];
   }
-  function edgeBlocked(i, j, di, dj) { const [t, a, b] = edgeOf(i, j, di, dj); const et = edgeType(t, a, b); return et === 'wall' || et === 'window'; }
+  function edgeBlocked(i, j, di, dj) { const [t, a, b] = edgeOf(i, j, di, dj); const et = edgeType(t, a, b); return et === 'wall' || et === 'window' || et === 'tallwin'; }
   function footprint(type, rot) { const s = OBJ[type].size; return rot % 2 ? [s[1], s[0]] : [s[0], s[1]]; }
   function objCenter(o) { return { x: X0 + (o.i + o.w / 2) * CS, z: Z0 + (o.j + o.h / 2) * CS }; }
   function objYaw(o) { return o.rot * (Math.PI / 2); }
@@ -526,6 +591,7 @@ function createBase(opt) {
     if (type === 'window' && a && b) return { ok: false, why: 'Windows only go in outer walls.' };
     const cur = openings.get(ekey(t, i, j));
     if (cur === 'garage') return { ok: false, why: 'This is the garage door – remove the car lift to change it.' };
+    if (cur === 'tallwin') return { ok: false, why: 'A two-storey window is here – remove it first (Tall window tool).' };
     if (cur === type) return { ok: false, why: type === 'door' ? 'There\'s already a door here.' : 'There\'s already a window here.' };
     if (type === 'door') {
       const [[ai, aj], [bi, bj]] = edgeCells(t, i, j);
@@ -991,6 +1057,18 @@ function createBase(opt) {
         colliders.push(dcol);
         const ext = extSide;
         doors.push({ x: mx, z: mz, t, ux, uz, k: dw / 1.4, open: 0, col: dcol, st: dst, key, m1: M4.create(), m2: M4.create(), ext, nx: nx * extSide, nz: nz * extSide, lm: M4.create() });
+      } else if (op === 'tallwin') {   // kahekorruseline aken: klaas sokli pealt kuni vahelaeni (jätkub ülemisel korrusel)
+        const sill = 0.45, FR = [0.15, 0.155, 0.17], b = B.main[q];
+        seg(0, L, 0, sill, false); seg(0, L, 0, Math.min(LOW_H, sill), true);
+        const [mx, mz] = P(L / 2);
+        G.color([0.42, 0.62, 0.70]).boxB(mx, sill, mz, t === 'v' ? 0.04 : L - 0.1, WH - sill, t === 'v' ? L - 0.1 : 0.04);
+        b.color(FR).boxB(mx, sill - 0.08, mz, t === 'v' ? WT + 0.22 : L, 0.1, t === 'v' ? L : WT + 0.22);
+        b.color(FR).boxB(mx, WH - 0.22, mz, t === 'v' ? WT + 0.12 : L, 0.3, t === 'v' ? L : WT + 0.12);   // vahelae riba
+        b.color(FR).boxB(mx, sill, mz, t === 'v' ? WT + 0.06 : 0.06, WH - sill, t === 'v' ? 0.06 : WT + 0.06);   // keskmine post
+        for (const side of [1, -1]) if (side === extSide) pbox(SL, L / 2, sill + 0.02, L - 0.2, 0.025, 0.03, 0.08, side, ACCENT, MAT.GLOW);
+        const [p0x, p0z] = P(0), [p3x, p3z] = P(L);
+        addWallCol(p0x, p0z, p3x, p3z, 0, sill);
+        addWallCol(p0x, p0z, p3x, p3z, sill, WH, { noRay: true, glass: true });
       } else if (op === 'window') {
         const W_ = wide.has(key), ww = W_ ? 1.7 : 1.5, sOff = (L - ww) / 2, y0w = W_ ? 0.6 : 1.0, y1w = W_ ? 2.45 : 2.0;
         seg(0, L, 0, y0w, false); seg(0, L, y1w, WH, false); seg(0, sOff, y0w, y1w, false); seg(L - sOff, L, y0w, y1w, false);
@@ -1073,6 +1151,27 @@ function createBase(opt) {
         }
       }
     }
+    // ---------- rõdud: restpõrand, alumine plaat, piire servadel ----------
+    for (const k of decks) {
+      const [i, j] = k.split(':').map(Number), c = cellCenter(i, j), bu = B.up[0];
+      bu.color([0.3, 0.3, 0.31], MAT.WORN).boxB(c.x, WH - 0.05, c.z, CS, FLOOR_Y + 0.05, CS);
+      for (let q2 = -2; q2 <= 2; q2++) bu.color([0.19, 0.19, 0.2]).boxB(c.x + q2 * 0.38, WH + FLOOR_Y, c.z, 0.05, 0.012, CS * 0.94);
+      B.main[0].color([0.22, 0.22, 0.23], MAT.RUST).boxB(c.x, WH - 0.27, c.z, CS + 0.02, 0.22, CS + 0.02);
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj;
+        if (hiAt(ni, nj) || walkUp(ni, nj)) {
+          // seina all olev tugi: kaldtala seina juurde (ainult kui naaber on tuba)
+          if (roomAt(ni, nj) || hiAt(ni, nj)) { const ex = c.x + di * CS / 2, ez = c.z + dj * CS / 2; B.main[0].push().tf(ex - di * 0.55, WH - 0.75, ez - dj * 0.55, Math.atan2(di, dj), 0.75, 0).color([0.2, 0.2, 0.21], MAT.RUST).box(0, 0, 0, 0.12, 0.12, 1.3).pop(); }
+          continue;
+        }
+        const ex = c.x + di * CS / 2, ez = c.z + dj * CS / 2, ax = ex - (dj ? CS / 2 : 0), az = ez - (di ? CS / 2 : 0), bx = ex + (dj ? CS / 2 : 0), bz = ez + (di ? CS / 2 : 0);
+        bu.color([0.2, 0.2, 0.21], MAT.RUST).boxB(ex, WH + FLOOR_Y + 0.98, ez, dj ? CS : 0.07, 0.07, di ? CS : 0.07);
+        bu.color([0.2, 0.2, 0.21], MAT.RUST).boxB(ex, WH + FLOOR_Y + 0.45, ez, dj ? CS : 0.04, 0.04, di ? CS : 0.04);
+        for (let k2 = 0; k2 <= 4; k2++) bu.color([0.24, 0.24, 0.25]).boxB(ax + (bx - ax) * k2 / 4, WH + FLOOR_Y, az + (bz - az) * k2 / 4, 0.05, 1.0, 0.05);
+        bu.color([0.86, 0.64, 0.14]).boxB(ex, WH - 0.05, ez, dj ? CS : 0.08, 0.16, di ? CS : 0.08);
+        colliders.push({ t: 's', ax, az, bx, bz, r: 0.08, y0: OY + WH, y1: OY + WH + 1.15, kind: 'wall', noRay: true });
+      }
+    }
     for (const k of upPillars) {
       const [vi, vj] = k.split(':').map(Number), x = X0 + vi * CS, z = Z0 + vj * CS;
       B.main[0].color(POST, MAT.WORN).boxB(x, -1.2, z, 0.34, WH + 1.0, 0.34);
@@ -1117,6 +1216,15 @@ function createBase(opt) {
         useg(0, sOff, 0, WH); useg(L - sOff, L, 0, WH); useg(sOff, L - sOff, 2.3, WH);
         const [p0x, p0z] = P(0), [p1x, p1z] = P(sOff), [p2x, p2z] = P(L - sOff), [p3x, p3z] = P(L);
         addWallCol(p0x, p0z, p1x, p1z, WH, WH * 2); addWallCol(p2x, p2z, p3x, p3z, WH, WH * 2); addWallCol(p1x, p1z, p2x, p2z, WH + 2.3, WH * 2);
+      } else if (op === 'tallwin') {
+        const top = WH - 0.4, FR = [0.15, 0.155, 0.17];
+        useg(0, L, top, WH);
+        const [mx, mz] = P(L / 2);
+        G.color([0.42, 0.62, 0.70]).boxB(mx, WH, mz, t === 'v' ? 0.04 : L - 0.1, top, t === 'v' ? L - 0.1 : 0.04);
+        B.up[q].color(FR).boxB(mx, WH + top - 0.05, mz, t === 'v' ? WT + 0.14 : L, 0.1, t === 'v' ? L : WT + 0.14);
+        B.up[q].color(FR).boxB(mx, WH, mz, t === 'v' ? WT + 0.06 : 0.06, top, t === 'v' ? 0.06 : WT + 0.06);
+        const [p0x, p0z] = P(0), [p3x, p3z] = P(L);
+        addWallCol(p0x, p0z, p3x, p3z, WH, WH + top, { noRay: true, glass: true }); addWallCol(p0x, p0z, p3x, p3z, WH + top, WH * 2);
       } else if (op === 'window') {
         const ww = uW ? 1.7 : 1.5, sOff = (L - ww) / 2, a0 = uW ? 0.6 : 1.0, a1 = uW ? 2.45 : 2.0;
         useg(0, L, 0, a0); useg(0, L, a1, WH); useg(0, sOff, a0, a1); useg(L - sOff, L, a0, a1);
@@ -1474,6 +1582,12 @@ function createBase(opt) {
         if (!o.hm) o.hm = M4.create();
         M4.child(o.hm, o.m, 0, 4.35, 0, o.on ? o.anim * 1.6 : 0.4, 0, 0);
         GFX.draw(MODELS.obj.radarDish, o.hm, tint, null, { rust: 0.2 });
+      } else if (o.type === 'tuulik' && MODELS.obj.tuulikRotor) {
+        if (!o.hm) o.hm = M4.create();
+        M4.child(o.hm, o.m, 0, 8.9, 0.62, 0, 0, o.broken ? 0.3 : o.anim * 2.4);
+        GFX.draw(MODELS.obj.tuulikRotor, o.hm, tint, null, { rust: 0.3 });
+      } else if (o.type === 'fusioon' && powered) {
+        GFX.addLight(o.cx, OY + 3.0, o.cz, 9, 0.45, 0.8, 1.0, 1.6 + Math.sin(time * 5) * 0.2);
       } else if (o.type === 'skanner') {
         if (!o.hm) o.hm = M4.create();
         M4.child(o.hm, o.m, 0, 1.6 + Math.sin(o.anim * 0.8) * 0.6 * (o.on ? 1 : 0), 0, o.on ? o.anim * 0.9 : 0, 0, 0);
@@ -1508,7 +1622,7 @@ function createBase(opt) {
   }
   function reset() {
     roomJob.clear();
-    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); voids.clear(); upWalls.clear(); upOpen.clear(); upRoomCell.fill(0); upRooms.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
+    cellRoom.fill(0); cellObj.fill(0); cellObjUp.fill(0); upper.clear(); voids.clear(); decks.clear(); upWalls.clear(); upOpen.clear(); upRoomCell.fill(0); upRooms.clear(); cellStyle.fill(255); cellRust.fill(0); walls.clear(); rooms.clear(); objs.clear(); openings.clear();
     nextRoomId = 1; nextObjId = 1; dirty = true; doorSt.clear();
   }
   function isInside(x, z) { const c = toCell(x, z); return roomAt(c.i, c.j) > 0; }
@@ -1521,7 +1635,7 @@ function createBase(opt) {
       const back = -(lx * Math.sin(yw) + lz * Math.cos(yw));
       return OY + FLOOR_Y + clamp(0.5 + back / (2 * CS), 0, 1) * WH;
     }
-    if (y !== undefined && y > OY + WH * 0.55 && upAt(c.i, c.j)) return OY + WH + FLOOR_Y;
+    if (y !== undefined && y > OY + WH * 0.55 && walkUp(c.i, c.j)) return OY + upFloorY(c.i, c.j);
     if (roomAt(c.i, c.j) > 0) return OY + FLOOR_Y;
     if (!o) return -1e9;
     const d = OBJ[o.type];
@@ -1533,13 +1647,13 @@ function createBase(opt) {
     }
     return -1e9;
   }
-  function levelAt(x, z, y) { const c = toCell(x, z); return y > OY + WH * 0.55 && upAt(c.i, c.j) ? 1 : 0; }
+  function levelAt(x, z, y) { const c = toCell(x, z); return y > OY + WH * 0.55 && walkUp(c.i, c.j) ? 1 : 0; }
   // teise korruse lisamine / eemaldamine tervele toale
   // kõrge tuba: seinad üles (kui pole) ja kogu vahelagi ära
   function setTall(rid, on) {
     const r = rooms.get(rid); if (!r) return false;
     if (on) { if (!r.cells.every(([i, j]) => hiAt(i, j))) raiseRoom(rid); for (const [i, j] of r.cells) if (canVoid(i, j).ok) voids.add(i + ':' + j); }
-    else for (const [i, j] of r.cells) voids.delete(i + ':' + j);
+    else { for (const [i, j] of r.cells) voids.delete(i + ':' + j); for (const [t, i, j] of roomEdges(r)) if (openings.get(ekey(t, i, j)) === 'tallwin') setTallWin([[t, i, j]], false); }
     pruneObjects(); dirty = true; return true;
   }
   function roomIsTall(rid) { const r = rooms.get(rid); return !!(r && r.cells.length && r.cells.every(([i, j]) => tallAt(i, j))); }
@@ -1576,7 +1690,7 @@ function createBase(opt) {
   function pathUp(ax, az, bx, bz) {
     const s0 = toCell(ax, az), g = toCell(bx, bz);
     if (!inGrid(s0.i, s0.j) || !inGrid(g.i, g.j)) return null;
-    const ok = (i, j) => inGrid(i, j) && upAt(i, j) && !holeAt(i, j) && (!objUpAt(i, j) || (i === g.i && j === g.j));
+    const ok = (i, j) => inGrid(i, j) && walkUp(i, j) && !holeAt(i, j) && (!objUpAt(i, j) || (i === g.i && j === g.j));
     const prev = new Map(), k0 = s0.j * N + s0.i, kg = g.j * N + g.i;
     prev.set(k0, -1); const q = [k0];
     while (q.length) {
@@ -1615,7 +1729,7 @@ function createBase(opt) {
     const styles = [];
     for (const r of rooms.values()) styles.push([r.cells[0][0], r.cells[0][1], r.style, r.rust]);
     const jobs = []; for (const [rid, k] of roomJob) { const r = rooms.get(rid); if (r) jobs.push([r.cells[0][0], r.cells[0][1], k]); }
-    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], wide: [...wide], upWide: [...upWide], doors: [...doorSt.entries()].filter(([, v]) => v.broken || v.hp < DOOR_HP || Object.keys(v.hack).length).map(([k, v]) => [k, v.hp, v.broken ? 1 : 0, Object.keys(v.hack)]), voids: [...voids], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
+    return { v: 2, jobs, walls: [...walls], openings: [...openings.entries()], styles, up2: 1, upWalls: [...upWalls], upOpen: [...upOpen.entries()], wide: [...wide], upWide: [...upWide], doors: [...doorSt.entries()].filter(([, v]) => v.broken || v.hp < DOOR_HP || Object.keys(v.hack).length).map(([k, v]) => [k, v.hp, v.broken ? 1 : 0, Object.keys(v.hack)]), voids: [...voids], decks: [...decks], objs: [...objs.values()].map((o) => ({ id: o.id, type: o.type, i: o.i, j: o.j, rot: o.rot, hp: o.hp, broken: o.broken, data: o.data, lv: o.lv || 0 })) };
   }
   function deserialize(d) {
     reset();
@@ -1632,7 +1746,7 @@ function createBase(opt) {
     wide.clear(); upWide.clear(); for (const k of d.wide || []) if (openings.has(k)) wide.add(k); for (const k of d.upWide || []) upWide.add(k);
     if (d.up2) {
       for (const k of d.upWalls || []) upWalls.add(k);
-      for (const [k, v] of d.upOpen || []) if (v === 'door' || v === 'window') upOpen.set(k, v);
+      for (const [k, v] of d.upOpen || []) if (v === 'door' || v === 'window' || v === 'tallwin') upOpen.set(k, v);
       for (const k of d.voids || []) voids.add(k);
     } else if ((d.upper && d.upper.length) || (d.tall && d.tall.length)) {
       // vana salvestus: teise korruse seinad tuletatakse esimese korruse seintest nagu varem
@@ -1651,6 +1765,7 @@ function createBase(opt) {
       for (const k of d.tall || []) voids.add(k);
     }
     for (const [i, j, k] of d.jobs || []) { const rid = roomAt(i, j); if (rid) roomJob.set(rid, k); }
+    for (const k of d.decks || []) decks.add(k);
     for (const o of d.objs) addObj(o.type, o.i, o.j, o.rot, { hp: o.hp, broken: o.broken, data: o.data || {}, lv: o.lv || 0 }, o.id);
     computeRooms();
     dirty = true;
@@ -1667,6 +1782,7 @@ function createBase(opt) {
     inGrid, inArea, roomAt, objAt, objUpAt, upAt, holeAt, levelAt, setUpper, roomHasUpper, stairRoute, pathUp, tallAt, setTall, roomIsTall, frontEdges, gdoors, setRoomJob, roomJobStatus, roomJob, canPlaceReplacing, placeReplacing, upRoomAt, upRooms, hiAt, lowDistAt, OVERHANG, canVoid, setVoid, voidAt, upperWallsFor, raiseRoom, removeUpRooms, upWallAt, upOpening, isWide, canPlaceUpWall, addUpWalls, removeUpWalls, isUpWallCustom, canSetUpOpening, setUpOpening, stairDir, upper, cellCenter, toCell, containsWorld, isWall, edgeType, edgeRooms, edgeCells, footprint, objCenter, objYaw,
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, sizeScore, countBeds, updatePower, roomAccess, escapeCell,
+    deckAt, canDeck, setDeck, roofAt, walkUp, canTallWin, setTallWin, tallWinAt,
     findPath, pathWorld, vehiclePath, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
     serialize, deserialize, markDirty: () => { dirty = true; }, rebuildNow: () => rebuild(), computeRooms,
     get viewLevel() { return viewLevel; }, set viewLevel(v) { viewLevel = v ? 1 : 0; },

@@ -55,6 +55,7 @@ const Build = (() => {
   }
   function setLevel(lv) {
     S.level = lv ? 1 : 0; Base.viewLevel = S.level; pending = null; drag = null; hover = null;
+    if (!S.level && S.tool === 'floor') S.tool = 'look';
     UI.buildTools(S); UI.buildConfirm(null); info();
     UI.toast(S.level ? 'Floor 2 – walls, doors, windows and items upstairs' : 'Floor 1');
   }
@@ -227,8 +228,10 @@ const Build = (() => {
       if (!rid) deny('Tap a room to give it a job.'); else { Audio2.ui(); UI.openRoomJob(rid); }
     } else if (S.tool === 'floor' && hover && moved < 25) {
       if (!S.level) deny('Switch to Floor 2 to remove or restore floor.');
+      else if (Base.deckAt(hover.i, hover.j)) { Base.setDeck(hover.i, hover.j, false); G.res.scrap += 6; Audio2.build(); UI.toast('Balcony tile removed (+6 scrap)'); }
       else if (Base.voidAt(hover.i, hover.j)) { Base.setVoid(hover.i, hover.j, false); Audio2.build(); UI.toast('Floor restored'); }
-      else { const ok = Base.canVoid(hover.i, hover.j); if (!ok.ok) deny(ok.why); else { Base.setVoid(hover.i, hover.j, true); Audio2.build(); UI.toast('Floor removed – two storeys tall here'); } }
+      else if (Base.upAt(hover.i, hover.j)) { const ok = Base.canVoid(hover.i, hover.j); if (!ok.ok) deny(ok.why); else { Base.setVoid(hover.i, hover.j, true); Audio2.build(); UI.toast('Floor removed – two storeys tall here'); } }
+      else { const ok = Base.canDeck(hover.i, hover.j), cost = { s: 12 }, af = afford(cost); if (!ok.ok) deny(ok.why); else if (af) deny(af); else { pay(cost); Base.setDeck(hover.i, hover.j, true); Audio2.build(); UI.toast('Balcony tile built. Make an upstairs door onto it (Door tool on Floor 2).'); } }
     } else if (S.tool === 'tall' && hover && moved < 25) {
       const rid = Base.roomAt(hover.i, hover.j);
       if (!rid) deny('Tap a room to make it two storeys tall.');
@@ -380,15 +383,26 @@ const Build = (() => {
     UI.toast((hasStairs ? 'Walls raised upstairs.' : 'Walls raised upstairs. Add Indoor stairs (Items → Garage & stairs) so people can get up.') + ' On Floor 2 you can build more walls – rooms may reach 3 tiles past the ground floor.');
     return true;
   }
-  const EDGE_TOOLS = new Set(['door', 'window', 'doorW', 'windowW']);
+  const EDGE_TOOLS = new Set(['door', 'window', 'doorW', 'windowW', 'windowT']);
   // laiad variandid: 'doorW' / 'windowW' → sama ava, aga laiem (ja aken ka kõrgem)
-  const edgeSpec = (type) => { const w = type.endsWith('W'), bt = w ? type.slice(0, -1) : type; return { w, bt, cost: (bt === 'door' ? 8 : 6) + (w ? 4 : 0), refund: (bt === 'door' ? 4 : 3) + (w ? 2 : 0) }; };
+  const edgeSpec = (type) => { if (type === 'windowT') return { w: false, bt: 'tallwin', cost: 40, refund: 20, c: 60 }; const w = type.endsWith('W'), bt = w ? type.slice(0, -1) : type; return { w, bt, cost: (bt === 'door' ? 8 : 6) + (w ? 4 : 0), refund: (bt === 'door' ? 4 : 3) + (w ? 2 : 0) }; };
   const curEdge = (ed) => {
     const lv = S.level ? 1 : 0, c = lv ? Base.upOpening(ed.t, ed.i, ed.j) : Base.edgeType(ed.t, ed.i, ed.j);
     if (c !== 'door' && c !== 'window') return c;
     return c + (Base.isWide(ed.t, ed.i, ed.j, lv) ? 'W' : '');
   };
+  // kahekorruseline aken: kaks seinalõiku korraga, mõlemal korrusel
+  function commitTallWin(ed) {
+    const cur = Base.tallWinAt(ed.t, ed.i, ed.j);
+    if (cur) { Base.setTallWin(cur, false); G.res.scrap += 20 * cur.length / 2; Audio2.build(); pending = null; UI.buildConfirm(null); UI.toast('Tall window removed'); undo.length = 0; return true; }
+    const ok = Base.canTallWin(ed.t, ed.i, ed.j); if (!ok.ok) { deny(ok.why); return false; }
+    const cost = { s: 40, c: 60 }; const af = afford(cost); if (af) { deny(af); return false; }
+    pay(cost); Base.setTallWin(ok.edges, true); undo.length = 0;
+    Audio2.build(); pending = null; UI.buildConfirm(null); UI.toast('Two-storey window built');
+    return true;
+  }
   function commitEdge(ed, type) {
+    if (type === 'windowT') return commitTallWin(ed);
     const sp = edgeSpec(type), cur = curEdge(ed), cs = cur && (cur.startsWith('door') || cur.startsWith('window')) ? edgeSpec(cur) : null;
     if (S.level) {
       if (cur === type) {
@@ -443,6 +457,7 @@ const Build = (() => {
       if (h.edge && Base.isUpWallCustom(h.edge.t, h.edge.i, h.edge.j)) return { kind: 'upwalls', edges: [[h.edge.t, h.edge.i, h.edge.j]] };
       const uid = Base.objUpAt(h.i, h.j);
       if (uid) return { kind: 'obj', o: Base.objs.get(uid) };
+      if (Base.deckAt(h.i, h.j)) return { kind: 'deck', i: h.i, j: h.j };
       if (Base.upAt(h.i, h.j) && Base.canVoid(h.i, h.j).ok) return { kind: 'floor', i: h.i, j: h.j };
       return null;
     }
@@ -462,6 +477,7 @@ const Build = (() => {
       UI.toast(rem.length + ' upper-floor wall segments demolished. Refund: ' + rem.length + ' scrap');
       Audio2.build(); pending = null; UI.buildConfirm(null); undo.length = 0; return;
     }
+    if (tg.kind === 'deck') { Base.setDeck(tg.i, tg.j, false); G.res.scrap += 6; UI.toast('Balcony tile removed (+6 scrap)'); Audio2.build(); pending = null; UI.buildConfirm(null); return; }
     if (tg.kind === 'floor') {
       if (!Base.setVoid(tg.i, tg.j, true)) { deny(Base.canVoid(tg.i, tg.j).why); return; }
       UI.toast('Floor removed – the room below is now two storeys tall here. A railing guards the edge. (Floor tool puts it back.)');
@@ -520,8 +536,9 @@ const Build = (() => {
     else if (pending.kind === 'objline') { const li = lineInfo(pending.type, pending.cells); cost = li.n + ' × · ' + costStr(li.cost); ok = li.n > 0 && !afford(li.cost); label = 'Build'; }
     else if (pending.kind === 'tall') { const c = tallCost(pending.rid); const on = Base.roomIsTall(pending.rid); cost = on ? 'refund ' + costStr(half(c)) : costStr(c); ok = on || !afford(c); label = on ? 'Make normal' : 'Tall room'; }
     else if (pending.kind === 'upper') { const c = upperCost(pending.rid); cost = costStr(c); ok = !afford(c) && !Base.roomHasUpper(pending.rid); label = '2nd floor'; }
+    else if (pending.kind === 'edge' && pending.type === 'windowT') { const on = !!Base.tallWinAt(pending.e.t, pending.e.i, pending.e.j); label = on ? 'Remove' : 'Tall window'; cost = on ? '+20 scrap' : '40 scrap · 60 ₵'; ok = on || Base.canTallWin(pending.e.t, pending.e.i, pending.e.j).ok; }
     else if (pending.kind === 'edge') { const sp = edgeSpec(pending.type), cur = curEdge(pending.e); if (cur === pending.type) { label = 'Remove'; cost = '+' + sp.refund + ' scrap'; } else { cost = sp.cost + ' scrap'; const cs = cur && cur !== 'wall' && cur !== 'garage' ? edgeSpec(cur) : null; ok = cs && cs.bt === sp.bt ? true : (S.level ? Base.canSetUpOpening(pending.e.t, pending.e.i, pending.e.j, sp.bt).ok : Base.canPlaceOpening(pending.e.t, pending.e.i, pending.e.j, sp.bt).ok); } }
-    else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.kind === 'floor' ? 'Floor tile' : pending.tg.edges.length + ' wall segments'; }
+    else if (pending.kind === 'demolish') { label = 'Demolish'; cost = pending.tg.kind === 'obj' ? OBJ[pending.tg.o.type].name : pending.tg.kind === 'floor' ? 'Floor tile' : pending.tg.kind === 'deck' ? 'Balcony tile' : pending.tg.edges.length + ' wall segments'; }
     UI.buildConfirm({ label, cost, ok, canRotate: pending.kind === 'obj' });
   }
 
@@ -539,7 +556,8 @@ const Build = (() => {
       paint: 'Tap a room to change its colour. Cleaning a rusty room costs 10 scrap.',
       demolish: S.level ? 'Tap an upstairs item, or an empty upper floor to remove it.' : 'Tap an item or a wall. Drag to demolish a whole wall line. You get part of the cost back.',
       job: 'Tap a room to give it a job (barracks, canteen, workshop …). With only the right items inside, the room gives a bonus.',
-      floor: 'Floor 2: tap a floor tile above a ground-floor room to remove it (makes a two-storey space with a railing) – tap again to put it back.',
+      floor: S.level ? 'Floor 2: tap next to an upstairs wall or a roof edge to build a BALCONY tile (12 scrap, up to 2 tiles out). Tap it again to remove. Tap upstairs floor above a room to remove it (two-storey space). Roofs can be walked on – make an upstairs door onto the roof or balcony.' : 'Switch to Floor 2 to build balconies or remove floor.',
+      windowT: 'Two-storey window, 2 tiles wide: tap the outer wall of a TALL room (both tiles must be wall). Tap it again to remove. 40 scrap + 60 ₵.',
       tall: 'Tap a room to make it two storeys tall (3 scrap per new upstairs wall segment) – no floor in between. Good for a garage: then place the Car lift against an outer wall. Tap a tall room again to make it normal.',
       upper: 'Tap a room to raise its walls to the second floor (3 scrap per wall segment). Or switch to Floor 2 and draw walls yourself – rooms can reach 3 tiles past the ground floor (posts appear under longer overhangs). Then add Indoor stairs and switch to Floor 2 to furnish it.',
     };
@@ -635,11 +653,11 @@ const Build = (() => {
       const e2 = pending && pending.kind === 'edge' ? pending.e : hover.edge;
       edgeBox(e2, wallHere(e2.t, e2.i, e2.j) ? (S.tool.startsWith('door') ? YEL : BLUE) : RED);
     } else if (pending && pending.kind === 'edge') edgeBox(pending.e, YEL);
-    if (S.tool === 'floor' && hover && S.level) { const c = Base.cellCenter(hover.i, hover.j), ok = Base.voidAt(hover.i, hover.j) || Base.canVoid(hover.i, hover.j).ok; box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, ok ? YEL : RED, 0.45); }
+    if (S.tool === 'floor' && hover && S.level) { const c = Base.cellCenter(hover.i, hover.j), ok = Base.voidAt(hover.i, hover.j) || Base.deckAt(hover.i, hover.j) || (Base.upAt(hover.i, hover.j) ? Base.canVoid(hover.i, hover.j).ok : Base.canDeck(hover.i, hover.j).ok); box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, ok ? YEL : RED, 0.45); }
     if ((S.tool === 'paint' || S.tool === 'demolish' || S.tool === 'upper' || S.tool === 'tall' || S.tool === 'job') && (hover || pending)) {
       const tg = pending && pending.kind === 'demolish' ? pending.tg : S.tool === 'demolish' && hover && !drag ? demolishTarget(hover) : null;
       if (tg && tg.kind === 'obj') { const o = tg.o; box(o.cx, 0.7, o.cz, o.w * Base.CS, 1.4, o.h * Base.CS, RED, 0.35); }
-      else if (tg && tg.kind === 'floor') { const c = Base.cellCenter(tg.i, tg.j); box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, RED, 0.45); }
+      else if (tg && (tg.kind === 'floor' || tg.kind === 'deck')) { const c = Base.cellCenter(tg.i, tg.j); box(c.x, 0.16, c.z, Base.CS - 0.08, 0.1, Base.CS - 0.08, RED, 0.45); }
       else if (tg && (tg.kind === 'walls' || tg.kind === 'upwalls')) { for (const [t, i, j] of tg.edges) edgeBox({ t, i, j }, RED); }
       else if ((S.tool === 'paint' || S.tool === 'upper' || S.tool === 'tall' || S.tool === 'job') && hover) { const rid = Base.roomAt(hover.i, hover.j); if (rid) cellsBox(Base.rooms.get(rid), YEL); }
     }
