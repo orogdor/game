@@ -376,7 +376,7 @@ const Player = {
     }
     // korjused
     for (const e of Ents.list) {
-      if ((e.kind === 'alien' || e.kind === 'beast' || e.kind === 'beetle') && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
+      if ((e.kind === 'alien' || e.kind === 'beast' || e.kind === 'beetle' || e.kind === 'mother' || e.kind === 'hawk') && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
       if (e.alive || !e.butcherable) continue;
       if (Math.abs(e.pos.x - px) > 3 || Math.abs(e.pos.z - pz) > 3) continue;
       consider({ key: 'c' + e.id, label: 'Butcher meat', sub: e.meat + ' pieces', hold: 1.4, act: () => butcher(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.4, e.pos.z, [0.5, 0.15, 0.12], 1); } }, e.pos.x, e.pos.z, 2.6);

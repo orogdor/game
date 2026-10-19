@@ -1,5 +1,5 @@
 {
- "version": "v77",
+ "version": "v78",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -102,6 +102,7 @@
   "js/11_comets.js",
   "js/12_crew.js",
   "js/13_rivals.js",
+  "js/14_alienstyle.js",
   "js/14_boss.js",
   "js/14b_waves.js",
   "js/14c_vehicles.js",
@@ -110,6 +111,7 @@
   "js/14f_sandworm.js",
   "js/14h_tunnels.js",
   "js/14i_fauna.js",
+  "js/14j_fauna2.js",
   "js/15_objectives.js",
   "js/16_input.js",
   "js/17_build.js",

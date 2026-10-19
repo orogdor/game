@@ -228,6 +228,8 @@ const Ents = (() => {
         Tunnels.spheres(e, s); break;
       case 'glider': case 'bloat': case 'beetle':
         Fauna.spheres(e, s); break;
+      case 'hawk': case 'eel': case 'spitter': case 'mother': case 'larva': case 'phantom':
+        Fauna2.spheres(e, s); break;
     }
   }
   // kiir vs olemid
@@ -271,6 +273,7 @@ const Ents = (() => {
     if (e.kind === 'alien') Aliens.hurt(e, src);
     if (e.kind === 'beast') Tunnels.hurt(e, src);
     if (e.kind === 'glider' || e.kind === 'bloat' || e.kind === 'beetle') Fauna.hurt(e, src);
+    if (Fauna2.KINDS[e.kind]) Fauna2.hurt(e, src);
   }
   function kill(e, src) {
     e.alive = false; e.hp = 0; e.deathT = 0; e.pose = 'dead'; stopMove(e);
@@ -289,6 +292,7 @@ const Ents = (() => {
     if (e.kind === 'alien') Aliens.onKill(e);
     if (e.kind === 'beast') Tunnels.onKill(e);
     if (e.kind === 'glider' || e.kind === 'bloat' || e.kind === 'beetle') Fauna.onKill(e);
+    if (Fauna2.KINDS[e.kind]) Fauna2.onKill(e);
     if (e.kind === 'stalker') { Audio2.stalker(fx.x, fx.z); FX.goo(fx.x, fx.y + 0.5, fx.z, [0.55, 0.75, 0.2], 16); }
     if (e.kind === 'crab') {
       Audio2.crab(fx.x, fx.z);
@@ -304,7 +308,7 @@ const Ents = (() => {
       else if (typeof Rivals !== 'undefined') Rivals.onUnitDeath(e, src);
     }
     if (src && e.kind !== 'goat' && e.kind !== 'ram' && e.kind !== 'jelly' && typeof Levels !== 'undefined') { if (src.kind === 'player') Levels.add('player', 'fight', e.kind === 'beast' || e.kind === 'kiskja' ? 3 : 1); else if (src.crew) Levels.add(src.crew, 'fight', e.kind === 'beast' || e.kind === 'kiskja' ? 3 : 1); }
-    if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'alien' || e.kind === 'beast' || e.kind === 'glider' || e.kind === 'bloat' || e.kind === 'beetle' || e.kind === 'human') UI.hitMarker(true); }
+    if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'alien' || e.kind === 'beast' || e.kind === 'glider' || e.kind === 'bloat' || e.kind === 'beetle' || Fauna2.KINDS[e.kind] || e.kind === 'human') UI.hitMarker(true); }
   }
 
   // ---------- olendite AI ----------
@@ -515,7 +519,7 @@ const Ents = (() => {
         continue;
       }
       const far = Math.hypot(e.pos.x - Player.pos.x, e.pos.z - Player.pos.z) > 260 && Math.hypot(e.pos.x, e.pos.z) > 120 && !(typeof Net !== 'undefined' && Net.active && Net.nearAvatar(e.pos.x, e.pos.z, 260));
-      if (far && e.kind !== 'human' && e.kind !== 'bug' && e.kind !== 'boss' && Math.random() > dt * 4) { updateSpheres(e); continue; }
+      if (far && e.kind !== 'human' && e.kind !== 'bug' && e.kind !== 'boss' && e.kind !== 'hawk' && Math.random() > dt * 4) { updateSpheres(e); continue; }
       switch (e.kind) {
         case 'goat': case 'ram': updateGoat(e, dt); break;
         case 'stalker': updateStalker(e, dt); break;
@@ -524,6 +528,7 @@ const Ents = (() => {
         case 'alien': Aliens.update(e, dt); break;
         case 'beast': Tunnels.beastAI(e, dt); break;
         case 'glider': case 'bloat': case 'beetle': Fauna.update(e, dt); break;
+        case 'hawk': case 'eel': case 'spitter': case 'mother': case 'larva': case 'phantom': Fauna2.update(e, dt); break;
         case 'jelly': updateJelly(e, dt); break;
         case 'bug': Waves.bugAI(e, dt); break;
         case 'human': if (e.ai) e.ai(e, dt); break;
@@ -777,6 +782,7 @@ const Ents = (() => {
         case 'alien': Aliens.draw(e); break;
         case 'beast': Tunnels.drawBeast(e); break;
         case 'glider': case 'bloat': case 'beetle': Fauna.draw(e); break;
+        case 'hawk': case 'eel': case 'spitter': case 'mother': case 'larva': case 'phantom': Fauna2.draw(e); break;
         case 'jelly': drawJelly(e); break;
         case 'bug': Waves.draw(e); break;
         case 'boss': Boss.draw(e); break;

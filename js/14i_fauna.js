@@ -10,7 +10,7 @@ const Fauna = (() => {
   function initMeshes() {
     if (M) return M;
     M = {};
-    const CH = [0.22, 0.2, 0.26], CH2 = [0.34, 0.3, 0.36], AC = [0.55, 1.0, 0.25], EYE = [1.0, 0.8, 0.2], MEM = [0.42, 0.25, 0.3];
+    const CH = AS.CH, CH2 = AS.CH2, AC = AS.GLOW, EYE = AS.EYE, MEM = AS.MEM;
     let b = new MB(); b.jit = 0;   // lenduri keha
     b.color(CH, MAT.WORN).sphere(0, 0, 0, 0.35, 10, 7, 0.75); b.color(CH2, MAT.WORN).sphere(0, 0.05, 0.38, 0.22, 8, 6, 0.85);
     for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.09, 0.1, 0.56, 0.04, 6, 4, 1);
@@ -22,22 +22,22 @@ const Fauna = (() => {
     for (let k = 0; k < 3; k++) b.color(CH, MAT.WORN).push().tf(0.5 + k * 0.45, 0.02, 0.05, 0, 0, 0).box(0, 0, 0, 0.04, 0.05, 0.75).pop();
     M.wing = b.build();
     b = new MB(); b.jit = 0;   // mürgipõis: lihakas kott, kõhtmikul jalakesed
-    b.color([0.5, 0.42, 0.28], MAT.WORN).sphere(0, 1.3, 0, 1.0, 14, 9, 1);
+    b.color(AS.CH2, MAT.WORN).sphere(0, 1.3, 0, 1.0, 14, 9, 1);
     b.color([0.62, 0.95, 0.25], MAT.GLOW).sphere(0, 1.3, 0, 0.82, 12, 8, 1.05);
-    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color([0.4, 0.33, 0.22], MAT.WORN).push().tf(Math.cos(a) * 0.95, 1.3, Math.sin(a) * 0.95, 0, 0, 0).sphere(0, 0, 0, 0.22, 6, 4, 1).pop(); }
+    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(AS.PLATE, MAT.WORN).push().tf(Math.cos(a) * 0.95, 1.3, Math.sin(a) * 0.95, 0, 0, 0).sphere(0, 0, 0, 0.22, 6, 4, 1).pop(); }
     for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; b.color(CH, MAT.WORN).push().tf(Math.cos(a) * 0.5, 0.45, Math.sin(a) * 0.5, 0, 0, 0).cyl(0, -0.45, 0, 0.06, 0.03, 0.6, 5, true).pop(); }
     b.color(EYE, MAT.GLOW).sphere(0, 1.6, 0.92, 0.09, 6, 4, 1);
     M.bloat = b.build();
     b = new MB(); b.jit = 0;   // mardikas: kõrge kilp ees, kitiinkest, mortiir seljal
-    b.color([0.3, 0.28, 0.22], MAT.WORN).sphere(0, 1.1, -0.3, 1.5, 14, 9, 0.62);
-    for (let k = 0; k < 5; k++) b.color([0.42, 0.38, 0.28], MAT.WORN).push().tf(0, 1.1, -1.3 + k * 0.55, 0, 0, 0).box(0, 0.75, 0, 2.2 - Math.abs(k - 2) * 0.3, 0.12, 0.45).pop();
-    b.color([0.5, 0.46, 0.36], MAT.WORN).push().tf(0, 1.2, 1.25, 0, -0.35, 0).box(0, 0, 0, 2.4, 1.8, 0.35).pop();   // esikilp
-    for (let k = 0; k < 4; k++) b.color([0.85, 0.8, 0.66], MAT.WORN).push().tf(-0.9 + k * 0.6, 2.1, 1.25, 0, -0.7, 0).cyl(0, 0, 0, 0.1, 0, 0.45, 6, true).pop();
+    b.color(AS.CH, MAT.WORN).sphere(0, 1.1, -0.3, 1.5, 14, 9, 0.62);
+    for (let k = 0; k < 5; k++) b.color(AS.CH2, MAT.WORN).push().tf(0, 1.1, -1.3 + k * 0.55, 0, 0, 0).box(0, 0.75, 0, 2.2 - Math.abs(k - 2) * 0.3, 0.12, 0.45).pop();
+    b.color(AS.PLATE, MAT.WORN).push().tf(0, 1.2, 1.25, 0, -0.35, 0).box(0, 0, 0, 2.4, 1.8, 0.35).pop();   // esikilp
+    for (let k = 0; k < 4; k++) b.color(AS.BONE, MAT.WORN).push().tf(-0.9 + k * 0.6, 2.1, 1.25, 0, -0.7, 0).cyl(0, 0, 0, 0.1, 0, 0.45, 6, true).pop();
     for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.35, 0.9, 1.45, 0.08, 6, 4, 1);
-    b.color([0.25, 0.22, 0.2], MAT.WORN).push().tf(0, 1.9, -0.6, 0, 0.6, 0).cyl(0, 0, 0, 0.35, 0.3, 1.1, 10, true).pop();   // mortiiritoru
+    b.color(AS.CH, MAT.WORN).push().tf(0, 1.9, -0.6, 0, 0.6, 0).cyl(0, 0, 0, 0.35, 0.3, 1.1, 10, true).pop();   // mortiiritoru
     b.color(AC, MAT.GLOW).push().tf(0, 1.9, -0.6, 0, 0.6, 0).cyl(0, 1.05, 0, 0.26, 0.26, 0.06, 10, true).pop();
     M.beetle = b.build();
-    b = new MB(); b.jit = 0; b.color([0.25, 0.22, 0.18], MAT.WORN).cyl(0, -0.9, 0, 0.12, 0.06, 0.95, 6, true); M.bleg = b.build();
+    b = new MB(); b.jit = 0; b.color(AS.CH, MAT.WORN).cyl(0, -0.9, 0, 0.12, 0.06, 0.95, 6, true); M.bleg = b.build();
     b = new MB(); b.jit = 0; b.color(AC, MAT.GLOW).sphere(0, 0, 0, 0.35, 8, 5, 1); M.glob = b.build();
     return M;
   }

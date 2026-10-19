@@ -51,6 +51,9 @@ function isThreatTo(t, team) {
   if (t.kind === 'beast') return t.state === 'hunt';
   if (t.kind === 'glider') return t.state !== 'circle';
   if (t.kind === 'bloat' || t.kind === 'beetle') return true;
+  if (t.kind === 'hawk') return t.state === 'dive';
+  if (t.kind === 'eel') return t.state === 'up';
+  if (t.kind === 'spitter' || t.kind === 'mother' || t.kind === 'larva' || t.kind === 'phantom') return true;
   if (t.kind === 'ram') return t.state === 'charge';
   if (t.kind === 'boss') return t.state !== 'sleep';
   if (t.kind === 'human' || t.kind === 'player' || t.kind === 'core' || t.kind === 'rturret') {

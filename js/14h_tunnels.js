@@ -102,7 +102,7 @@ const Tunnels = (() => {
   function initMeshes() {
     if (BM) return BM;
     BM = {};
-    const SK = [0.3, 0.27, 0.3], SK2 = [0.2, 0.18, 0.21], PL = [0.42, 0.36, 0.3], BONE = [0.85, 0.8, 0.66], EYE = [1.0, 0.35, 0.1], MOUTH = [0.45, 0.1, 0.12];
+    const SK = AS.CH2, SK2 = AS.CH, PL = AS.PLATE, BONE = AS.BONE, EYE = AS.EYE, MOUTH = AS.MOUTH;
     let b = new MB(); b.jit = 0;
     b.color(SK, MAT.WORN).sphere(0, 1.55, -0.2, 1.55, 14, 9, 0.78);                 // tünnkeha
     b.color(SK2, MAT.WORN).sphere(0, 1.25, 0.9, 1.2, 12, 8, 0.8);                   // õlad
