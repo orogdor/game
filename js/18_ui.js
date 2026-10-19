@@ -639,7 +639,7 @@ const UI = (() => {
     G.res.cr -= u.cost.c || 0; G.res.scrap -= u.cost.s || 0; G.res.kris -= u.cost.k || 0;
     if (id === 'r2') G.up.rifle = 2; if (id === 'r3') G.up.rifle = 3;
     if (id === 'rail') { G.up.rail = true; const v = Inv.ensure(); if (!v.eq.w2) v.eq.w2 = 'rail'; else Inv.stashAdd('rail', 1); Inv.stashAdd('ammo_c', 10); Player.mag.rail = 5; toast('The railgun is equipped. Charges are in storage.'); }
-    if (id === 'a1' || id === 'a2') { G.up.armor++; Player.maxHp = 100 + G.up.armor * 50; Player.hp = Player.maxHp; }
+    if (id === 'a1' || id === 'a2') { G.up.armor++; Player.maxHp = Levels.pHp(); Player.hp = Player.maxHp; }
     Player.mag.rifle = Math.min(Player.mag.rifle, weaponStats('rifle').mag);
     Audio2.cash(); toast(u.name + ' is yours');
   }

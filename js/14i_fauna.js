@@ -10,35 +10,48 @@ const Fauna = (() => {
   function initMeshes() {
     if (M) return M;
     M = {};
-    const CH = AS.CH, CH2 = AS.CH2, AC = AS.GLOW, EYE = AS.EYE, MEM = AS.MEM;
-    let b = new MB(); b.jit = 0;   // lenduri keha
-    b.color(CH, MAT.WORN).sphere(0, 0, 0, 0.35, 10, 7, 0.75); b.color(CH2, MAT.WORN).sphere(0, 0.05, 0.38, 0.22, 8, 6, 0.85);
-    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.09, 0.1, 0.56, 0.04, 6, 4, 1);
-    b.color(AC, MAT.GLOW).sphere(0, -0.05, -0.32, 0.16, 8, 5, 1);
-    b.color(CH, MAT.WORN).push().tf(0, 0, -0.45, 0, -1.4, 0).cyl(0, 0, 0, 0.08, 0.0, 0.7, 6, true).pop();
+    const { CH, CH2, PLATE, BELLY, GLOW, EYE, BONE, MOUTH, MEM } = AS, md0 = MB.detail; MB.detail = true;
+    // lendur: sale kitiinkeha, rippuv happekott, kahe hambareaga lõuad, okkaline saba
+    let b = new MB(); b.jit = 0;
+    Org.blob(b, 0, 0, -0.05, 0.28, 0.24, 0.5, CH, { amp: 0.08, ridge: 4 });
+    Org.blob(b, 0, -0.16, -0.25, 0.2, 0.18, 0.24, GLOW, { amp: 0.05, mat: MAT.GLOW });
+    Org.tube(b, [[0, 0.05, 0.35, 0.16], [0, 0.1, 0.55, 0.14], [0, 0.08, 0.72, 0.15]], 10, CH2);
+    Org.blob(b, 0, 0.08, 0.82, 0.16, 0.12, 0.2, CH2, { amp: 0.05 });
+    for (const sx of [-1, 1]) { b.color(EYE, MAT.GLOW).sphere(sx * 0.08, 0.15, 0.92, 0.035, 8, 5, 1); Org.claw(b, sx * 0.07, 0.0, 0.95, sx * 0.3, -0.6, 1, 0.22, 0.035, -0.4, BONE); }
+    Org.tube(b, [[0, 0, -0.5, 0.12], [0, 0.05, -0.85, 0.08], [0, 0.15, -1.15, 0.05], [0, 0.3, -1.35, 0.0]], 8, CH);
+    for (let k = 0; k < 4; k++) Org.claw(b, 0, 0.2, -0.15 - k * 0.18, 0, 1, -0.4, 0.18, 0.03, 0.3, BONE);
     M.glider = b.build();
-    b = new MB(); b.jit = 0;   // tiib (+x poole), pöörleb ümber z
-    b.color(MEM, MAT.MATTE).box(0.75, 0, 0, 1.5, 0.03, 0.8); b.color(CH, MAT.WORN).box(0.75, 0.02, 0.38, 1.5, 0.06, 0.06);
-    for (let k = 0; k < 3; k++) b.color(CH, MAT.WORN).push().tf(0.5 + k * 0.45, 0.02, 0.05, 0, 0, 0).box(0, 0, 0, 0.04, 0.05, 0.75).pop();
+    b = new MB(); b.jit = 0;   // tiib: luusõrmed + venitatud nahk (+x)
+    const tips = [[1.5, 0.05, 0.35], [1.6, 0.0, -0.05], [1.3, -0.02, -0.45], [0.8, -0.02, -0.55]];
+    Org.tube(b, [[0, 0, 0.1, 0.07], [0.6, 0.05, 0.3, 0.06], [1.5, 0.05, 0.35, 0.02]], 6, CH);
+    for (const t of tips.slice(1)) Org.tube(b, [[0.6, 0.05, 0.3, 0.04], [t[0], t[1], t[2], 0.012]], 5, CH);
+    b.color(MEM, MAT.MATTE); for (let k = 0; k < tips.length - 1; k++) { const a = tips[k], c = tips[k + 1]; Org.oq(b, [0, 0, 0.05], [0.6, 0.05, 0.3], a, c, [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]); Org.oq(b, [0, 0, 0.05], c, a, [0.6, 0.05, 0.3], [0, -1, 0], [0, -1, 0], [0, -1, 0], [0, -1, 0]); }
+    Org.claw(b, 1.5, 0.05, 0.35, 1, 0, 0.3, 0.25, 0.03, 0.4, BONE);
     M.wing = b.build();
-    b = new MB(); b.jit = 0;   // mürgipõis: lihakas kott, kõhtmikul jalakesed
-    b.color(AS.CH2, MAT.WORN).sphere(0, 1.3, 0, 1.0, 14, 9, 1);
-    b.color([0.62, 0.95, 0.25], MAT.GLOW).sphere(0, 1.3, 0, 0.82, 12, 8, 1.05);
-    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(AS.PLATE, MAT.WORN).push().tf(Math.cos(a) * 0.95, 1.3, Math.sin(a) * 0.95, 0, 0, 0).sphere(0, 0, 0, 0.22, 6, 4, 1).pop(); }
-    for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; b.color(CH, MAT.WORN).push().tf(Math.cos(a) * 0.5, 0.45, Math.sin(a) * 0.5, 0, 0, 0).cyl(0, -0.45, 0, 0.06, 0.03, 0.6, 5, true).pop(); }
-    b.color(EYE, MAT.GLOW).sphere(0, 1.6, 0.92, 0.09, 6, 4, 1);
+    // mürgipõis: läbipaistva naha all helendav mürk, veenid, väikesed jalad ja nokk-suu
+    b = new MB(); b.jit = 0;
+    Org.blob(b, 0, 1.35, 0, 0.98, 0.92, 0.98, GLOW, { amp: 0.04, mat: MAT.GLOW, seg: 20 });
+    for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; const pts = []; for (let q = 0; q <= 6; q++) { const t = q / 6 * Math.PI * 0.9 + 0.1, r = 1.0 + Math.sin(q * 1.7 + k) * 0.03; pts.push([Math.cos(a + Math.sin(q + k) * 0.15) * Math.sin(t) * r, 1.35 + Math.cos(t) * r * 0.95, Math.sin(a + Math.sin(q + k) * 0.15) * Math.sin(t) * r, 0.09]); } Org.tube(b, pts, 6, CH2); }
+    Org.blob(b, 0, 2.2, 0, 0.45, 0.25, 0.45, CH, { amp: 0.1, ridge: 5 });
+    Org.blob(b, 0, 0.6, 0, 0.55, 0.3, 0.55, CH, { amp: 0.12 });
+    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + 0.3; Org.limb(b, [[Math.cos(a) * 0.45, 0.6, Math.sin(a) * 0.45], [Math.cos(a) * 0.9, 0.55, Math.sin(a) * 0.9], [Math.cos(a) * 1.05, 0.0, Math.sin(a) * 1.05]], 0.08, 0.04, CH, 0.12); }
+    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.18, 1.75, 0.88, 0.07, 8, 5, 1);
+    Org.blob(b, 0, 1.35, 0.95, 0.22, 0.2, 0.15, MOUTH, { amp: 0.05, mat: MAT.MATTE });
+    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; Org.claw(b, Math.cos(a) * 0.18, 1.35 + Math.sin(a) * 0.17, 1.02, Math.cos(a) * 0.4, Math.sin(a) * 0.4, 0.5, 0.18, 0.03, 0.2, BONE); }
     M.bloat = b.build();
-    b = new MB(); b.jit = 0;   // mardikas: kõrge kilp ees, kitiinkest, mortiir seljal
-    b.color(AS.CH, MAT.WORN).sphere(0, 1.1, -0.3, 1.5, 14, 9, 0.62);
-    for (let k = 0; k < 5; k++) b.color(AS.CH2, MAT.WORN).push().tf(0, 1.1, -1.3 + k * 0.55, 0, 0, 0).box(0, 0.75, 0, 2.2 - Math.abs(k - 2) * 0.3, 0.12, 0.45).pop();
-    b.color(AS.PLATE, MAT.WORN).push().tf(0, 1.2, 1.25, 0, -0.35, 0).box(0, 0, 0, 2.4, 1.8, 0.35).pop();   // esikilp
-    for (let k = 0; k < 4; k++) b.color(AS.BONE, MAT.WORN).push().tf(-0.9 + k * 0.6, 2.1, 1.25, 0, -0.7, 0).cyl(0, 0, 0, 0.1, 0, 0.45, 6, true).pop();
-    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.35, 0.9, 1.45, 0.08, 6, 4, 1);
-    b.color(AS.CH, MAT.WORN).push().tf(0, 1.9, -0.6, 0, 0.6, 0).cyl(0, 0, 0, 0.35, 0.3, 1.1, 10, true).pop();   // mortiiritoru
-    b.color(AC, MAT.GLOW).push().tf(0, 1.9, -0.6, 0, 0.6, 0).cyl(0, 1.05, 0, 0.26, 0.26, 0.06, 10, true).pop();
+    // piiramismardikas: kumer soomuskest, kõrge kilp ees kihvadega, mortiir-organ seljal
+    b = new MB(); b.jit = 0;
+    Org.blob(b, 0, 1.1, -0.35, 1.45, 0.95, 1.75, CH, { amp: 0.07, ridge: 6, flatBelly: 0.5 });
+    for (let k = 0; k < 6; k++) { const z = -1.6 + k * 0.55, w = 1.45 - Math.abs(k - 2.5) * 0.2; const pts = []; for (let q = 0; q <= 8; q++) { const a = Math.PI * (0.05 + 0.9 * q / 8); pts.push([Math.cos(a) * w, 1.1 + Math.sin(a) * 0.98, z, 0.07]); } Org.tube(b, pts, 6, CH2); }
+    Org.blob(b, 0, 1.25, 1.35, 1.25, 0.95, 0.3, PLATE, { amp: 0.09, ridge: 3 });
+    for (let k = 0; k < 5; k++) Org.claw(b, -0.9 + k * 0.45, 1.9 + Math.sin(k) * 0.1, 1.45, 0, 1, 0.4, 0.55, 0.09, -0.3, BONE);
+    for (const sx of [-1, 1]) { Org.claw(b, sx * 0.45, 0.55, 1.55, sx * 0.4, -0.2, 1, 0.9, 0.12, 0.5, BONE); b.color(EYE, MAT.GLOW).sphere(sx * 0.35, 0.95, 1.62, 0.08, 8, 5, 1); b.color(EYE, MAT.GLOW).sphere(sx * 0.6, 1.05, 1.55, 0.05, 6, 4, 1); }
+    Org.tube(b, [[0, 1.85, -0.5, 0.38], [0, 2.3, -0.75, 0.33], [0, 2.75, -0.95, 0.3], [0, 2.95, -1.05, 0.34]], 12, CH2);
+    b.color(GLOW, MAT.GLOW).sphere(0, 2.98, -1.06, 0.24, 10, 6, 0.5);
     M.beetle = b.build();
-    b = new MB(); b.jit = 0; b.color(AS.CH, MAT.WORN).cyl(0, -0.9, 0, 0.12, 0.06, 0.95, 6, true); M.bleg = b.build();
-    b = new MB(); b.jit = 0; b.color(AC, MAT.GLOW).sphere(0, 0, 0, 0.35, 8, 5, 1); M.glob = b.build();
+    b = new MB(); b.jit = 0; Org.limb(b, [[0, 0, 0], [0, 0.25, 0.3], [0, -0.95, 0.45]], 0.13, 0.06, CH, 0.18); M.bleg = b.build();
+    b = new MB(); b.jit = 0; Org.blob(b, 0, 0, 0, 0.3, 0.3, 0.38, GLOW, { amp: 0.15, mat: MAT.GLOW }); M.glob = b.build();
+    MB.detail = md0;
     return M;
   }
 

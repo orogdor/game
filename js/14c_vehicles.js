@@ -255,14 +255,19 @@ const Vehicles = (() => {
       b.color(BK, MAT.METAL).box(-0.4, -0.8, -0.1, 0.08, 1.3, 0.6);
       b.color(ST, MAT.METAL).push().tf(0.3, -0.8, -0.5, 0, 0, 0).cyl(0, -0.6, 0, 0.11, 0.11, 1.2, 10).pop(); b.color(ST, MAT.METAL).push().tf(-0.25, -0.8, -0.5, 0, 0, 0).cyl(0, -0.55, 0, 0.08, 0.08, 1.1, 10).pop();
       for (let k = 0; k < 4; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(0.385, -0.3 - k * 0.16, 0.2, 0.02, 0.16, 0.55);
-      b.color(ST, MAT.METAL).push().tf(0, -1.6, 0, 0, 0, Math.PI / 2).cyl(0, -0.42, 0, 0.34, 0.34, 0.84, 14).pop(); M.mThigh = b.build();
+      b.color(ST, MAT.METAL).push().tf(0, -1.6, 0, 0, 0, Math.PI / 2).cyl(0, -0.42, 0, 0.34, 0.34, 0.84, 14).pop();
+      Org.tube(b, [[0.42, -0.2, 0.35, 0.09], [0.46, -0.9, 0.42, 0.09]], 10, ST, MAT.METAL); Org.tube(b, [[0.46, -0.9, 0.42, 0.06], [0.44, -1.45, 0.3, 0.06]], 10, [0.75, 0.75, 0.78], MAT.METAL);   // hüdraulikakolb
+      Org.tube(b, [[-0.38, -0.1, -0.35, 0.04], [-0.5, -0.8, -0.45, 0.04], [-0.42, -1.5, -0.3, 0.04]], 6, BK, MAT.MATTE);   // voolik
+      Org.blob(b, 0, -0.45, 0.3, 0.45, 0.45, 0.32, OL, { amp: 0.02, mat: MAT.WORN }); M.mThigh = b.build();
       b = new MB(); b.jit = 0;   // säär + saabas (alla 1.7)
       b.color(OL, MAT.WORN).push().tf(0, 0.05, 0.35, 0, -0.25, 0).box(0, -0.1, 0, 0.8, 0.75, 0.35).pop();                  // põlvekaitse
       b.color(OL2, MAT.WORN).box(0, -0.8, -0.05, 0.68, 1.4, 0.8); b.color(BK, MAT.METAL).box(0, -0.75, 0.42, 0.42, 1.0, 0.08);
       b.color(ST, MAT.METAL).push().tf(0, -0.8, -0.5, 0, 0, 0).cyl(0, -0.6, 0, 0.12, 0.12, 1.2, 10).pop();
       b.color(OL, MAT.WORN).box(0, -1.55, 0.2, 1.0, 0.32, 1.7); b.color(BK, MAT.METAL).box(0, -1.72, 0.25, 1.05, 0.12, 1.8);
       for (const sx of [-0.3, 0.3]) b.color(OL2, MAT.WORN).box(sx, -1.6, 1.05, 0.38, 0.25, 0.3);                   // varbad
-      b.color(OL2, MAT.WORN).box(0, -1.6, -0.75, 0.6, 0.3, 0.35); M.mShin = b.build();
+      b.color(OL2, MAT.WORN).box(0, -1.6, -0.75, 0.6, 0.3, 0.35);
+      for (const sx of [-1, 1]) { Org.tube(b, [[sx * 0.38, -0.15, -0.2, 0.08], [sx * 0.4, -0.8, -0.3, 0.08]], 10, ST, MAT.METAL); Org.tube(b, [[sx * 0.4, -0.8, -0.3, 0.055], [sx * 0.36, -1.35, -0.1, 0.055]], 10, [0.75, 0.75, 0.78], MAT.METAL); }
+      Org.blob(b, 0, -0.35, 0.33, 0.45, 0.4, 0.22, OL, { amp: 0.02 }); M.mShin = b.build();
       b = new MB(); b.jit = 0;   // kere (0 = pöördliiges kere all), küürus ette
       b.color(OL2, MAT.WORN).box(0, 0.3, -0.1, 1.5, 0.6, 1.3);                                                       // kõhuosa
       b.color(OL, MAT.WORN).push().tf(0, 1.25, 0.05, 0, 0.18, 0).box(0, 0, 0, 2.3, 1.5, 1.9).pop();                  // rind
@@ -281,6 +286,8 @@ const Vehicles = (() => {
         b.color(GL, MAT.GLOW).box(sx * 1.5, 1.55, 0.8, 0.35, 0.08, 0.04);
       }
       b.color(GL, MAT.GLOW).box(-0.55, 2.22, 0.75, 0.22, 0.12, 0.05); b.color(GL, MAT.GLOW).box(0.55, 2.22, 0.75, 0.22, 0.12, 0.05);   // prožektorid
+      for (const sx of [-1, 1]) { Org.blob(b, sx * 1.55, 2.25, 0, 0.62, 0.42, 0.85, OL, { amp: 0.02 }); Org.tube(b, [[sx * 0.7, 1.6, -1.35, 0.06], [sx * 1.1, 2.1, -1.0, 0.06], [sx * 1.5, 1.85, -0.4, 0.06]], 8, BK, MAT.MATTE); Org.tube(b, [[sx * 0.5, 0.9, -1.4, 0.05], [sx * 0.9, 0.5, -1.1, 0.05], [sx * 1.05, 0.25, -0.5, 0.05]], 8, BK, MAT.MATTE); }
+      Org.blob(b, 0, 2.25, -0.1, 1.0, 0.22, 0.9, OL2, { amp: 0.02 });
       M.mTorso = b.build();
       b = new MB(); b.jit = 0;   // käed + kahur ühes tükis; 0 = õlgade telg (kere kohalik y 1.9)
       const limb = (x0, y0, z0, x1, y1, z1, w, col) => { const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, L = Math.hypot(dx, dy, dz); b.color(col, MAT.WORN).push().tf((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.atan2(dx, dz), -Math.asin(dy / L), 0).box(0, 0, 0, w, w, L).pop(); };
@@ -299,6 +306,8 @@ const Vehicles = (() => {
       for (let k = 0; k < 4; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(0.53, -1.1, 0.9 + k * 0.3, 0.02, 0.5, 0.3);
       b.color(ST, MAT.METAL).push().tf(0.15, -1.1, 2.6, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.36, 0.36, 0.3, 14).pop();
       b.color([1, 0.2, 0.1], MAT.GLOW).box(0.5, -0.8, 2.45, 0.05, 0.05, 0.05);
+      for (const sx of [-1, 1]) { Org.tube(b, [[sx * 1.8, 0.1, -0.3, 0.07], [sx * 2.0, -0.7, -0.2, 0.07], [sx * 1.85, -1.4, 0.1, 0.07]], 8, BK, MAT.MATTE); Org.tube(b, [[sx * 1.7, -0.3, 0.25, 0.09], [sx * 1.72, -1.0, 0.3, 0.09]], 10, ST, MAT.METAL); Org.blob(b, sx * 1.72, -0.55, 0.0, 0.42, 0.55, 0.42, OL, { amp: 0.02 }); }
+      Org.tube(b, [[0.15, -1.55, 1.0, 0.07], [0.6, -1.7, 0.6, 0.07], [1.1, -1.4, 0.3, 0.07], [1.6, -1.2, 0.2, 0.07]], 8, [0.6, 0.5, 0.2], MAT.METAL);   // padrunilint
       M.mArmsGun = b.build();
       b = new MB(); b.jit = 0;   // torukimp (pöörleb ümber z), kinnitub kahuri esiotsa
       for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(BK, MAT.METAL).push().tf(Math.cos(a) * 0.19, Math.sin(a) * 0.19, 0, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.06, 0.06, 2.0, 8).pop(); }

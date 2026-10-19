@@ -26,7 +26,7 @@ const Levels = (() => {
     if (k === 'haul') return player ? 'resources stack ' + Math.round(l * 20) + '% higher' : 'carries ' + Math.round(l * 15) + '% more per trip';
     if (k === 'fight') return player ? Math.round(l * 4) + '% more damage, less recoil' : 'braver, more accurate';
     if (k === 'work') return player ? 'actions ' + Math.round(l * 8) + '% faster' : 'works ' + Math.round(l * 8) + '% faster';
-    return player ? '+' + l * 8 + ' max health, faster sprint' : 'walks ' + Math.round(l * 3) + '% faster';
+    return player ? '+' + l * 6 + ' max health, faster sprint' : 'walks ' + Math.round(l * 3) + '% faster';
   }
   function badges(who, player) {
     return '<div class="lvls">' + KEYS.map((k) => { const l = level(who, k); return `<span class="lv" title="${SK[k].name}: ${perkText(!!player, k, l)}"><b>${SK[k].short}</b> ${l}<i style="width:${Math.round(progress(who, k) * 100)}%"></i></span>`; }).join('') + '</div>';
@@ -40,7 +40,7 @@ const Levels = (() => {
   const pStack = () => 1 + level('player', 'haul') * 0.2;
   const pDmg = () => 1 + level('player', 'fight') * 0.04;
   const pHold = () => 1 - level('player', 'work') * 0.08;
-  const pHp = () => 100 + level('player', 'legs') * 8;
+  const pHp = () => 75 + ((G.up && G.up.armor) || 0) * 38 + level('player', 'legs') * 6;   // mängija elud −25% (100 -> 75)
   const pSprint = () => 1 + level('player', 'legs') * 0.02;
   return { SK, KEYS, level, progress, add, badges, perkText, crewCarry, crewWork, crewSpeed, crewFear, crewAcc, pStack, pDmg, pHold, pHp, pSprint };
 })();

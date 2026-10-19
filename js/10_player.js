@@ -25,7 +25,7 @@ function weaponStats(w) {
 
 const Player = {
   kind: 'player', team: 'player', id: 0, pos: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 }, yaw: Math.PI, pitch: 0,
-  hp: 100, maxHp: 100, alive: true, radius: 0.38, spheres: [], hitY: 1.0, pose: 'stand', moveAmt: 0, speed: 0, phase: 0,
+  hp: 75, maxHp: 75, alive: true, radius: 0.38, spheres: [], hitY: 1.0, pose: 'stand', moveAmt: 0, speed: 0, phase: 0,
   dead: false, deadT: 0, onGround: true, speedNow: 0, bobT: 0, lastStep: 0,
   weapon: 'rifle', mag: { arc: 12, rifle: 24, rail: 5, sniper: 5, shotgun: 6, pistol: 12, smg: 40, lmg: 100, revolver: 6, dmr: 15, plasma: 30, gl: 6, ashot: 10 }, reloadT: 0, fireCool: 0, recoil: 0, kick: 0, swayX: 0, swayY: 0,
   inter: null, interT: 0, interScan: 0, hurtT: 0, lastHurt: 99, regenT: 0, eyeH: 1.62, fallV: 0,
@@ -33,7 +33,7 @@ const Player = {
 
   reset(x, z, yaw) {
     this.pos.x = x; this.pos.z = z; this.pos.y = Ents.groundY(x, z); this.yaw = yaw; this.pitch = 0;
-    this.vel.x = this.vel.y = this.vel.z = 0; this.maxHp = 100 + G.up.armor * 50; this.hp = this.maxHp;
+    this.vel.x = this.vel.y = this.vel.z = 0; this.maxHp = Levels.pHp(); this.hp = this.maxHp;
     this.dead = false; this.alive = true; this.reloadT = 0; this.fireCool = 0;
     this.weapon = Inv.curWeapon() || 'rifle';
   },

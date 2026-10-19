@@ -13,68 +13,74 @@ const Fauna2 = (() => {
   function initMeshes() {
     if (M) return M;
     M = {};
-    const { CH, CH2, PLATE, BELLY, GLOW, EYE, BONE, MOUTH, MEM } = AS;
-    const spike = (b, x, y, z, yaw, pitch, r, L) => b.color(BONE, MAT.WORN).push().tf(x, y, z, yaw, pitch, 0).cyl(0, 0, 0, r, 0, L, 6, true).pop();
-    // Liikumisekütt: sale keha, pikk kael ja nokk-pea, kolm silmapaari, sabaogad
+    const { CH, CH2, PLATE, BELLY, GLOW, EYE, BONE, MOUTH, MEM } = AS, md0 = MB.detail; MB.detail = true;
+    // Liikumisekütt: kitsas kiilukujuline keha, pikk kael, sirbinokk, kuus silma, haaratsküünised, okkasaba
     let b = new MB(); b.jit = 0;
-    b.color(CH, MAT.WORN).sphere(0, 0, 0, 0.7, 12, 8, 0.6); b.color(CH2, MAT.WORN).sphere(0, 0.1, 0.8, 0.45, 10, 7, 0.75);
-    b.color(CH, MAT.WORN).push().tf(0, 0.1, 1.3, 0, -0.1, 0).push().tf(0, 0, 0, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.18, 0.12, 0.8, 8, true).pop().pop();
-    b.color(CH2, MAT.WORN).push().tf(0, 0.15, 2.15, 0, 0.1, 0).box(0, 0, 0, 0.35, 0.3, 0.6).pop(); spike(b, 0, 0.1, 2.45, 0, Math.PI / 2 - 0.15, 0.1, 0.7);
-    for (let k = 0; k < 3; k++) for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.15, 0.28, 2.0 + k * 0.12, 0.04, 6, 4, 1);
-    b.color(GLOW, MAT.GLOW).sphere(0, -0.15, -0.3, 0.3, 8, 5, 1);
-    b.color(CH, MAT.WORN).push().tf(0, 0, -0.6, 0, -1.45, 0).cyl(0, 0, 0, 0.2, 0.03, 2.2, 8, true).pop();
-    for (let k = 0; k < 4; k++) spike(b, 0, 0.35, -0.2 - k * 0.45, 0, -0.6, 0.06, 0.4);
-    for (const sx of [-1, 1]) b.color(BONE, MAT.WORN).push().tf(sx * 0.3, -0.5, 0.4, 0, 0.9, 0).cyl(0, 0, 0, 0.06, 0.02, 0.8, 5, true).pop();   // haaratsid
+    Org.blob(b, 0, 0, 0, 0.55, 0.42, 1.0, CH, { amp: 0.07, ridge: 5 });
+    Org.blob(b, 0, -0.2, -0.15, 0.32, 0.22, 0.45, GLOW, { amp: 0.05, mat: MAT.GLOW });
+    Org.tube(b, [[0, 0.05, 0.8, 0.26], [0, 0.18, 1.3, 0.19], [0, 0.2, 1.75, 0.16]], 10, CH2);
+    Org.blob(b, 0, 0.2, 2.0, 0.24, 0.2, 0.4, CH2, { amp: 0.06 });
+    Org.claw(b, 0, 0.22, 2.3, 0, -0.15, 1, 0.75, 0.13, -0.5, BONE);   // sirbinokk
+    Org.claw(b, 0, 0.1, 2.25, 0, -0.3, 1, 0.45, 0.08, 0.3, BONE);
+    for (let k = 0; k < 3; k++) for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.16, 0.3, 2.05 + k * 0.1, 0.04, 6, 4, 1);
+    Org.tube(b, [[0, 0, -0.9, 0.3], [0, 0.05, -1.6, 0.18], [0, 0.1, -2.3, 0.08], [0, 0.15, -2.8, 0.0]], 8, CH);
+    for (let k = 0; k < 5; k++) Org.claw(b, 0, 0.35 - k * 0.04, 0.4 - k * 0.55, 0, 1, -0.5, 0.45, 0.06, -0.3, BONE);
+    for (const sx of [-1, 1]) Org.limb(b, [[sx * 0.3, -0.3, 0.3], [sx * 0.4, -0.75, 0.6], [sx * 0.3, -1.0, 1.0]], 0.08, 0.05, CH, 0.3);   // haaratsid
     M.hawk = b.build();
-    b = new MB(); b.jit = 0;   // kulli tiib (+x), 4.5 m
-    b.color(MEM, MAT.MATTE).push().tf(2.2, 0, -0.3, 0, 0, 0).box(0, 0, 0, 4.4, 0.04, 1.4).pop();
-    b.color(CH, MAT.WORN).box(2.2, 0.03, 0.4, 4.4, 0.1, 0.12);
-    for (let k = 0; k < 4; k++) b.color(CH, MAT.WORN).push().tf(1.0 + k * 1.0, 0.03, -0.25, 0, 0, 0).box(0, 0, 0, 0.06, 0.08, 1.3).pop();
-    spike(b, 4.4, 0.03, 0.4, Math.PI / 2, Math.PI / 2, 0.06, 0.5);
+    b = new MB(); b.jit = 0;   // tiib (+x 4.5 m): luusõrmed ja nahk
+    const T = [[4.4, 0.1, 0.4], [4.2, 0, -0.4], [3.2, -0.05, -1.0], [1.8, -0.05, -1.1], [0.4, 0, -0.6]];
+    Org.tube(b, [[0, 0, 0.1, 0.13], [1.5, 0.1, 0.45, 0.11], [2.8, 0.12, 0.5, 0.08], [4.4, 0.1, 0.4, 0.03]], 8, CH);
+    for (const t of T.slice(1, 4)) Org.tube(b, [[2.8, 0.12, 0.5, 0.06], [t[0], t[1], t[2], 0.015]], 5, CH);
+    b.color(MEM, MAT.MATTE); const pv = [[0, 0, 0], [1.5, 0.1, 0.45], [2.8, 0.12, 0.5], ...T];
+    for (const [A, B2, C] of [[pv[2], pv[3], pv[4]], [pv[2], pv[4], pv[5]], [pv[2], pv[5], pv[6]], [pv[1], pv[2], pv[6]], [pv[1], pv[6], pv[7]], [pv[0], pv[1], pv[7]]]) { Org.oq(b, A, B2, C, C, [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]); Org.oq(b, A, C, B2, B2, [0, -1, 0], [0, -1, 0], [0, -1, 0], [0, -1, 0]); }
+    Org.claw(b, 4.4, 0.1, 0.4, 1, 0, 0.5, 0.45, 0.05, 0.5, BONE);
     M.hwing = b.build();
-    // Liivaangerjas: pikk lüliline keha, lame pea, ogad seljal
+    // Liivaangerjas: lüliline madu-keha, lai lõugadega pea, seljaharjad
     b = new MB(); b.jit = 0;
-    for (let k = 0; k < 7; k++) { const z = 1.6 - k * 0.55, r = 0.5 - k * 0.05; b.color(k % 2 ? CH : CH2, MAT.WORN).sphere(0, 0, z, r, 10, 6, 0.8); spike(b, 0, r * 0.75, z, 0, -0.3, 0.07, 0.45); }
-    b.color(CH2, MAT.WORN).box(0, 0, 2.15, 0.8, 0.35, 0.8); b.color(MOUTH, MAT.MATTE).box(0, -0.1, 2.5, 0.7, 0.12, 0.3);
-    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.3, 0.15, 2.4, 0.06, 6, 4, 1);
-    for (let k = 0; k < 6; k++) spike(b, -0.3 + k * 0.12, -0.05, 2.55, 0, Math.PI / 2, 0.035, 0.18);
+    { const pts = []; for (let k = 0; k <= 10; k++) { const z = 2.0 - k * 0.42; pts.push([Math.sin(k * 0.6) * 0.12, 0, z, 0.52 - k * 0.042]); } Org.tube(b, pts, 12, CH, MAT.WORN, { rough: 0.08 }); for (let k = 0; k < 9; k++) { const p = pts[k]; Org.tube(b, [[p[0] - p[3] * 1.02, p[1], p[2], 0.05], [p[0], p[1] + p[3] * 1.02, p[2], 0.05], [p[0] + p[3] * 1.02, p[1], p[2], 0.05]], 5, CH2); Org.claw(b, p[0], p[1] + p[3] * 0.85, p[2], 0, 1, -0.5, 0.5 - k * 0.03, 0.07, -0.3, BONE); } }
+    Org.blob(b, 0, 0.05, 2.35, 0.55, 0.3, 0.55, CH2, { amp: 0.08 }); Org.blob(b, 0, -0.18, 2.4, 0.5, 0.14, 0.5, CH, { amp: 0.06 });
+    Org.blob(b, 0, -0.05, 2.5, 0.42, 0.05, 0.38, MOUTH, { amp: 0.03, mat: MAT.MATTE });
+    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.33, 0.22, 2.55, 0.06, 6, 4, 1);
+    for (let k = 0; k < 7; k++) { Org.claw(b, -0.36 + k * 0.12, 0.02, 2.85, 0, -1, 0.3, 0.22, 0.035, 0.1, BONE); Org.claw(b, -0.36 + k * 0.12, -0.1, 2.85, 0, 1, 0.3, 0.18, 0.03, 0.1, BONE); }
     M.eel = b.build();
-    b = new MB(); b.jit = 0; for (let k = 0; k < 5; k++) spike(b, 0, 0, 1.2 - k * 0.6, 0, -0.25, 0.1, 0.7 - k * 0.08); M.eelFin = b.build();
-    // Kivistunud sülitaja: juurtega kännu-kest, avanev õiekael, helendav kurk
+    b = new MB(); b.jit = 0; for (let k = 0; k < 6; k++) Org.claw(b, Math.sin(k * 0.6) * 0.12, 0, 1.6 - k * 0.55, 0, 1, -0.4, 0.75 - k * 0.07, 0.11, -0.3, BONE); M.eelFin = b.build();
+    // Kivistunud sülitaja: juurtest kerkiv kõver vars, lõhenev "õie" lõug ja helendav kurk
     b = new MB(); b.jit = 0;
-    b.color(CH, MAT.WORN).cyl(0, 0, 0, 1.2, 0.7, 1.4, 10, true);
-    for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(CH2, MAT.WORN).push().tf(Math.cos(a) * 1.0, 0.2, Math.sin(a) * 1.0, -a, 0, 0).push().tf(0, 0, 0, 0, 0, 1.1).cyl(0, 0, 0, 0.2, 0.05, 1.1, 6, true).pop().pop(); }
-    b.color(PLATE, MAT.WORN).cyl(0, 1.4, 0, 0.6, 0.45, 1.6, 10, true);
-    for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; b.color(CH2, MAT.WORN).push().tf(Math.cos(a) * 0.5, 3.0, Math.sin(a) * 0.5, -a + Math.PI / 2, 0, 0).push().tf(0, 0, 0, 0, 0.6, 0).box(0, 0.4, 0, 0.5, 0.9, 0.08).pop().pop(); }
-    b.color(GLOW, MAT.GLOW).sphere(0, 3.1, 0, 0.35, 8, 6, 1);
-    for (let k = 0; k < 4; k++) spike(b, Math.cos(k * 1.6) * 0.7, 0.9, Math.sin(k * 1.6) * 0.7, k * 1.6, -0.8, 0.07, 0.5);
+    for (let k = 0; k < 7; k++) { const a = k / 7 * TAU; Org.tube(b, [[0, 0.6, 0, 0.3], [Math.cos(a) * 0.9, 0.3, Math.sin(a) * 0.9, 0.18], [Math.cos(a) * 1.6, -0.1, Math.sin(a) * 1.6, 0.06]], 6, CH, MAT.WORN, { rough: 0.15 }); }
+    Org.tube(b, [[0, 0, 0, 0.75], [0.1, 0.9, 0, 0.6], [0.15, 1.9, 0.1, 0.48], [0.05, 2.7, 0.2, 0.42]], 12, CH2, MAT.WORN, { rough: 0.12 });
+    for (let k = 0; k < 5; k++) { const z = 0.4 + k * 0.5; Org.tube(b, [[-0.55, z, 0.05, 0.06], [0, z + 0.1, 0.55, 0.06], [0.6, z, 0.05, 0.06]], 5, PLATE); }
+    for (let k = 0; k < 5; k++) { const a = k / 5 * TAU; Org.tube(b, [[0.05 + Math.cos(a) * 0.3, 2.8, 0.2 + Math.sin(a) * 0.3, 0.16], [0.05 + Math.cos(a) * 0.7, 3.4, 0.2 + Math.sin(a) * 0.7, 0.1], [0.05 + Math.cos(a) * 0.8, 3.9, 0.2 + Math.sin(a) * 0.8, 0.02]], 6, CH2); Org.claw(b, 0.05 + Math.cos(a) * 0.8, 3.9, 0.2 + Math.sin(a) * 0.8, Math.cos(a), 0.4, Math.sin(a), 0.3, 0.04, 0.4, BONE); }
+    Org.blob(b, 0.05, 3.05, 0.2, 0.4, 0.35, 0.4, GLOW, { amp: 0.1, mat: MAT.GLOW });
+    for (let k = 0; k < 6; k++) Org.claw(b, Math.cos(k) * 0.65, 0.5 + k * 0.3, Math.sin(k) * 0.65, Math.cos(k), 0.3, Math.sin(k), 0.4, 0.06, 0.3, BONE);
     M.spitter = b.build();
-    // Pesaema: suur madal tagakeha munakottidega, raske esikeha, kuus jalga
+    // Pesaema: paistes munadega tagakeha, rinnakilp, kombitsad suu ümber
     b = new MB(); b.jit = 0;
-    b.color(CH, MAT.WORN).sphere(0, 1.6, -1.2, 2.0, 14, 9, 0.65);
-    for (let k = 0; k < 7; k++) { const a = k / 7 * TAU; b.color(GLOW, MAT.GLOW).sphere(Math.cos(a) * 1.3, 1.5 + Math.sin(k) * 0.3, -1.2 + Math.sin(a) * 1.3, 0.35, 8, 5, 1); }
-    b.color(BELLY, MAT.MATTE).sphere(0, 1.1, -1.2, 1.7, 12, 7, 0.45);
-    b.color(CH2, MAT.WORN).sphere(0, 1.8, 0.9, 1.0, 12, 8, 0.85); b.color(PLATE, MAT.WORN).box(0, 2.5, 0.9, 1.4, 0.2, 1.2);
-    for (let k = 0; k < 3; k++) for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * (0.25 + k * 0.12), 2.0, 1.75 - k * 0.1, 0.07, 6, 4, 1);
-    for (let k = 0; k < 6; k++) spike(b, 0, 2.6 - k * 0.05, 0.4 - k * 0.6, 0, -0.5, 0.12, 0.7);
-    for (const sx of [-1, 1]) b.color(BONE, MAT.WORN).push().tf(sx * 0.4, 1.4, 1.8, 0, 1.1, 0).cyl(0, 0, 0, 0.12, 0, 0.9, 6, true).pop();
+    Org.blob(b, 0, 1.7, -1.3, 2.0, 1.45, 2.3, CH, { amp: 0.06, flatBelly: 0.7, seg: 22, rings: 14 });
+    for (let k = 0; k < 12; k++) { const a = k * 2.4, h = Math.sin(k * 1.3); Org.blob(b, Math.cos(a) * 1.55, 1.75 + h * 0.6, -1.3 + Math.sin(a) * 1.75, 0.38, 0.32, 0.38, GLOW, { amp: 0.06, mat: MAT.GLOW, seg: 10, rings: 7 }); }
+    for (let k = 0; k < 5; k++) { const z = -2.8 + k * 0.7; const pts = []; for (let q = 0; q <= 8; q++) { const a = Math.PI * (0.1 + 0.8 * q / 8); pts.push([Math.cos(a) * 1.95, 1.7 + Math.sin(a) * 1.4, z, 0.08]); } Org.tube(b, pts, 6, CH2); }
+    Org.blob(b, 0, 1.9, 0.8, 1.05, 0.9, 1.05, CH2, { amp: 0.07 }); Org.blob(b, 0, 2.55, 0.7, 0.95, 0.35, 0.95, PLATE, { amp: 0.08, ridge: 4 });
+    for (let k = 0; k < 3; k++) for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * (0.25 + k * 0.14), 2.15 - k * 0.04, 1.75 - k * 0.12, 0.08, 8, 5, 1);
+    for (let k = 0; k < 6; k++) { const a = (k / 5 - 0.5) * 1.6; Org.tube(b, [[Math.sin(a) * 0.5, 1.55, 1.7, 0.1], [Math.sin(a) * 0.7, 1.2, 2.1, 0.07], [Math.sin(a) * 0.9, 0.9, 2.35, 0.04], [Math.sin(a) * 1.0, 0.8, 2.6, 0.0]], 6, CH); }
+    for (let k = 0; k < 6; k++) Org.claw(b, 0, 2.85 - k * 0.05, 0.6 - k * 0.65, 0, 1, -0.4, 0.8, 0.13, -0.3, BONE);
     M.mother = b.build();
-    b = new MB(); b.jit = 0; b.color(CH, MAT.WORN).cyl(0, -1.6, 0, 0.14, 0.08, 1.6, 6, true); spike(b, 0, -1.6, 0, 0, Math.PI, 0.08, 0.3); M.mleg = b.build();
-    // vastne: väike, kiire, roheline kõht
-    b = new MB(); b.jit = 0; b.color(CH2, MAT.WORN).sphere(0, 0.35, 0, 0.35, 8, 6, 0.8); b.color(GLOW, MAT.GLOW).sphere(0, 0.3, -0.2, 0.2, 6, 4, 1);
-    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.1, 0.45, 0.3, 0.04, 5, 3, 1);
-    for (let k = 0; k < 6; k++) { const sx = k < 3 ? 1 : -1, i = k % 3; b.color(CH, MAT.WORN).push().tf(sx * 0.25, 0.3, 0.15 - i * 0.15, 0, 0, sx * 1.0).cyl(0, -0.35, 0, 0.03, 0.02, 0.35, 4, true).pop(); }
+    b = new MB(); b.jit = 0; Org.limb(b, [[0, 0, 0], [0, 0.35, 0.4], [0, -1.6, 0.6]], 0.16, 0.07, CH, 0.25); M.mleg = b.build();
+    // vastne: kiire kuuejalgne, suur suu, helendav kõht
+    b = new MB(); b.jit = 0; Org.blob(b, 0, 0.35, -0.05, 0.3, 0.24, 0.42, CH2, { amp: 0.1, ridge: 3 }); Org.blob(b, 0, 0.28, -0.25, 0.2, 0.16, 0.22, GLOW, { amp: 0.05, mat: MAT.GLOW });
+    for (const sx of [-1, 1]) { b.color(EYE, MAT.GLOW).sphere(sx * 0.1, 0.45, 0.33, 0.04, 6, 4, 1); Org.claw(b, sx * 0.08, 0.3, 0.38, sx * 0.3, -0.3, 1, 0.2, 0.035, -0.4, BONE); }
+    for (let k = 0; k < 6; k++) { const sx = k < 3 ? 1 : -1, i = k % 3; Org.limb(b, [[sx * 0.2, 0.35, 0.15 - i * 0.15], [sx * 0.45, 0.45, 0.2 - i * 0.18], [sx * 0.55, 0.0, 0.25 - i * 0.2]], 0.04, 0.02, CH, 0); }
     M.larva = b.build();
-    // Varjuluuraja: pikk kõhn humanoid, sirbikäed, pea ilma nähtava suuta
+    // Varjuluuraja: kõhn pikkade jäsemetega olend, ilma näota kolp, sirpkäed, selgroo ogad
     b = new MB(); b.jit = 0;
-    b.color(CH, MAT.WORN).push().tf(0, 1.4, 0, 0, 0.25, 0).cyl(0, -0.6, 0, 0.25, 0.35, 1.3, 8, true).pop();
-    b.color(CH2, MAT.WORN).sphere(0, 2.4, 0.3, 0.32, 10, 7, 1.3);
-    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.12, 2.5, 0.58, 0.05, 6, 4, 1);
-    for (const sx of [-1, 1]) { b.color(CH, MAT.WORN).push().tf(sx * 0.35, 1.9, 0.2, 0, 0.9, sx * 0.3).cyl(0, -1.0, 0, 0.07, 0.05, 1.0, 6, true).pop(); b.color(BONE, MAT.WORN).push().tf(sx * 0.5, 1.1, 0.9, 0, 1.9, 0).box(0, 0.4, 0, 0.04, 0.9, 0.12).pop(); }
-    for (const sx of [-1, 1]) b.color(CH, MAT.WORN).push().tf(sx * 0.18, 0.85, -0.05, 0, -0.2, 0).cyl(0, -0.85, 0, 0.09, 0.05, 0.9, 6, true).pop();
-    for (let k = 0; k < 4; k++) spike(b, 0, 2.1 - k * 0.3, -0.25, 0, -0.9, 0.05, 0.35);
-    b.color(GLOW, MAT.GLOW).sphere(0, 1.5, 0.15, 0.1, 6, 4, 1);
+    Org.tube(b, [[0, 0.95, -0.05, 0.2], [0, 1.4, 0.0, 0.25], [0, 1.9, 0.08, 0.27], [0, 2.15, 0.15, 0.16]], 10, CH, MAT.WORN, { rough: 0.1 });
+    for (let k = 0; k < 4; k++) Org.tube(b, [[-0.25, 1.4 + k * 0.15, 0.02, 0.035], [0, 1.45 + k * 0.15, 0.27, 0.035], [0.25, 1.4 + k * 0.15, 0.02, 0.035]], 5, CH2);
+    Org.blob(b, 0, 2.45, 0.32, 0.22, 0.28, 0.42, CH2, { amp: 0.08 });
+    for (const sx of [-1, 1]) b.color(EYE, MAT.GLOW).sphere(sx * 0.1, 2.5, 0.68, 0.035, 6, 4, 1);
+    for (const sx of [-1, 1]) { Org.limb(b, [[sx * 0.28, 2.0, 0.05], [sx * 0.5, 1.5, 0.3], [sx * 0.45, 1.2, 0.8]], 0.08, 0.05, CH, 0); Org.claw(b, sx * 0.45, 1.2, 0.8, sx * 0.1, 0.5, 1, 1.0, 0.07, -0.6, BONE); }
+    for (const sx of [-1, 1]) Org.limb(b, [[sx * 0.15, 0.95, -0.05], [sx * 0.22, 0.5, 0.2], [sx * 0.18, 0.0, -0.1]], 0.1, 0.05, CH, 0.15);
+    for (let k = 0; k < 5; k++) Org.claw(b, 0, 2.1 - k * 0.25, -0.15, 0, 0.3, -1, 0.35, 0.04, 0.4, BONE);
+    b.color(GLOW, MAT.GLOW).sphere(0, 1.55, 0.25, 0.08, 6, 4, 1);
     M.phantom = b.build();
+    MB.detail = md0;
     return M;
   }
 
