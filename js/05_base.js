@@ -1626,6 +1626,12 @@ function createBase(opt) {
     nextRoomId = 1; nextObjId = 1; dirty = true; doorSt.clear();
   }
   function isInside(x, z) { const c = toCell(x, z); return roomAt(c.i, c.j) > 0; }
+  // katuse all (mitte katusel ega rõdul): ilm, tolmutorm jms ei paista sisse
+  function indoorAt(x, y, z) {
+    const c = toCell(x, z); if (!inGrid(c.i, c.j)) return false;
+    const lo = roomAt(c.i, c.j) > 0, hi = hiAt(c.i, c.j); if (!lo && !hi) return false;
+    return y < OY + (hi ? 2 * WH : WH) + 0.05 && y > OY - 1;
+  }
   // põranda kõrgus; y = olija praegune kõrgus (teise korruse jaoks)
   function floorAt(x, z, y) {
     const c = toCell(x, z); if (!inGrid(c.i, c.j)) return -1e9;
@@ -1783,7 +1789,7 @@ function createBase(opt) {
     lineEdges, canPlaceWall, addWalls, removeWalls, rectEdges, addRoom, setRoomStyle, roomEdges, autoDoor, setOpening, canPlaceOpening, doorCount,
     canPlaceObj, addObj, removeObj, autoRot, useCells, objsOfType, signature, sizeScore, countBeds, updatePower, roomAccess, escapeCell,
     deckAt, canDeck, setDeck, roofAt, walkUp, canTallWin, setTallWin, tallWinAt,
-    findPath, pathWorld, vehiclePath, straightOK, update, draw, setupStart, reset, isInside, floorAt, bounds,
+    findPath, pathWorld, vehiclePath, straightOK, update, draw, setupStart, reset, isInside, indoorAt, floorAt, bounds,
     serialize, deserialize, markDirty: () => { dirty = true; }, rebuildNow: () => rebuild(), computeRooms,
     get viewLevel() { return viewLevel; }, set viewLevel(v) { viewLevel = v ? 1 : 0; },
   };

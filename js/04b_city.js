@@ -66,7 +66,7 @@ const City = (() => {
           // akendega lõik: sein alla, klaasita ava keskel, sein üles (iga korrus)
           for (let f = 0; f < floors; f++) {
             const fy = y0 + f * FH;
-            if (rng() < 0.55) { wallSeg(p0x, p0z, p1x, p1z, fy, 1.1, T, col); wallSeg(p0x, p0z, p1x, p1z, fy + 2.3, FH - 2.3, T, col, f === 0 ? { stripe: acc } : null);
+            if (rng() < 0.55) { wallSeg(p0x, p0z, p1x, p1z, fy, 1.1, T, col, f > 0 ? { raised: true } : null); wallSeg(p0x, p0z, p1x, p1z, fy + 2.3, FH - 2.3, T, col, f === 0 ? { stripe: acc, raised: true } : { raised: true });   // aknaava jääb kuulidele vabaks
               b.color(FRAME, MAT.METAL).push().tf((p0x + p1x) / 2, fy, (p0z + p1z) / 2, Math.atan2(ux, uz), 0, 0).boxB(0, 1.1, 0, T + 0.06, 1.2, 0.18).pop(); }
             else wallSeg(p0x, p0z, p1x, p1z, fy, FH, T, col, f === 0 ? { stripe: acc } : null);
           }

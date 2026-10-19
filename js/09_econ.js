@@ -160,7 +160,7 @@ const Econ = (() => {
     const mix3 = (k) => L(L(dayC[k], goldC[k], golden), nightC[k], night);
     e.sunCol = mix3('sun'); e.skyCol = mix3('sky'); e.gndCol = mix3('gnd'); e.fogCol = mix3('fog'); e.zenith = mix3('zen'); e.horizon = mix3('hor');
     e.night = night;
-    const storm = Weather.storm;
+    const storm = Weather.vis;
     e.fogDen = lerp(lerp(0.0021 + golden * 0.0013, 0.0045, night), 0.016, storm);
     e.fogDen = Math.max(e.fogDen, 2.0 / (1000 * (GFX.S.viewMul || 1)));   // lühem nähtavus = tihedam udu (peidab kaugete asjade kadumise)
     if (storm > 0) { e.fogCol = L(e.fogCol, L([0.62, 0.42, 0.30], [0.12, 0.09, 0.08], night), storm * 0.8); e.sunCol = L(e.sunCol, [e.sunCol[0] * 0.4, e.sunCol[1] * 0.4, e.sunCol[2] * 0.4], storm); }
@@ -317,12 +317,26 @@ const Weather = {
       else this.timer = 200;
     }
     this.storm += (this.target - this.storm) * Math.min(1, dt * 0.25);
-    Audio2.setWind(0.2 + this.storm * 0.8);
+    // siseruumis (katuse all) torm ei paista: udu ja tolmuosakesed hõrenevad kiiresti
+    const c = GFX.cam.pos, inDoor = indoorAny(c.x, c.y, c.z) ? 1 : 0;
+    this.indoor += (inDoor - this.indoor) * Math.min(1, dt * 3);
+    this.vis = this.storm * (1 - 0.92 * this.indoor);
+    Audio2.setWind(0.2 + this.storm * 0.8 * (1 - 0.6 * this.indoor));
     if (this.storm > 0.2 && GFX.partAlpha) {
       for (let i = 0; i < Math.floor(this.storm * 6); i++) {
-        const c = GFX.cam.pos;
-        GFX.partAlpha.emit(c.x + rand(-25, 25), c.y + rand(-3, 8), c.z + rand(-25, 25), 14 + rand(-2, 2), rand(-0.5, 0.5), 6 + rand(-2, 2), 2.2, 1.5, 3.5, [0.62, 0.45, 0.32, 0.25 * this.storm], [0.62, 0.45, 0.32, 0]);
+        const x = c.x + rand(-25, 25), y = c.y + rand(-3, 8), z = c.z + rand(-25, 25);
+        // tuul kannab osakest +x/+z suunas ~15 m/s: kui tee viib katuse alla, ära tekita (muidu lendaks läbi seina sisse)
+        let blocked = false;
+        for (let t = 0; t <= 2.4 && !blocked; t += 0.4) blocked = indoorAny(x + 14 * t, y, z + 6 * t);
+        if (blocked) continue;
+        GFX.partAlpha.emit(x, y, z, 14 + rand(-2, 2), rand(-0.5, 0.5), 6 + rand(-2, 2), 2.2, 1.5, 3.5, [0.62, 0.45, 0.32, 0.25 * this.storm], [0.62, 0.45, 0.32, 0]);
       }
     }
   },
+  indoor: 0, vis: 0,
 };
+function indoorAny(x, y, z) {
+  if (typeof Bases === 'undefined') return Base.indoorAt(x, y, z);
+  for (const b of Bases.list) if (Math.abs(x - b.OX) < 50 && Math.abs(z - b.OZ) < 50 && b.indoorAt(x, y, z)) return true;
+  return false;
+}
