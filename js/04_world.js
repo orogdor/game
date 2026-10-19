@@ -114,6 +114,14 @@ const World = (() => {
     const rcity = Math.hypot(x - sites.city.x, z - sites.city.z);
     h = lerp(sites.city.level, h, smoothstep(sites.city.r, sites.city.r + 90, rcity));
     for (const v of sites.villages || []) { const rv = Math.hypot(x - v.x, z - v.z); if (rv < v.r + 60) h = lerp(v.level, h, smoothstep(v.r, v.r + 60, rv)); }
+    // tunnelikraav: mäe sisse lõigatud koridor (kaetakse tunneli ja kaanega)
+    for (const T of sites.tunnels || []) {
+      const dx = x - T.ax, dz = z - T.az, along = dx * T.ux + dz * T.uz, t = along / T.L;
+      if (t < -0.15 || t > 1.15) continue;
+      const lat = Math.abs(-dx * T.uz + dz * T.ux); if (lat > 12) continue;
+      const fl = T.hA + (T.hB - T.hA) * clamp(t, 0, 1);
+      if (h > fl) h = lerp(fl, h, smoothstep(7, 11.5, lat));
+    }
     return h;
   }
   function heightAt(x, z) {
@@ -185,6 +193,81 @@ const World = (() => {
   }
 
   const CITY_RINGS = [60, 100, 140, 176, 212];   // linna ringteede raadiused
+  // ---- teede marsruut: A* jämedal võrgul (järsud nõlvad ja mägede tipud on kallid) ----
+  const RG = 16;
+  function routeAStar(a, b) {
+    const pad = 360, x0 = Math.max(-HALF * 0.86, Math.min(a.x, b.x) - pad), z0 = Math.max(-HALF * 0.86, Math.min(a.z, b.z) - pad);
+    const x1 = Math.min(HALF * 0.86, Math.max(a.x, b.x) + pad), z1 = Math.min(HALF * 0.86, Math.max(a.z, b.z) + pad);
+    const W = Math.ceil((x1 - x0) / RG) + 1, Hh = Math.ceil((z1 - z0) / RG) + 1, n = W * Hh;
+    const hh = new Float32Array(n); for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++) hh[j * W + i] = heightFn(x0 + i * RG, z0 + j * RG);
+    const ci = (x) => clamp(Math.round((x - x0) / RG), 0, W - 1), cj = (z) => clamp(Math.round((z - z0) / RG), 0, Hh - 1);
+    const s0 = cj(a.z) * W + ci(a.x), g = cj(b.z) * W + ci(b.x), gi = g % W, gj = (g / W) | 0;
+    const base = Math.min(hh[s0], hh[g]);
+    const cost = new Float32Array(n).fill(1e30), prev = new Int32Array(n).fill(-1), closed = new Uint8Array(n);
+    const heap = []; const push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = i * 2 + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+    cost[s0] = 0; push(s0, 0);
+    const D8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    while (heap.length) {
+      const [, k] = pop(); if (closed[k]) continue; closed[k] = 1; if (k === g) break;
+      const i = k % W, j = (k / W) | 0;
+      for (const [di, dj] of D8) {
+        const ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= W || nj >= Hh) continue;
+        const nk = nj * W + ni; if (closed[nk]) continue;
+        const L = RG * (di && dj ? 1.414 : 1), sl = Math.abs(hh[nk] - hh[k]) / L, up = Math.max(0, hh[nk] - base - 5);
+        const c = cost[k] + L * (1 + 30 * Math.max(0, sl - 0.12) + up * 0.6);
+        if (c < cost[nk]) { cost[nk] = c; prev[nk] = k; push(nk, c + Math.hypot(ni - gi, nj - gj) * RG); }
+      }
+    }
+    if (prev[g] < 0 && g !== s0) return null;
+    const cells = []; for (let k = g; k >= 0; k = prev[k]) { cells.push({ x: x0 + (k % W) * RG, z: z0 + ((k / W) | 0) * RG }); if (k === s0) break; }
+    cells.reverse(); cells[0] = { x: a.x, z: a.z }; cells[cells.length - 1] = { x: b.x, z: b.z };
+    // lihtsustus: pikad sirged lõigud, kui sirgel pole järske kohti
+    const lineOK = (p, q) => { const L = Math.hypot(q.x - p.x, q.z - p.z), n2 = Math.max(2, Math.ceil(L / 8)); let ph = heightFn(p.x, p.z); const top = Math.max(heightFn(p.x, p.z), heightFn(q.x, q.z)) + 3; for (let k = 1; k <= n2; k++) { const t = k / n2, h = heightFn(p.x + (q.x - p.x) * t, p.z + (q.z - p.z) * t); if (h > top || Math.abs(h - ph) / (L / n2) > 0.3) return false; ph = h; } return true; };
+    const out = [cells[0]]; let i = 0;
+    while (i < cells.length - 1) { let j = Math.min(cells.length - 1, i + 40); while (j > i + 1 && !lineOK(cells[i], cells[j])) j--; out.push(cells[j]); i = j; }
+    let len = 0; for (let k = 1; k < out.length; k++) len += Math.hypot(out[k].x - out[k - 1].x, out[k].z - out[k - 1].z);
+    return { pts: out, len };
+  }
+  // sirgel mägi (kõrgem kui otsad + 7 m): tagasta lõigu algus ja lõpp (t)
+  function mesaRun(a, b) {
+    const L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.ceil(L / 6), base = Math.max(heightFn(a.x, a.z), heightFn(b.x, b.z)) + 7;
+    let best = null, st = -1;
+    for (let k = 0; k <= n; k++) { const t = k / n, hi = heightFn(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t) > base; if (hi && st < 0) st = k; if ((!hi || k === n) && st >= 0) { const len = (k - st) * L / n; if (!best || len > best.len) best = { t0: st / n, t1: k / n, len }; st = -1; } }
+    if (!best || best.len < 30 || best.len > 420 || best.t0 < 0.08 || best.t1 > 0.92) return null;
+    return best;
+  }
+  function addRoad(a, b, forceTunnel) {
+    const ls = Math.hypot(b.x - a.x, b.z - a.z), run = mesaRun(a, b);
+    const r = forceTunnel ? null : routeAStar(a, b);
+    if (run && sites.tunnels.length < 3 && (forceTunnel || !r || r.len > ls * 1.3)) {
+      const ux = (b.x - a.x) / ls, uz = (b.z - a.z) / ls;
+      const pa = { x: a.x + ux * (run.t0 * ls - 14), z: a.z + uz * (run.t0 * ls - 14) }, pb = { x: a.x + ux * (run.t1 * ls + 14), z: a.z + uz * (run.t1 * ls + 14) };
+      const T = { ax: pa.x, az: pa.z, bx: pb.x, bz: pb.z, hA: heightFn(pa.x, pa.z), hB: heightFn(pb.x, pb.z), L: Math.hypot(pb.x - pa.x, pb.z - pa.z), ux, uz, id: sites.tunnels.length };
+      sites.tunnels.push(T);
+      sites.roads.push(roadSeg(a, pa)); const ts = roadSeg(pa, pb); ts.tunnel = T; sites.roads.push(ts); sites.roads.push(roadSeg(pb, b));
+      return;
+    }
+    if (!r) { sites.roads.push(roadSeg(a, b)); return; }
+    for (let k = 1; k < r.pts.length; k++) sites.roads.push(roadSeg(r.pts[k - 1], r.pts[k]));
+  }
+  // tunneli koridor: kas punkt on tunneli kraavis; tagastab põranda kõrguse ja lae (kaane) kõrguse
+  function tunnelAt(x, z) {
+    for (const T of sites.tunnels || []) {
+      const dx = x - T.ax, dz = z - T.az, t = (dx * T.ux + dz * T.uz) / T.L;
+      if (t < -0.02 || t > 1.02) continue;
+      const lat = Math.abs(-dx * T.uz + dz * T.ux); if (lat > 10.5) continue;
+      return { T, t: clamp(t, 0, 1), lat, floor: T.hA + (T.hB - T.hA) * clamp(t, 0, 1) };
+    }
+    return null;
+  }
+  // kaane peal kõndija (mäe peal tunneli kohal)
+  function lidAt(x, z, y) {
+    if (y === undefined || !sites.tunnels || !sites.tunnels.length) return -1e9;
+    const q = tunnelAt(x, z); if (!q || q.t <= 0.02 || q.t >= 0.98 || !q.T.lid) return -1e9;
+    const lh = q.T.lid[Math.min(q.T.lid.length - 1, Math.floor(q.t * q.T.lid.length))];
+    return y > q.floor + 7.5 ? lh : -1e9;
+  }
   function roadSeg(a, b) { const dx = b.x - a.x, dz = b.z - a.z; return { ax: a.x, az: a.z, dx, dz, L2: dx * dx + dz * dz || 1, L: Math.hypot(dx, dz), x0: Math.min(a.x, b.x) - 8, x1: Math.max(a.x, b.x) + 8, z0: Math.min(a.z, b.z) - 8, z1: Math.max(a.z, b.z) + 8 }; }
   function generate(s) {
     seed = s;
@@ -224,22 +307,35 @@ const World = (() => {
       if (sites.villages.some((v) => Math.hypot(v.x - x, v.z - z) < 380)) continue;
       sites.villages.push({ x, z, level: 0, r: 34 });
     }
-    sites.roads = [];
-    { const nodes = [sites.city, ...sites.villages], done = [nodes[0]], rest = nodes.slice(1);
-      while (rest.length) { let best = null; for (const a of done) for (const b of rest) { const d = Math.hypot(a.x - b.x, a.z - b.z); if (!best || d < best.d) best = { a, b, d }; } done.push(best.b); rest.splice(rest.indexOf(best.b), 1); sites.roads.push(roadSeg(best.a, best.b)); }
-      // vana maantee linnast kaardi serva poole
-      const ca = Math.atan2(sites.city.z, sites.city.x); sites.roads.push(roadSeg(sites.city, { x: sites.city.x + Math.cos(ca + 0.4) * 600, z: sites.city.z + Math.sin(ca + 0.4) * 600 }));
-      const r0 = sites.roads[0]; if (r0) sites.city.roadA = Math.atan2(r0.dz, r0.dx); }   // linna radiaalteed joondatakse esimese maanteega (värav tee otsas)
     sites.campLevel = [0, 0];
     sites.nestLevel = 0;
     sites.campLevel = sites.rivals.map((r) => rawH(r.x, r.z));
     sites.nestLevel = rawH(sites.nest.x, sites.nest.z) * 0.5;
     sites.city.level = rawH(sites.city.x, sites.city.z) * 0.4;
     for (const v of sites.villages) v.level = rawH(v.x, v.z) * 0.6;
+    sites.tunnels = [];
+    sites.roads = [];
+    { const nodes = [sites.city, ...sites.villages], done = [nodes[0]], rest = nodes.slice(1);
+      sites.tunnels = [];
+      const edges = [];
+      while (rest.length) { let best = null; for (const a of done) for (const b of rest) { const d = Math.hypot(a.x - b.x, a.z - b.z); if (!best || d < best.d) best = { a, b, d }; } done.push(best.b); rest.splice(rest.indexOf(best.b), 1); edges.push([best.a, best.b]); }
+      // teed ei lähe üle kaljude: tiiruga ümber (A*) või tunneliga läbi mäe
+      for (const [a, b] of edges) addRoad(a, b, false);
+      if (!sites.tunnels.length) {   // vähemalt üks tunnel: otsi asulapaar, mille vahel on mägi
+        const all = [sites.city, ...sites.villages], pairs = [];
+        for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) { const d = Math.hypot(all[i].x - all[j].x, all[i].z - all[j].z); if (d < 1000) pairs.push([all[i], all[j], d]); }
+        pairs.sort((p, q) => p[2] - q[2]);
+        for (const [a, b] of pairs) { if (sites.tunnels.length) break; if (mesaRun(a, b)) addRoad(a, b, true); }
+      }
+      // vana maantee linnast kaardi serva poole
+      const ca = Math.atan2(sites.city.z, sites.city.x); { const ex = sites.city.x + Math.cos(ca + 0.4) * 600, ez = sites.city.z + Math.sin(ca + 0.4) * 600, k = Math.min(1, HALF * 0.8 / Math.max(Math.abs(ex), Math.abs(ez))); addRoad(sites.city, { x: ex * k, z: ez * k }, false); }
+      const r0 = sites.roads[0]; if (r0) sites.city.roadA = Math.atan2(r0.dz, r0.dx); }   // linna radiaalteed joondatakse esimese maanteega (värav tee otsas)
     for (let j = 0; j < N1; j++) for (let i = 0; i < N1; i++) H[j * N1 + i] = heightFn(-HALF + i * STEP, -HALF + j * STEP);
+    for (const T of sites.tunnels || []) { T.lid = []; for (let k = 0; k < Math.ceil(T.L / 8); k++) { const t = (k + 0.5) / Math.ceil(T.L / 8), x = T.ax + T.ux * t * T.L, z = T.az + T.uz * t * T.L; T.lid.push(Math.max(T.hA + (T.hB - T.hA) * t + 7.5, rawH(x - T.uz * 13, z + T.ux * 13), rawH(x + T.uz * 13, z - T.ux * 13)) + 0.2); } }
     buildTerrainMesh();
     scatter(rng);
     if (typeof City !== 'undefined') City.build(mulberry32(s * 13 + 7));
+    if (typeof Tunnels !== 'undefined') Tunnels.build(mulberry32(s * 17 + 3));
   }
 
   let tPos = null, tNor = null, tCol = null;
@@ -334,6 +430,7 @@ const World = (() => {
     if (Math.hypot(x - sites.nest.x, z - sites.nest.z) < 50) return false;
     if (Math.hypot(x - sites.city.x, z - sites.city.z) < sites.city.r + 40) return false;
     for (const v of sites.villages || []) if (Math.hypot(x - v.x, z - v.z) < v.r + 25) return false;
+    for (const T of sites.tunnels || []) { const dx = x - T.ax, dz = z - T.az, t = (dx * T.ux + dz * T.uz) / T.L; if (t > -0.25 && t < 1.25 && Math.abs(-dx * T.uz + dz * T.ux) < 22) return false; }
     return true;
   }
 
@@ -647,11 +744,12 @@ const World = (() => {
     for (const r of sites.ribs) GFX.draw(MODELS.ribcage, r.m, null, null, { rust: 0 });
     for (const d of sites.decor || []) GFX.draw(d.mesh, d.m, null, null, { rust: 1.1 });
     if (typeof City !== 'undefined') City.draw();
+    if (typeof Tunnels !== 'undefined') Tunnels.draw();
   }
 
   return {
     HALF, SIZE, RES, STEP, N1, H, mapRGB, sites, wrecks, ores, groves, instSets,
-    generate, heightAt, normalAt, slopeAt, addCol, removeCol, clearWreck, clearOre, query, collideCircle, deformCrater,
+    generate, heightAt, normalAt, tunnelAt, lidAt, slopeAt, addCol, removeCol, clearWreck, clearOre, query, collideCircle, deformCrater,
     raycastCols, raycastTerrain, lineOfSight, draw, okSpot,
     get terrainMesh() { return null; }, setTerrainShadow(v) { terrainShadow = v; },
   };

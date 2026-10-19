@@ -36,6 +36,8 @@ const ITEMS = (() => {
     pack_s: { name: 'Small backpack', cat: 'gear', stack: 1, col: '#c9b9a2', slot: 'pack', cap: 6, desc: '+6 slots.', icon: s('<path d="M10 11h12l1 15H9z"/><path d="M13 11V8a3 3 0 0 1 6 0v3"/>') },
     revolver: { name: '.44 Revolver', cat: 'weapon', stack: 1, col: '#d8c3a0', slot: 'w', desc: 'Six-shot magnum revolver: damage 58, slow but hits hard. Uses .44 rounds.', icon: s('<path d="M4 11h17v3h-6l-1 1h-3l-2 9H5l2-8H4z"/><circle cx="15" cy="13" r="3"/>') },
     dmr: { name: 'DMR marksman rifle', cat: 'weapon', stack: 1, col: '#c8b48a', slot: 'w', desc: 'Semi-automatic rifle with a scope: damage 48, 15-round mag. Uses carbine ammo.', icon: s('<path d="M1 15h22l2-1h6v2h-6l-1 1H12l-1 1H9l-2 6H4l1-6H1z"/><rect x="10" y="10" width="9" height="3" rx="1"/>') },
+    arc: { name: 'Arc thrower', cat: 'weapon', stack: 1, col: '#b6e0ff', slot: 'w', desc: 'Colony mining prototype found in a tunnel: a bolt of lightning (damage 46) that jumps on to 3 more enemies nearby. Uses plasma cells. Not sold anywhere.', icon: s('<path d="M3 13h18l4 2-4 2H12l-2 6H7l1-6H3z"/><path d="M24 9l3 3-3 1 3 3"/>') },
+    exo: { name: 'Tunnel-rat exo rig', cat: 'gear', stack: 1, col: '#ffb35c', slot: 'vest', arm: 0.34, cap: 8, gear: 3, spd: 0.06, desc: 'Powered work exoskeleton from the old tunnel crews: +8 slots, damage −34% and you move 6% faster. Not sold anywhere.', icon: s('<path d="M9 4L4 9l3 5 2-1v15h14V13l2 1 3-5-5-5-3 4h-4z"/><path d="M12 13h8M12 18h8M12 23h8M16 13v13"/>') },
     plasma: { name: 'Plasma rifle', cat: 'weapon', stack: 1, col: '#8fe3ff', slot: 'w', desc: 'Fires bolts of superheated plasma: damage 30, fast, never needs bullets — only plasma cells.', icon: s('<path d="M3 13h20l5 2-5 2H12l-2 6H7l1-6H3z"/><path d="M15 13v4M18 13v4M21 13v4"/>') },
     gl: { name: 'Grenade launcher', cat: 'weapon', stack: 1, col: '#a8b07a', slot: 'w', desc: 'Six-shot drum launcher. 40 mm grenades explode on impact, splash damage 150.', icon: s('<circle cx="13" cy="16" r="6"/><path d="M19 13h10v5H19M7 19l-2 6h3l2-5"/>') },
     ashot: { name: 'Auto shotgun', cat: 'weapon', stack: 1, col: '#c49a6a', slot: 'w', desc: 'Fully automatic shotgun with a 10-shell drum. Brutal up close.', icon: s('<path d="M2 13h22l2-1h4v3h-4l-1 1H13l-2 7H8l1-7H2z"/><circle cx="14" cy="20" r="3"/>') },
@@ -104,9 +106,9 @@ const Inv = (() => {
   }
   // relvad
   function weaponIn(slot) { return ensure().eq[slot]; }
-  const W_OF = { carbine: 'rifle', rail: 'rail', sniper: 'sniper', shotgun: 'shotgun', pistol: 'pistol', smg: 'smg', lmg: 'lmg', revolver: 'revolver', dmr: 'dmr', plasma: 'plasma', gl: 'gl', ashot: 'ashot' };
+  const W_OF = { carbine: 'rifle', rail: 'rail', sniper: 'sniper', shotgun: 'shotgun', pistol: 'pistol', smg: 'smg', lmg: 'lmg', revolver: 'revolver', dmr: 'dmr', plasma: 'plasma', gl: 'gl', ashot: 'ashot', arc: 'arc' };
   function curWeapon() { const v = ensure(); const w = v.eq[v.sel] || v.eq.w1 || v.eq.w2; return W_OF[w] || null; }
-  function ammoFor(w) { const X = { revolver: 'ammo_44', plasma: 'ammo_pl', gl: 'ammo_gl', ashot: 'ammo_s', dmr: 'ammo_r' }; if (X[w]) return X[w]; return w === 'rail' ? 'ammo_c' : w === 'sniper' ? 'ammo_sn' : w === 'shotgun' ? 'ammo_s' : (w === 'pistol' || w === 'smg') ? 'ammo_p' : 'ammo_r'; }
+  function ammoFor(w) { const X = { revolver: 'ammo_44', plasma: 'ammo_pl', arc: 'ammo_pl', gl: 'ammo_gl', ashot: 'ammo_s', dmr: 'ammo_r' }; if (X[w]) return X[w]; return w === 'rail' ? 'ammo_c' : w === 'sniper' ? 'ammo_sn' : w === 'shotgun' ? 'ammo_s' : (w === 'pistol' || w === 'smg') ? 'ammo_p' : 'ammo_r'; }
   function swap() { const v = ensure(); const o = v.sel === 'w1' ? 'w2' : 'w1'; if (v.eq[o]) { v.sel = o; return true; } return false; }
   function hasWeapon(id) { const v = ensure(); return EQ_KEYS.some((k) => v.eq[k] === id) || count(id) > 0 || (G.stash[id] || 0) > 0; }
   // konteineri vahetus: sisu kolitakse ümber; kui ei mahu, jääb vana alles

@@ -39,6 +39,7 @@ function applyGunModels() {
   if (typeof GUN_DATA === 'undefined') return;
   const g = (k, l = 0) => (GUN_DATA[k] ? decodeSdfMesh(GUN_DATA[k].lod[Math.min(l, GUN_DATA[k].lod.length - 1)]) : null);
   for (const k of ['carbine', 'carbineTan', 'shotgun', 'pistol', 'smg', 'sniper', 'lmg', 'revolver', 'dmr', 'plasma', 'gl', 'ashot']) { const m = g(k); if (m) MODELS[k] = m; }
+  if (MODELS.plasma && !MODELS.arc) MODELS.arc = MODELS.plasma;
   const rail = g('rail'); if (rail) MODELS.railFPS = rail;
   if (GUN_DATA.carbine) { MODELS.rifleFPS = MODELS.carbine; MODELS.rifleNPC = g('carbine', 1); }
   MODELS.npcGuns = {}; for (const k of ['carbine', 'carbineTan', 'shotgun', 'smg', 'dmr', 'lmg']) { const m = g(k, 1); if (m) MODELS.npcGuns[k] = m; }

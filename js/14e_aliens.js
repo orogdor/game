@@ -215,7 +215,7 @@ const Aliens = (() => {
       }
     }
     // happeklombi pritsmed: maandudes kahjustab lähedal olijaid veidi
-    for (const e of Ents.list) if (e.kind === 'alien' && !e.alive && e.deathT > 300) { e.remove = true; e.harvestable = false; }
+    for (const e of Ents.list) if ((e.kind === 'alien' || e.kind === 'beast') && !e.alive && e.deathT > 300) { e.remove = true; e.harvestable = false; }
   }
   function reset() { spawnT = 2; raidT = DAY_LEN * 1.2; }
 

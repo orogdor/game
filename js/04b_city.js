@@ -558,6 +558,7 @@ const City = (() => {
     });
     // maanteed asulate vahel: asfaltplaadid järgivad maastikku, suur osa lagunenud või liiva all
     for (const r of World.sites.roads || []) {
+      if (r.tunnel) continue;   // tunnelis on oma põrand
       const n = Math.floor(r.L / 6);
       for (let k = 0; k < n; k++) {
         const x0 = r.ax + r.dx * k / n, z0 = r.az + r.dz * k / n, x1 = r.ax + r.dx * (k + 1) / n, z1 = r.az + r.dz * (k + 1) / n, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;

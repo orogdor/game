@@ -241,38 +241,68 @@ const Vehicles = (() => {
     b.color([0.3, 0.3, 0.32], MAT.WORN).boxB(1.55, 0, -2.4, 0.5, 0.9, 0.9);        // tööriistakapp
     b.color([0.8, 0.1, 0.08], MAT.RUST).boxB(1.55, 0.9, -2.4, 0.5, 0.06, 0.9);
     M.lift = b.build();
-    // ---- mech (Alien / Tiberian Sun stiil): vaagen, reied, sääred+labajalad, kabiinikere, minigunni käsi, pöörlev torukimp ----
-    { const OL = [0.36, 0.38, 0.32], OL2 = [0.26, 0.28, 0.24], HZ = [0.9, 0.68, 0.12], BK = [0.08, 0.08, 0.09], ST = [0.42, 0.43, 0.45], GL = [1.0, 0.55, 0.15];
-      b = new MB(); b.jit = 0;   // vaagen (kohalik 0 = puusaliiges)
-      b.color(OL2, MAT.WORN).box(0, 0, 0, 1.9, 0.6, 1.1); b.color(ST, MAT.METAL).push().tf(0, 0, 0, 0, 0, Math.PI / 2).cyl(0, -1.25, 0, 0.32, 0.32, 2.5, 12).pop();
-      b.color(BK, MAT.METAL).cyl(0, 0.3, 0, 0.5, 0.5, 0.35, 12); M.mPelvis = b.build();
-      b = new MB(); b.jit = 0;   // reis: allapoole 1.55
-      b.color(OL, MAT.WORN).box(0, -0.75, 0, 0.55, 1.5, 0.7); b.color(OL2, MAT.WORN).box(0, -0.7, 0.38, 0.42, 1.1, 0.08);
-      b.color(ST, MAT.METAL).push().tf(0, -0.7, -0.4, 0, 0, 0).cyl(0, -0.55, 0, 0.09, 0.09, 1.1, 8).pop();
-      for (let k = 0; k < 3; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(0.29, -0.25 - k * 0.18, 0, 0.02, 0.18, 0.6);
-      b.color(ST, MAT.METAL).push().tf(0, -1.55, 0, 0, 0, Math.PI / 2).cyl(0, -0.33, 0, 0.26, 0.26, 0.66, 12).pop(); M.mThigh = b.build();
-      b = new MB(); b.jit = 0;   // säär + labajalg: allapoole 1.55
-      b.color(OL, MAT.WORN).box(0, -0.75, -0.05, 0.5, 1.5, 0.6); b.color(BK, MAT.METAL).box(0, -0.6, 0.32, 0.3, 0.9, 0.08);
-      b.color(ST, MAT.METAL).push().tf(0, -0.7, -0.38, 0, 0, 0).cyl(0, -0.6, 0, 0.1, 0.1, 1.2, 8).pop();
-      b.color(OL2, MAT.WORN).box(0, -1.62, 0.25, 0.85, 0.22, 1.5); b.color(BK, MAT.METAL).box(0, -1.72, 0.85, 0.75, 0.12, 0.3); b.color(BK, MAT.METAL).box(0, -1.72, -0.4, 0.6, 0.12, 0.35);
-      M.mShin = b.build();
-      b = new MB(); b.jit = 0;   // kere/kabiin (kohalik 0 = pöördliiges kere all)
-      b.color(OL, MAT.WORN).box(0, 0.9, -0.2, 2.3, 1.5, 2.0); b.color(OL2, MAT.WORN).box(0, 1.75, -0.3, 2.0, 0.3, 1.8);
-      b.color(OL, MAT.WORN).push().tf(0, 1.0, 0.95, 0, -0.35, 0).box(0, 0, 0, 1.9, 1.2, 0.5).pop();
-      b.color([0.15, 0.22, 0.26], MAT.METAL).push().tf(0, 1.25, 1.18, 0, -0.35, 0).box(0, 0, 0, 1.3, 0.5, 0.06).pop();   // klaas
-      for (let k = 0; k < 6; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(-0.95 + k * 0.38, 0.22, 0.81, 0.38, 0.14, 0.04);
-      b.color(BK, MAT.METAL).box(0, 0.9, -1.3, 1.6, 1.1, 0.4); for (let k = 0; k < 4; k++) b.color(ST, MAT.METAL).box(-0.6 + k * 0.4, 0.9, -1.52, 0.12, 0.9, 0.06);   // radiaator
-      b.color(ST, MAT.METAL).cyl(0.7, 1.9, -0.8, 0.05, 0.03, 1.4, 6); b.color(GL, MAT.GLOW).box(-0.9, 1.92, 0.5, 0.14, 0.1, 0.14); b.color([1, 0.15, 0.08], MAT.GLOW).box(0.9, 1.92, 0.5, 0.14, 0.1, 0.14);
-      for (const sx of [-1, 1]) { b.color(OL2, MAT.WORN).box(sx * 1.3, 1.05, -0.1, 0.35, 0.9, 1.2); b.color(GL, MAT.GLOW).box(sx * 1.2, 1.55, 0.86, 0.3, 0.06, 0.04); }
+    // ---- mech: raske kõndiv tööülikond. Küürus kere suure kabiiniklaasiga, massiivsed õlakapslid,
+    //      jämedad jalad, mõlema käega hoitav pöörlevate torudega kahur (oma disain) ----
+    { const OL = [0.33, 0.35, 0.33], OL2 = [0.23, 0.245, 0.24], HZ = [0.9, 0.68, 0.12], BK = [0.07, 0.075, 0.08], ST = [0.46, 0.47, 0.49], GL = [1.0, 0.55, 0.15], GLS = [0.12, 0.2, 0.24];
+      const md0 = MB.detail; MB.detail = true;
+      b = new MB(); b.jit = 0;   // vaagen (0 = puusatelg)
+      b.color(OL2, MAT.WORN).box(0, 0.05, 0, 1.7, 0.75, 1.2); b.color(BK, MAT.METAL).box(0, -0.35, 0.05, 1.2, 0.3, 0.9);
+      b.color(ST, MAT.METAL).push().tf(0, 0, 0, 0, 0, Math.PI / 2).cyl(0, -1.3, 0, 0.36, 0.36, 2.6, 14).pop();
+      for (const sx of [-1, 1]) b.color(OL, MAT.WORN).box(sx * 1.05, 0.1, 0, 0.35, 0.95, 1.0);
+      b.color(BK, MAT.METAL).cyl(0, 0.4, 0, 0.55, 0.6, 0.4, 14); M.mPelvis = b.build();
+      b = new MB(); b.jit = 0;   // reis (alla 1.6)
+      b.color(OL, MAT.WORN).box(0, -0.8, 0.05, 0.75, 1.55, 0.95); b.color(OL2, MAT.WORN).box(0, -0.65, 0.53, 0.6, 1.0, 0.12);
+      b.color(BK, MAT.METAL).box(-0.4, -0.8, -0.1, 0.08, 1.3, 0.6);
+      b.color(ST, MAT.METAL).push().tf(0.3, -0.8, -0.5, 0, 0, 0).cyl(0, -0.6, 0, 0.11, 0.11, 1.2, 10).pop(); b.color(ST, MAT.METAL).push().tf(-0.25, -0.8, -0.5, 0, 0, 0).cyl(0, -0.55, 0, 0.08, 0.08, 1.1, 10).pop();
+      for (let k = 0; k < 4; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(0.385, -0.3 - k * 0.16, 0.2, 0.02, 0.16, 0.55);
+      b.color(ST, MAT.METAL).push().tf(0, -1.6, 0, 0, 0, Math.PI / 2).cyl(0, -0.42, 0, 0.34, 0.34, 0.84, 14).pop(); M.mThigh = b.build();
+      b = new MB(); b.jit = 0;   // säär + saabas (alla 1.7)
+      b.color(OL, MAT.WORN).push().tf(0, 0.05, 0.35, 0, -0.25, 0).box(0, -0.1, 0, 0.8, 0.75, 0.35).pop();                  // põlvekaitse
+      b.color(OL2, MAT.WORN).box(0, -0.8, -0.05, 0.68, 1.4, 0.8); b.color(BK, MAT.METAL).box(0, -0.75, 0.42, 0.42, 1.0, 0.08);
+      b.color(ST, MAT.METAL).push().tf(0, -0.8, -0.5, 0, 0, 0).cyl(0, -0.6, 0, 0.12, 0.12, 1.2, 10).pop();
+      b.color(OL, MAT.WORN).box(0, -1.55, 0.2, 1.0, 0.32, 1.7); b.color(BK, MAT.METAL).box(0, -1.72, 0.25, 1.05, 0.12, 1.8);
+      for (const sx of [-0.3, 0.3]) b.color(OL2, MAT.WORN).box(sx, -1.6, 1.05, 0.38, 0.25, 0.3);                   // varbad
+      b.color(OL2, MAT.WORN).box(0, -1.6, -0.75, 0.6, 0.3, 0.35); M.mShin = b.build();
+      b = new MB(); b.jit = 0;   // kere (0 = pöördliiges kere all), küürus ette
+      b.color(OL2, MAT.WORN).box(0, 0.3, -0.1, 1.5, 0.6, 1.3);                                                       // kõhuosa
+      b.color(OL, MAT.WORN).push().tf(0, 1.25, 0.05, 0, 0.18, 0).box(0, 0, 0, 2.3, 1.5, 1.9).pop();                  // rind
+      b.color(OL2, MAT.WORN).push().tf(0, 2.0, -0.1, 0, 0.18, 0).box(0, 0, 0, 1.9, 0.35, 1.6).pop();
+      b.color(GLS, MAT.METAL).push().tf(0, 1.55, 1.0, 0, -0.5, 0).box(0, 0, 0, 1.55, 0.95, 0.06).pop();                // kabiiniklaas
+      b.color(BK, MAT.METAL).push().tf(0, 1.55, 1.03, 0, -0.5, 0).box(0, 0.5, 0, 1.7, 0.1, 0.1).box(0, -0.5, 0, 1.7, 0.1, 0.1).box(-0.82, 0, 0, 0.1, 1.05, 0.1).box(0.82, 0, 0, 0.1, 1.05, 0.1).pop();
+      for (let k = 0; k < 6; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(-0.95 + k * 0.38, 0.66, 0.98, 0.38, 0.14, 0.04);
+      b.color(BK, MAT.METAL).box(0, 1.2, -1.15, 1.7, 1.4, 0.55);                                                       // seljakott: jahutus
+      for (let k = 0; k < 5; k++) b.color(ST, MAT.METAL).box(-0.7 + k * 0.35, 1.2, -1.45, 0.1, 1.2, 0.06);
+      for (const sx of [-1, 1]) { b.color(ST, MAT.METAL).cyl(sx * 0.6, 1.9, -1.2, 0.14, 0.12, 0.7, 10); b.color(BK, MAT.METAL).cyl(sx * 0.6, 2.58, -1.2, 0.15, 0.15, 0.06, 10); }   // heitgaasitorud
+      b.color(ST, MAT.METAL).cyl(0.75, 2.2, -0.6, 0.04, 0.02, 1.3, 6); b.color([1, 0.15, 0.08], MAT.GLOW).box(0.75, 3.52, -0.6, 0.08, 0.08, 0.08);
+      for (const sx of [-1, 1]) {   // õlakapslid
+        b.color(OL, MAT.WORN).push().tf(sx * 1.55, 2.0, 0, 0, 0, -sx * 0.12).box(0, 0, 0, 1.05, 1.0, 1.55).pop();
+        b.color(OL2, MAT.WORN).push().tf(sx * 1.55, 2.55, 0, 0, 0, -sx * 0.12).box(0, 0, 0, 0.9, 0.18, 1.35).pop();
+        for (let k = 0; k < 3; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(sx * 2.09, 1.8 - k * 0.2 + 0.2, 0.3, 0.03, 0.2, 0.7);
+        b.color(GL, MAT.GLOW).box(sx * 1.5, 1.55, 0.8, 0.35, 0.08, 0.04);
+      }
+      b.color(GL, MAT.GLOW).box(-0.55, 2.22, 0.75, 0.22, 0.12, 0.05); b.color(GL, MAT.GLOW).box(0.55, 2.22, 0.75, 0.22, 0.12, 0.05);   // prožektorid
       M.mTorso = b.build();
-      b = new MB(); b.jit = 0;   // minigunni käsi (toru +z), kohalik 0 = õlg
-      b.color(OL2, MAT.WORN).box(0, 0, 0.2, 0.6, 0.6, 1.4); b.color(BK, MAT.METAL).box(0, -0.4, 0.1, 0.5, 0.35, 0.8);   // padrunikast
-      b.color(ST, MAT.METAL).push().tf(0, 0, 0.9, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.26, 0.26, 0.3, 12).pop();
-      M.mArm = b.build();
-      b = new MB(); b.jit = 0;   // torukimp (pöörleb ümber z)
-      for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(BK, MAT.METAL).push().tf(Math.cos(a) * 0.14, Math.sin(a) * 0.14, 0, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.045, 0.045, 1.5, 6).pop(); }
-      b.color(ST, MAT.METAL).push().tf(0, 0, 0.6, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.22, 0.22, 0.12, 10).pop(); b.color(ST, MAT.METAL).push().tf(0, 0, 1.35, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.21, 0.21, 0.1, 10).pop();
+      b = new MB(); b.jit = 0;   // käed + kahur ühes tükis; 0 = õlgade telg (kere kohalik y 1.9)
+      const limb = (x0, y0, z0, x1, y1, z1, w, col) => { const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0, L = Math.hypot(dx, dy, dz); b.color(col, MAT.WORN).push().tf((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2, Math.atan2(dx, dz), -Math.asin(dy / L), 0).box(0, 0, 0, w, w, L).pop(); };
+      for (const sx of [-1, 1]) {
+        b.color(ST, MAT.METAL).push().tf(sx * 1.55, 0, 0, 0, 0, Math.PI / 2).cyl(0, -0.3, 0, 0.3, 0.3, 0.6, 12).pop();   // õlaliiges
+        limb(sx * 1.75, -0.1, 0, sx * 1.7, -1.35, 0.2, 0.62, OL);                                                         // õlavars
+        b.color(ST, MAT.METAL).sphere(sx * 1.7, -1.4, 0.25, 0.36, 10, 6, 1);                                               // küünarnukk
+        limb(sx * 1.65, -1.45, 0.3, sx * 0.6, -1.4, 1.45, 0.52, OL);                                                        // küünarvars
+        b.color(BK, MAT.METAL).box(sx * 0.55, -1.35, 1.5, 0.4, 0.5, 0.45);                                                  // käsi
+      }
+      b.color(OL2, MAT.WORN).box(0.15, -1.1, 1.6, 0.75, 0.75, 1.9);                                                       // kahuri korpus
+      b.color(BK, MAT.METAL).box(0.15, -1.55, 1.3, 0.55, 0.45, 0.9);                                                      // padrunisalv
+      b.color(ST, MAT.METAL).box(0.15, -0.62, 1.4, 0.12, 0.3, 1.0); b.color(ST, MAT.METAL).box(0.15, -0.5, 1.4, 0.2, 0.06, 1.2);   // kandesang
+      for (let k = 0; k < 4; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(0.53, -1.1, 0.9 + k * 0.3, 0.02, 0.5, 0.3);
+      b.color(ST, MAT.METAL).push().tf(0.15, -1.1, 2.6, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.36, 0.36, 0.3, 14).pop();
+      b.color([1, 0.2, 0.1], MAT.GLOW).box(0.5, -0.8, 2.45, 0.05, 0.05, 0.05);
+      M.mArmsGun = b.build();
+      b = new MB(); b.jit = 0;   // torukimp (pöörleb ümber z), kinnitub kahuri esiotsa
+      for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(BK, MAT.METAL).push().tf(Math.cos(a) * 0.19, Math.sin(a) * 0.19, 0, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.06, 0.06, 2.0, 8).pop(); }
+      for (const zz of [0.6, 1.4, 1.95]) b.color(ST, MAT.METAL).push().tf(0, 0, zz, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.3, 0.3, 0.1, 12).pop();
       M.mBarrel = b.build();
+      MB.detail = md0;
       b = new MB(); b.jit = 0;   // osa kast (korjatav)
       b.color([0.86, 0.5, 0.12], MAT.WORN).box(0, 0.3, 0, 0.9, 0.6, 0.7); b.color(BK, MAT.METAL).box(0, 0.62, 0, 0.94, 0.06, 0.74);
       b.color([1, 0.6, 0.15], MAT.GLOW).box(0, 0.3, 0.36, 0.5, 0.1, 0.02); M.partCrate = b.build(); }
@@ -578,8 +608,8 @@ const Vehicles = (() => {
     v.gunYaw = P.yaw; v.gunPitch = P.pitch;
     const tw = angDiff(v.yaw, P.yaw); v.twist = clamp(tw, -1.3, 1.3);
     M4.compose(v.m, v.x, v.y, v.z, v.yaw, 0, 0);
-    const ep = M4.point(v.m, 0, 4.25, 0, tmp);
-    P.pos.x = ep.x + Math.sin(P.yaw) * 0.9; P.pos.z = ep.z + Math.cos(P.yaw) * 0.9; P.pos.y = ep.y - P.eyeH + 0.55;
+    const ep = M4.point(v.m, 0, 5.8, 0, tmp);
+    P.pos.x = ep.x + Math.sin(P.yaw) * 1.25; P.pos.z = ep.z + Math.cos(P.yaw) * 1.25; P.pos.y = ep.y - P.eyeH;
     P.vel.x = Math.sin(v.yaw) * v.speed; P.vel.z = Math.cos(v.yaw) * v.speed; P.vel.y = 0; P.onGround = true; P.speedNow = 0; P.moveAmt = 0;
     if ((inp.fire || inp.reload) && (P.mag.minigun || 0) <= 0 && P.reloadT <= 0) reloadGun(v);
     if (P.reloadT > 0) P.reloadT -= dt;
@@ -642,22 +672,22 @@ const Vehicles = (() => {
   }
   function drawMech(v, show) {
     const ms = v.mm, R0 = ms[9], tint = v.dead ? [0.3, 0.27, 0.25, 0] : v.hurtT > 0 ? [1.6, 0.7, 0.6, 0] : null, o = { rust: v.dead ? 0.9 : 0.35 };
-    const ph = v.walkPh || 0, lift = Math.abs(Math.sin(ph)) * 0.12;
-    M4.compose(R0, v.x, v.y + 3.2 + lift - (show.legs ? 0 : 0), v.z, v.yaw, 0, 0);
+    const ph = v.walkPh || 0, lift = Math.abs(Math.sin(ph)) * 0.14;
+    M4.compose(R0, v.x, v.y + 2.7 + lift, v.z, v.yaw, 0, Math.sin(ph) * 0.04, 1.15, 1, 1.15);
     GFX.draw(M.mPelvis, R0, tint, null, o);
     if (show.legs) for (const sd of [1, -1]) {
-      const sw = Math.sin(ph + (sd > 0 ? 0 : Math.PI)) * 0.42, knee = Math.max(0, -Math.cos(ph + (sd > 0 ? 0 : Math.PI))) * 0.55 + 0.15;
+      const p2 = ph + (sd > 0 ? 0 : Math.PI), sw = Math.sin(p2) * 0.42, knee = Math.max(0, -Math.cos(p2)) * 0.6 + 0.12;
       const th = ms[sd > 0 ? 0 : 2], sh = ms[sd > 0 ? 1 : 3];
-      M4.child(th, R0, sd * 1.05, 0, 0, 0, -sw - 0.12, 0); GFX.draw(M.mThigh, th, tint, null, o);
-      M4.child(sh, th, 0, -1.55, 0, 0, knee, 0); GFX.draw(M.mShin, sh, tint, null, o);
+      M4.child(th, R0, sd * 1.2, 0, 0, 0, -sw - 0.15, 0, 1.1, 0.82, 1.05); GFX.draw(M.mThigh, th, tint, null, o);
+      M4.child(sh, th, 0, -1.6, 0, 0, knee, 0, 1.0, 1, 1.05); GFX.draw(M.mShin, sh, tint, null, o);
     }
     if (show.torso) {
-      const T = ms[4]; M4.child(T, R0, 0, 0.3, 0, v.twist || 0, 0, 0);
+      const T = ms[4]; M4.child(T, R0, 0, 0.45, 0, v.twist || 0, 0, 0, 1.18, 1.3, 1.13);
       if (!(Player.vehicle && Player.vehicle.mm === v.mm)) GFX.draw(M.mTorso, T, tint, null, o);
-      if (show.gun) for (const sd of [1, -1]) {
-        const A = ms[sd > 0 ? 5 : 6], Bm = ms[sd > 0 ? 7 : 8];
-        M4.child(A, T, sd * 1.6, 1.0, 0.1, 0, -(v.gunPitch || 0), 0); GFX.draw(M.mArm, A, tint, null, o);
-        M4.child(Bm, A, 0, 0, 1.0, 0, 0, (v.barrel || 0) * sd); GFX.draw(M.mBarrel, Bm, tint, null, o);
+      if (show.gun) {
+        const A = ms[5], Bm = ms[6];
+        M4.child(A, T, 0, 1.9, 0, 0, -(v.gunPitch || 0) * 0.9, 0); GFX.draw(M.mArmsGun, A, tint, null, o);
+        M4.child(Bm, A, 0.15, -1.1, 2.7, 0, 0, v.barrel || 0); GFX.draw(M.mBarrel, Bm, tint, null, o);
       }
     }
   }

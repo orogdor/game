@@ -48,6 +48,7 @@ function isThreatTo(t, team) {
   if (t.kind === 'kiskja') return true;
   if (t.kind === 'crab') return t.state === 'angry';
   if (t.kind === 'alien') return t.state === 'hunt' || !!t.raid;
+  if (t.kind === 'beast') return t.state === 'hunt';
   if (t.kind === 'ram') return t.state === 'charge';
   if (t.kind === 'boss') return t.state !== 'sleep';
   if (t.kind === 'human' || t.kind === 'player' || t.kind === 'core' || t.kind === 'rturret') {

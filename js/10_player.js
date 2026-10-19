@@ -8,6 +8,7 @@ const WEAPONS = {
   sniper: { name: 'Sniper rifle', dmg: 120, rate: 1.35, mag: 5, reload: 2.7, spread: 0.0006, range: 420, kick: 1.1, recoil: 0.9, snd: 'sniper', zoom: 0.78, moveSpread: 6 },
   revolver: { name: '.44 Revolver', dmg: 58, rate: 0.42, mag: 6, reload: 2.2, spread: 0.005, range: 170, semi: true, kick: 0.9, recoil: 0.7, snd: 'pistol' },
   dmr: { name: 'DMR marksman rifle', dmg: 48, rate: 0.26, mag: 15, reload: 2.0, spread: 0.0025, range: 320, semi: true, kick: 0.7, recoil: 0.5, snd: 'sniper', zoom: 0.62 },
+  arc: { name: 'Arc thrower', dmg: 46, rate: 0.32, mag: 12, reload: 2.3, spread: 0.004, range: 95, kick: 0.6, recoil: 0.4, snd: 'plasma', plasma: true, chain: 3 },
   plasma: { name: 'Plasma rifle', dmg: 30, rate: 0.11, mag: 30, reload: 2.0, spread: 0.011, range: 200, kick: 0.35, recoil: 0.22, snd: 'plasma', plasma: true },
   gl: { name: 'Grenade launcher', dmg: 150, rate: 0.85, mag: 6, reload: 3.0, spread: 0.004, range: 120, kick: 1.0, recoil: 0.9, snd: 'gl', launcher: true },
   ashot: { name: 'Auto shotgun', dmg: 11, pellets: 8, rate: 0.24, mag: 10, reload: 2.8, spread: 0.07, range: 42, kick: 0.8, recoil: 0.55, snd: 'shotgun' },
@@ -26,7 +27,7 @@ const Player = {
   kind: 'player', team: 'player', id: 0, pos: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 }, yaw: Math.PI, pitch: 0,
   hp: 100, maxHp: 100, alive: true, radius: 0.38, spheres: [], hitY: 1.0, pose: 'stand', moveAmt: 0, speed: 0, phase: 0,
   dead: false, deadT: 0, onGround: true, speedNow: 0, bobT: 0, lastStep: 0,
-  weapon: 'rifle', mag: { rifle: 24, rail: 5, sniper: 5, shotgun: 6, pistol: 12, smg: 40, lmg: 100, revolver: 6, dmr: 15, plasma: 30, gl: 6, ashot: 10 }, reloadT: 0, fireCool: 0, recoil: 0, kick: 0, swayX: 0, swayY: 0,
+  weapon: 'rifle', mag: { arc: 12, rifle: 24, rail: 5, sniper: 5, shotgun: 6, pistol: 12, smg: 40, lmg: 100, revolver: 6, dmr: 15, plasma: 30, gl: 6, ashot: 10 }, reloadT: 0, fireCool: 0, recoil: 0, kick: 0, swayX: 0, swayY: 0,
   inter: null, interT: 0, interScan: 0, hurtT: 0, lastHurt: 99, regenT: 0, eyeH: 1.62, fallV: 0,
   vm: M4.create(), vmG: M4.create(), vmArmL: M4.create(), vmArmR: M4.create(), camM: M4.create(), wasInside: false,
 
@@ -212,7 +213,7 @@ const Player = {
       for (const h of hits.slice(0, 6)) { this.applyHit(h, st, e, dx, dy, dz); hitAny = true; }
     } else {
       const hr = Ents.raycast(e.x, e.y, e.z, dx, dy, dz, wt, 'player', null);
-      if (hr) { this.applyHit(hr, st, e, dx, dy, dz); hitAny = true; endT = hr.t; }
+      if (hr) { this.applyHit(hr, st, e, dx, dy, dz); hitAny = true; endT = hr.t; if (st.chain) this.arcChain(hr.e, st, e.x + dx * hr.t, e.y + dy * hr.t, e.z + dz * hr.t); }
     }
     if (!hitAny || st.pierce) {
       const hx = e.x + dx * wt, hy = e.y + dy * wt, hz = e.z + dz * wt;
@@ -232,6 +233,19 @@ const Player = {
     this.pitch = Math.min(1.45, this.pitch + (st.pierce ? 0.035 : st.pellets ? 0.03 : 0.006) * (1 - (this.adsT || 0) * 0.4));
     if (st.pellets) UI.shake && UI.shake(0.25);
     Ents.noise(this.pos.x, this.pos.z, st.pierce ? 70 : 45, 'shot');
+  },
+  // kaarkiirgur: välk hüppab tabatud sihtmärgilt kuni 3 lähimale vaenlasele
+  arcChain(first, st, x, y, z) {
+    const hit = new Set([first]); let cur = { x, y, z };
+    for (let k = 0; k < st.chain; k++) {
+      let best = null, bd = 9;
+      for (const t of Ents.list) { if (!t.alive || hit.has(t) || t === this || Ents.friendly(t, this) || t.kind === 'goat' || t.kind === 'jelly') continue; const d = Math.hypot(t.pos.x - cur.x, t.pos.z - cur.z); if (d < bd) { bd = d; best = t; } }
+      if (!best) break;
+      hit.add(best); const ty = best.pos.y + 1.0;
+      FX.rail(cur.x, cur.y, cur.z, best.pos.x, ty, best.pos.z); GFX.addLight && GFX.addLight(best.pos.x, ty, best.pos.z, 5, 0.6, 0.8, 1.0, 1.4);
+      if (best.kind === 'boss') Boss.hit(best, st.dmg * 0.6, this, 0, best.pos.x, ty, best.pos.z); else Ents.damage(best, st.dmg * 0.7, this);
+      cur = { x: best.pos.x, y: ty, z: best.pos.z };
+    }
   },
   applyHit(hr, st, e, dx, dy, dz) {
     const t = hr.e;
@@ -359,7 +373,7 @@ const Player = {
     }
     // korjused
     for (const e of Ents.list) {
-      if (e.kind === 'alien' && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
+      if ((e.kind === 'alien' || e.kind === 'beast') && !e.alive && e.harvestable && Math.abs(e.pos.x - px) < 3.5 && Math.abs(e.pos.z - pz) < 3.5) consider({ key: 'a' + e.id, label: 'Harvest acid glands', sub: e.acid + ' glands', hold: 1.6, act: () => harvestAcid(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.6, e.pos.z, [0.55, 1.0, 0.2], 1); } }, e.pos.x, e.pos.z, 3);
       if (e.alive || !e.butcherable) continue;
       if (Math.abs(e.pos.x - px) > 3 || Math.abs(e.pos.z - pz) > 3) continue;
       consider({ key: 'c' + e.id, label: 'Butcher meat', sub: e.meat + ' pieces', hold: 1.4, act: () => butcher(e), tick: () => { if (Math.random() < 0.3) FX.goo(e.pos.x, e.pos.y + 0.4, e.pos.z, [0.5, 0.15, 0.12], 1); } }, e.pos.x, e.pos.z, 2.6);

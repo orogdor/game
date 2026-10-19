@@ -9,7 +9,7 @@ const Ents = (() => {
   let nextId = 1;
   const tmpV = { x: 0, y: 0, z: 0 };
 
-  function groundY(x, z, y) { return Math.max(World.heightAt(x, z), Bases.floorAt(x, z, y)); }
+  function groundY(x, z, y) { return Math.max(World.heightAt(x, z), Bases.floorAt(x, z, y), World.lidAt(x, z, y)); }
 
   function spawn(kind, team, x, z, o = {}) {
     const e = Object.assign({
@@ -224,6 +224,8 @@ const Ents = (() => {
         Boss.spheres(e, s); break;
       case 'bug':
         Waves.spheres(e, s); break;
+      case 'beast':
+        Tunnels.spheres(e, s); break;
     }
   }
   // kiir vs olemid
@@ -264,6 +266,7 @@ const Ents = (() => {
     if (e.kind === 'stalker') { if (e.state === 'buried') emerge(e); e.state = 'hunt'; e.target = src; e.stateT = 20; }
     if (e.kind === 'crab') { e.state = 'angry'; e.target = src; e.stateT = 15; }
     if (e.kind === 'alien') Aliens.hurt(e, src);
+    if (e.kind === 'beast') Tunnels.hurt(e, src);
   }
   function kill(e, src) {
     e.alive = false; e.hp = 0; e.deathT = 0; e.pose = 'dead'; stopMove(e);
@@ -280,6 +283,7 @@ const Ents = (() => {
     if (e.kind === 'bug') Waves.onKill(e);
     if (e.kind === 'kiskja') Kiskja.onKill(e);
     if (e.kind === 'alien') Aliens.onKill(e);
+    if (e.kind === 'beast') Tunnels.onKill(e);
     if (e.kind === 'stalker') { Audio2.stalker(fx.x, fx.z); FX.goo(fx.x, fx.y + 0.5, fx.z, [0.55, 0.75, 0.2], 16); }
     if (e.kind === 'crab') {
       Audio2.crab(fx.x, fx.z);
@@ -294,7 +298,7 @@ const Ents = (() => {
       if (e.team === 'crew' && typeof Crew !== 'undefined') Crew.onDeath(e, src);
       else if (typeof Rivals !== 'undefined') Rivals.onUnitDeath(e, src);
     }
-    if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'alien' || e.kind === 'human') UI.hitMarker(true); }
+    if (src && src.kind === 'player') { G.stats.kills++; if (e.kind === 'bug' || e.kind === 'stalker' || e.kind === 'kiskja' || e.kind === 'crab' || e.kind === 'alien' || e.kind === 'beast' || e.kind === 'human') UI.hitMarker(true); }
   }
 
   // ---------- olendite AI ----------
@@ -511,6 +515,7 @@ const Ents = (() => {
         case 'kiskja': Kiskja.update(e, dt); break;
         case 'crab': updateCrab(e, dt); break;
         case 'alien': Aliens.update(e, dt); break;
+        case 'beast': Tunnels.beastAI(e, dt); break;
         case 'jelly': updateJelly(e, dt); break;
         case 'bug': Waves.bugAI(e, dt); break;
         case 'human': if (e.ai) e.ai(e, dt); break;
@@ -761,6 +766,7 @@ const Ents = (() => {
         case 'kiskja': Kiskja.draw(e); break;
         case 'crab': drawCrab(e); break;
         case 'alien': Aliens.draw(e); break;
+        case 'beast': Tunnels.drawBeast(e); break;
         case 'jelly': drawJelly(e); break;
         case 'bug': Waves.draw(e); break;
         case 'boss': Boss.draw(e); break;

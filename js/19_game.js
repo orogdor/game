@@ -459,6 +459,7 @@ const Game = (() => {
     Rivals.updateBases(dt, humans);
     Herds.update(dt);
     Aliens.tick(dt);
+    if (typeof Tunnels !== 'undefined') Tunnels.tick(dt);
     Sandworm.update(dt);
     Ents.update(dt);
     Crew.update(dt);
