@@ -771,6 +771,7 @@ const Ents = (() => {
     for (const p of pickups) {
       if (!p.m) p.m = M4.create();
       M4.compose(p.m, p.x, p.y + 0.25 + Math.sin(p.t * 2) * 0.08, p.z, p.t * 0.8);
+      if (p.kind === 'mechpart') { GFX.draw(Vehicles.partMesh(), p.m, null, null, { shadow: false }); GFX.addLight(p.x, p.y + 1.2, p.z, 6, 1, 0.6, 0.15, 1.6); continue; }
       GFX.draw(p.kind === 'stones' ? MODELS.heartStone : MODELS.bag, p.m, null, null, { shadow: false });
       if (p.kind === 'stones') GFX.addLight(p.x, p.y + 1, p.z, 8, 1, 0.4, 0.8, 2);
     }

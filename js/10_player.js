@@ -11,6 +11,7 @@ const WEAPONS = {
   plasma: { name: 'Plasma rifle', dmg: 30, rate: 0.11, mag: 30, reload: 2.0, spread: 0.011, range: 200, kick: 0.35, recoil: 0.22, snd: 'plasma', plasma: true },
   gl: { name: 'Grenade launcher', dmg: 150, rate: 0.85, mag: 6, reload: 3.0, spread: 0.004, range: 120, kick: 1.0, recoil: 0.9, snd: 'gl', launcher: true },
   ashot: { name: 'Auto shotgun', dmg: 11, pellets: 8, rate: 0.24, mag: 10, reload: 2.8, spread: 0.07, range: 42, kick: 0.8, recoil: 0.55, snd: 'shotgun' },
+  minigun: { name: 'Mech minigun', dmg: 24, rate: 0.045, mag: 300, reload: 3.2, spread: 0.02, range: 280, kick: 0.2, recoil: 0.08, snd: 'lmg' },
   bugmg: { name: 'Buggy MG', dmg: 22, rate: 0.085, mag: 120, reload: 3.0, spread: 0.018, range: 260, kick: 0.35, recoil: 0.18, snd: 'lmg' },
   lmg: { name: 'Machine gun', dmg: 26, rate: 0.095, mag: 100, reload: 4.2, spread: 0.028, range: 260, kick: 0.5, recoil: 0.32, slow: 0.78, snd: 'lmg' },
 };
@@ -249,7 +250,8 @@ const Player = {
     if (this.dead || G.mode !== 'play' && G.mode !== 'build') return;
     if (G.mode === 'build') return;
     amt *= Inv.dmgMul() * 0.65;   // mängija on vastupidavam (varem suri liiga kergelt)
-    if (this.vehicle && !this.vehicle.dead) { this.vehicle.hp -= amt * 0.55; this.vehicle.hurtT = 0.25; amt *= this.seat === 1 ? 0.6 : 0.4; }   // sõiduk võtab osa löögist
+    if (this.vehicle && !this.vehicle.dead && Vehicles.DEF[this.vehicle.type].walker) { this.vehicle.hp -= amt; this.vehicle.hurtT = 0.25; amt *= 0.04; }   // mech: soomuskabiin võtab löögid
+    else if (this.vehicle && !this.vehicle.dead) { this.vehicle.hp -= amt * 0.55; this.vehicle.hurtT = 0.25; amt *= this.seat === 1 ? 0.6 : 0.4; }   // sõiduk võtab osa löögist
     this.hp -= amt;
     this.hurtT = 0.4; this.lastHurt = 0;
     Audio2.hurt();
@@ -367,6 +369,7 @@ const Player = {
       if (p.gone) continue;
       if (p.city && !p.seen && Math.abs(p.x - px) < 45 && Math.abs(p.z - pz) < 45) p.seen = true;
       if (!p.id) p.id = Math.floor(Math.random() * 1e9);
+      if (p.kind === 'mechpart') { consider({ key: 'p' + p.id, label: 'Take the ' + Vehicles.partName(p.data.part), sub: 'Mech part · take it to the unfinished mech in the city', hold: 1.2, act: () => Vehicles.takePart(p) }, p.x, p.z, 2.6); continue; }
       consider({ key: 'p' + p.id, label: p.kind === 'stones' ? 'Take the heartstones' : 'Pick up bag', hold: p.kind === 'stones' ? 1.5 : 0.6, act: () => pickupBag(p) }, p.x, p.z, 2.4);
     }
     if (typeof Vehicles !== 'undefined') Vehicles.interactions(consider);

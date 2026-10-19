@@ -191,7 +191,8 @@ const UI = (() => {
     for (const r of Rivals.list) if (r.base) out.push({ x: r.base.x, z: r.base.z, icon: 'flag', col: r.alive ? (r.id === 'krell' ? '#ff6d55' : '#b796ff') : '#6f604f', label: r.short, kind: 'rival' });
     if (World.sites.city && World.sites.city.x < 1e4) out.push({ x: World.sites.city.x, z: World.sites.city.z, icon: 'house', col: '#a9a39a', label: 'Old colony city', kind: 'city' });
     for (const v of World.sites.villages || []) out.push({ x: v.x, z: v.z, icon: 'house', col: '#8f877c', label: v.name || 'Abandoned settlement', kind: 'city' });
-    for (const p of Ents.pickups) if (!p.gone && !(p.city && !p.seen)) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : 'Items', kind: 'bag' });
+    for (const p of Ents.pickups) if (!p.gone && !(p.city && !p.seen)) out.push({ x: p.x, z: p.z, icon: p.kind === 'stones' ? 'heart' : 'bag', col: p.kind === 'stones' ? '#ff8fd0' : p.kind === 'mechpart' ? '#ff8a2a' : '#ddb45c', label: p.kind === 'stones' ? 'Heartstones' : p.kind === 'mechpart' ? 'Mech part' : 'Items', kind: 'bag' });
+    { const mb = Vehicles.bayMarker(); if (mb) out.push(mb); }
     const cur = Objectives.current();
     if (cur && cur.id === 'salv') {
       const w = World.wrecks.filter((q) => q.scrap > 0).sort((a, b) => Math.hypot(a.x - Player.pos.x, a.z - Player.pos.z) - Math.hypot(b.x - Player.pos.x, b.z - Player.pos.z))[0];
@@ -847,6 +848,7 @@ const UI = (() => {
     let h = `<div class="kv"><div><div class="k">Money</div><div class="v">${fmtInt(G.res.cr)} ₵</div></div><div><div class="k">Scrap</div><div class="v">${fmtInt(G.res.scrap)}</div></div><div><div class="k">On the lift</div><div class="v">${onLift ? esc(Vehicles.nameOf(onLift)) : 'empty'}</div></div></div>`;
     h += '<h4 style="margin:12px 0 6px">Buy</h4><div class="cards">';
     for (const [k, d] of Object.entries(Vehicles.DEF)) {
+      if (d.noBuy) continue;
       const why = Vehicles.canBuy(k, o);
       h += `<div class="card"><h4>${esc(d.name)}</h4><div class="act">${esc(d.desc)}</div>
         <div class="trait">${d.hp} hp · top speed ${Math.round(d.maxSpeed * 3.6)} km/h · cargo ${d.cargoCap}${d.gun ? ' · rear machine gun' : ''}</div>
@@ -919,7 +921,7 @@ const UI = (() => {
     body.innerHTML = `<div class="help">
       <h4>The story</h4><p>This was a colony world getting rich fast. Then a huge ship that was refuelling in orbit came down in the desert – and out of the wreck crawled the <b>Stoneheart</b>, a giant alien. Its workers, the acid mantises and the bug swarms, took the planet over. The colonists fled and left everything behind.</p>
       <p>Now someone has invented the <b>base heart</b>: a device whose hum keeps the sandworms away from buildings. People can settle here again. Whoever brings in the Stoneheart's heartstones – the proof that it is dead – gets the colonisation rights to the whole planet. That proof is worth a fortune.</p>
-      <p>The ruins of the <b>old colony city</b> lie at the edge of the map, farther out than any camp. The noise and the lights draw aliens there, but the city is full of scrap and abandoned gear.</p>
+      <p>The ruins of the <b>old colony city</b> lie at the edge of the map, farther out than any camp. The noise and the lights draw aliens there, but the city is full of scrap and abandoned gear. A half-built work <b>mech</b> stands in a gantry on the city plaza: find its five parts in the city buildings, fit them and you get a walking armour with a minigun.</p>
       <h4>Objective</h4><p>Keep the station and its heart alive, pay the bank its instalments and kill the Stoneheart. Its heartstones prove the kill and wipe out the whole debt. Two rivals are hunting the same thing.</p>
       <h4>Phone controls</h4><ul><li>Left thumb: move. Push all the way to run.</li><li>Right side: look around. Slide your finger on the fire button to aim at the same time.</li><li>The action button appears when there's something to do. Some actions must be held.</li><li>The hammer opens building, the minimap opens the big map.</li></ul>
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>

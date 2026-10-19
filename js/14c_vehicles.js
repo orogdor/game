@@ -10,7 +10,12 @@ const Vehicles = (() => {
     hauler: { name: 'Hauler truck', desc: 'Slow and tough: big cargo bed for hauling diamonds, ore and scrap. Two seats, no gun.', hp: 800, maxSpeed: 14, rev: 5, accel: 6, brake: 16, wheelBase: 3.3, cargoCap: 600, cost: { c: 1400, s: 220 },
       gun: null, seats: [{ x: 0.45, y: 1.0, z: 1.25, sit: true }, { x: -0.45, y: 1.0, z: 1.25, sit: true }],
       wheels: [[1.0, 0.55, 1.55], [-1.0, 0.55, 1.55], [1.0, 0.55, -0.9], [-1.0, 0.55, -0.9], [1.0, 0.55, -1.85], [-1.0, 0.55, -1.85]], wheelS: 1.22, mesh: 'hauler', len: 1.3 },
+    // MECH: linnast leitud osadest kokku pandud kõndiv soomusmasin, piloot juhib ja tulistab minigunniga
+    mech: { name: 'Atlas mech', desc: 'Walking armour with a minigun. Built from parts found in the old colony city.', hp: 2600, maxSpeed: 7.2, rev: 3, accel: 6, brake: 16, wheelBase: 2.2, cargoCap: 100, cost: { c: 0, s: 0 },
+      gun: null, mechGun: true, walker: true, noBuy: true, seats: [{ x: 0, y: 4.35, z: 0.55, sit: true }], wheels: [], wheelS: 1, mesh: 'mech', len: 1.1 },
   };
+  const MECH_PARTS = { legs: 'Mech leg actuators', torso: 'Mech torso armour', gun: 'Minigun arm', reactor: 'Mech micro-reactor', cpu: 'Pilot control unit' };
+  const PART_KEYS = Object.keys(MECH_PARTS);
   const DEFAULT_TYPE = 'buggy';
   const seatsOf = (v) => DEF[v.type].seats;
   const list = [];
@@ -236,6 +241,41 @@ const Vehicles = (() => {
     b.color([0.3, 0.3, 0.32], MAT.WORN).boxB(1.55, 0, -2.4, 0.5, 0.9, 0.9);        // tööriistakapp
     b.color([0.8, 0.1, 0.08], MAT.RUST).boxB(1.55, 0.9, -2.4, 0.5, 0.06, 0.9);
     M.lift = b.build();
+    // ---- mech (Alien / Tiberian Sun stiil): vaagen, reied, sääred+labajalad, kabiinikere, minigunni käsi, pöörlev torukimp ----
+    { const OL = [0.36, 0.38, 0.32], OL2 = [0.26, 0.28, 0.24], HZ = [0.9, 0.68, 0.12], BK = [0.08, 0.08, 0.09], ST = [0.42, 0.43, 0.45], GL = [1.0, 0.55, 0.15];
+      b = new MB(); b.jit = 0;   // vaagen (kohalik 0 = puusaliiges)
+      b.color(OL2, MAT.WORN).box(0, 0, 0, 1.9, 0.6, 1.1); b.color(ST, MAT.METAL).push().tf(0, 0, 0, 0, 0, Math.PI / 2).cyl(0, -1.25, 0, 0.32, 0.32, 2.5, 12).pop();
+      b.color(BK, MAT.METAL).cyl(0, 0.3, 0, 0.5, 0.5, 0.35, 12); M.mPelvis = b.build();
+      b = new MB(); b.jit = 0;   // reis: allapoole 1.55
+      b.color(OL, MAT.WORN).box(0, -0.75, 0, 0.55, 1.5, 0.7); b.color(OL2, MAT.WORN).box(0, -0.7, 0.38, 0.42, 1.1, 0.08);
+      b.color(ST, MAT.METAL).push().tf(0, -0.7, -0.4, 0, 0, 0).cyl(0, -0.55, 0, 0.09, 0.09, 1.1, 8).pop();
+      for (let k = 0; k < 3; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(0.29, -0.25 - k * 0.18, 0, 0.02, 0.18, 0.6);
+      b.color(ST, MAT.METAL).push().tf(0, -1.55, 0, 0, 0, Math.PI / 2).cyl(0, -0.33, 0, 0.26, 0.26, 0.66, 12).pop(); M.mThigh = b.build();
+      b = new MB(); b.jit = 0;   // säär + labajalg: allapoole 1.55
+      b.color(OL, MAT.WORN).box(0, -0.75, -0.05, 0.5, 1.5, 0.6); b.color(BK, MAT.METAL).box(0, -0.6, 0.32, 0.3, 0.9, 0.08);
+      b.color(ST, MAT.METAL).push().tf(0, -0.7, -0.38, 0, 0, 0).cyl(0, -0.6, 0, 0.1, 0.1, 1.2, 8).pop();
+      b.color(OL2, MAT.WORN).box(0, -1.62, 0.25, 0.85, 0.22, 1.5); b.color(BK, MAT.METAL).box(0, -1.72, 0.85, 0.75, 0.12, 0.3); b.color(BK, MAT.METAL).box(0, -1.72, -0.4, 0.6, 0.12, 0.35);
+      M.mShin = b.build();
+      b = new MB(); b.jit = 0;   // kere/kabiin (kohalik 0 = pöördliiges kere all)
+      b.color(OL, MAT.WORN).box(0, 0.9, -0.2, 2.3, 1.5, 2.0); b.color(OL2, MAT.WORN).box(0, 1.75, -0.3, 2.0, 0.3, 1.8);
+      b.color(OL, MAT.WORN).push().tf(0, 1.0, 0.95, 0, -0.35, 0).box(0, 0, 0, 1.9, 1.2, 0.5).pop();
+      b.color([0.15, 0.22, 0.26], MAT.METAL).push().tf(0, 1.25, 1.18, 0, -0.35, 0).box(0, 0, 0, 1.3, 0.5, 0.06).pop();   // klaas
+      for (let k = 0; k < 6; k++) b.color(k & 1 ? BK : HZ, MAT.MATTE).box(-0.95 + k * 0.38, 0.22, 0.81, 0.38, 0.14, 0.04);
+      b.color(BK, MAT.METAL).box(0, 0.9, -1.3, 1.6, 1.1, 0.4); for (let k = 0; k < 4; k++) b.color(ST, MAT.METAL).box(-0.6 + k * 0.4, 0.9, -1.52, 0.12, 0.9, 0.06);   // radiaator
+      b.color(ST, MAT.METAL).cyl(0.7, 1.9, -0.8, 0.05, 0.03, 1.4, 6); b.color(GL, MAT.GLOW).box(-0.9, 1.92, 0.5, 0.14, 0.1, 0.14); b.color([1, 0.15, 0.08], MAT.GLOW).box(0.9, 1.92, 0.5, 0.14, 0.1, 0.14);
+      for (const sx of [-1, 1]) { b.color(OL2, MAT.WORN).box(sx * 1.3, 1.05, -0.1, 0.35, 0.9, 1.2); b.color(GL, MAT.GLOW).box(sx * 1.2, 1.55, 0.86, 0.3, 0.06, 0.04); }
+      M.mTorso = b.build();
+      b = new MB(); b.jit = 0;   // minigunni käsi (toru +z), kohalik 0 = õlg
+      b.color(OL2, MAT.WORN).box(0, 0, 0.2, 0.6, 0.6, 1.4); b.color(BK, MAT.METAL).box(0, -0.4, 0.1, 0.5, 0.35, 0.8);   // padrunikast
+      b.color(ST, MAT.METAL).push().tf(0, 0, 0.9, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.26, 0.26, 0.3, 12).pop();
+      M.mArm = b.build();
+      b = new MB(); b.jit = 0;   // torukimp (pöörleb ümber z)
+      for (let k = 0; k < 6; k++) { const a = k / 6 * TAU; b.color(BK, MAT.METAL).push().tf(Math.cos(a) * 0.14, Math.sin(a) * 0.14, 0, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.045, 0.045, 1.5, 6).pop(); }
+      b.color(ST, MAT.METAL).push().tf(0, 0, 0.6, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.22, 0.22, 0.12, 10).pop(); b.color(ST, MAT.METAL).push().tf(0, 0, 1.35, 0, Math.PI / 2, 0).cyl(0, 0, 0, 0.21, 0.21, 0.1, 10).pop();
+      M.mBarrel = b.build();
+      b = new MB(); b.jit = 0;   // osa kast (korjatav)
+      b.color([0.86, 0.5, 0.12], MAT.WORN).box(0, 0.3, 0, 0.9, 0.6, 0.7); b.color(BK, MAT.METAL).box(0, 0.62, 0, 0.94, 0.06, 0.74);
+      b.color([1, 0.6, 0.15], MAT.GLOW).box(0, 0.3, 0.36, 0.5, 0.1, 0.02); M.partCrate = b.build(); }
     if (MODELS.obj && !MODELS.obj.tostuk) MODELS.obj.tostuk = M.lift;
     return M;
   }
@@ -289,7 +329,7 @@ const Vehicles = (() => {
       const steerT = v.steerIn * 0.58 * (1 - Math.min(0.7, Math.abs(vF) / 26));
       v.steer += (steerT - v.steer) * Math.min(1, dt * 7);
       const slip = clamp(Math.abs(vS) / 6, 0, 0.6);
-      const wantRate = vF / d.wheelBase * Math.tan(v.steer) * (1 - slip * 0.5) + (v.hand ? v.steer * Math.sign(vF) * Math.min(1, Math.abs(vF) / 8) * 1.2 : 0);
+      const wantRate = d.walker ? v.steerIn * 1.15 : vF / d.wheelBase * Math.tan(v.steer) * (1 - slip * 0.5) + (v.hand ? v.steer * Math.sign(vF) * Math.min(1, Math.abs(vF) / 8) * 1.2 : 0);
       v.yawRate += (wantRate - v.yawRate) * Math.min(1, dt * 9);
     } else {
       v.yawRate *= Math.max(0, 1 - dt * 0.5);   // õhus pöörlemine ei muutu kuigi palju
@@ -330,7 +370,7 @@ const Vehicles = (() => {
     } else {
       const vyG = (gy - v.y) / Math.max(dt, 1e-4);
       // maapind langeb kiiremini kui auto järgi jõuab -> lendu (ainult kiirusel)
-      if (gy < v.y - 0.25 && Math.abs(vF) > 9 && !paved) { v.air = true; v.vy = clamp(v.lastVy || 0, -2, 9); }
+      if (gy < v.y - 0.25 && Math.abs(vF) > 9 && !paved && !d.walker) { v.air = true; v.vy = clamp(v.lastVy || 0, -2, 9); }
       else { v.y += (gy - v.y) * Math.min(1, dt * 16); if (v.y < gy - 0.05) v.y = gy - 0.05; v.lastVy = clamp(vyG, -20, 20) * 0.6 + (v.lastVy || 0) * 0.4; }
     }
     v.comp = Math.max(0, (v.comp || 0) - dt * 0.8);
@@ -352,6 +392,7 @@ const Vehicles = (() => {
     }
     v.speed = vF; v.slip = Math.abs(vS);
     v.wheelRot += vF * dt / 0.45;
+    if (d.walker) { const w0 = v.walkPh || 0; v.walkPh = w0 + (Math.abs(vF) * 0.85 + Math.abs(v.yawRate) * 1.4) * dt; if (Math.floor(w0 / Math.PI) !== Math.floor(v.walkPh / Math.PI)) { UI.shake(Math.min(0.25, 0.08 + Math.abs(vF) * 0.02) * (Player.vehicle === v ? 1 : Math.max(0, 1 - Math.hypot(Player.pos.x - v.x, Player.pos.z - v.z) / 40))); Audio2.land && Audio2.land(); FX.dust(v.x + rand(-1, 1), v.y + 0.1, v.z + rand(-1, 1), 6, 1.5); } }
     // libisemisel tolm rataste alt
     if (!v.air && !paved && Math.abs(vS) > 3 && Math.random() < 0.7) FX.dust(v.x - fx * 1.2 + rand(-0.8, 0.8), v.y + 0.15, v.z - fz * 1.2 + rand(-0.8, 0.8), 2, 1.2);
     // olendid: vaenlased saavad löögi, omad lükatakse eest
@@ -409,7 +450,7 @@ const Vehicles = (() => {
       else if (drv !== Player) { v.throttle = 0; v.steerIn = 0; v.brake = v.speed !== 0 && Math.abs(v.speed) < 0.4 ? 1 : 0; }
       if (Math.abs(v.speed) > 0.01 || drv || v.air || (v.vx && Math.hypot(v.vx, v.vz) > 0.01) || Math.abs(v.y - groundAt(v.x, v.z, v.y)) > 0.02) step(v, dt);
       // istujad kaasa
-      for (let k = 0; k < 2; k++) {
+      for (let k = 0; k < seatsOf(v).length; k++) {
         const e = v.seats[k]; if (!e || e === Player) continue;
         if (!e.alive || e.downed) { leave(v, e); continue; }
         seatWorld(v, k, tmp2); e.pos.x = tmp2.x; e.pos.y = tmp2.y - (seatsOf(v)[k].sit ? 0.55 : 0); e.pos.z = tmp2.z; e.moveAmt = 0;
@@ -442,9 +483,10 @@ const Vehicles = (() => {
     v.seats[seat] = Player; Player.vehicle = v; Player.seat = seat; v.ai = null;
     Player.vel.x = Player.vel.y = Player.vel.z = 0;
     if (seat === 1 && DEF[v.type].gun) { Player._wBefore = Player.weapon; Player.weapon = 'bugmg'; if (!Player.mag.bugmg) reloadGun(v); }
+    if (DEF[v.type].mechGun) { Player._wBefore = Player.weapon; Player.weapon = 'minigun'; Player.yaw = v.yaw; Player.pitch = 0; if (!Player.mag.minigun) reloadGun(v); UI.toast('Mech online · WASD walk, mouse aims the minigun, hold E to climb out'); }
     Audio2.door(v.x, v.z);
     // jälgija hüppab kuulipilduja taha
-    if (seat === 0 && !v.seats[1] && typeof Crew !== 'undefined') {
+    if (seat === 0 && !v.seats[1] && seatsOf(v).length > 1 && typeof Crew !== 'undefined') {
       const f = Crew.followers().filter((e) => e.alive && !e.downed && Math.hypot(e.pos.x - v.x, e.pos.z - v.z) < 16).sort((a, b) => Math.hypot(a.pos.x - v.x, a.pos.z - v.z) - Math.hypot(b.pos.x - v.x, b.pos.z - v.z))[0];
       if (f) { v.seats[1] = f; f.inVehicle = v; UI.toast(f.crew.name.split(' ')[0] + (DEF[v.type].gun ? ' mans the machine gun' : ' rides along')); }
     }
@@ -471,11 +513,12 @@ const Vehicles = (() => {
     }
   }
   function reloadGun(v) {
-    const need = WEAPONS.bugmg.mag - (Player.mag.bugmg || 0); if (need <= 0) return true;
+    const wn = DEF[v.type].mechGun ? 'minigun' : 'bugmg';
+    const need = WEAPONS[wn].mag - (Player.mag[wn] || 0); if (need <= 0) return true;
     let got = Math.min(need, v.cargo.ammo_r || 0); v.cargo.ammo_r = (v.cargo.ammo_r || 0) - got;
     if (got < need) got += Inv.take('ammo_r', need - got) || 0;
     if (!got) { UI.toast('No rifle ammo in the cargo box or your backpack.'); return false; }
-    Player.mag.bugmg = (Player.mag.bugmg || 0) + got; Player.reloadT = 1.2; Audio2.reload(); return true;
+    Player.mag[wn] = (Player.mag[wn] || 0) + got; Player.reloadT = 1.2; Audio2.reload(); return true;
   }
   // mängija sõidukis (kutsub Player.update)
   function playerUpdate(P, dt, inp) {
@@ -486,6 +529,7 @@ const Vehicles = (() => {
     P.yaw -= inp.lookX; P.pitch = clamp(P.pitch - inp.lookY, -1.2, 1.2);
     if (inp.lookX || inp.lookY) P._lookT = 0; else P._lookT = (P._lookT || 0) + dt;
     const seat = P.seat;
+    if (DEF[v.type].mechGun) return mechUpdate(v, P, dt, inp);
     if (seat === 0) {
       v.throttle = inp.moveY; v.steerIn = inp.moveX; v.brake = 0; v.hand = !!inp.jump;   // tühik = käsipidur (drift)
       // kaamera pöörab ise sõidusuunda, kui hiirt/sõrme ei liigutata
@@ -528,10 +572,100 @@ const Vehicles = (() => {
     if (Base.isInside(P.pos.x, P.pos.z) && (Inv.count('kris') || Inv.count('scrap') || Inv.count('meat') || Inv.count('stones'))) P.deposit();
     Audio2.setListener(P.pos.x, P.pos.z, P.yaw);
   }
+  // mech: piloot kõnnib WASD-ga ja sihib hiirega (kere pöördub sihi suunas), minigun tulistab
+  function mechUpdate(v, P, dt, inp) {
+    v.throttle = inp.moveY; v.steerIn = inp.moveX; v.brake = 0; v.hand = false;
+    v.gunYaw = P.yaw; v.gunPitch = P.pitch;
+    const tw = angDiff(v.yaw, P.yaw); v.twist = clamp(tw, -1.3, 1.3);
+    M4.compose(v.m, v.x, v.y, v.z, v.yaw, 0, 0);
+    const ep = M4.point(v.m, 0, 4.25, 0, tmp);
+    P.pos.x = ep.x + Math.sin(P.yaw) * 0.9; P.pos.z = ep.z + Math.cos(P.yaw) * 0.9; P.pos.y = ep.y - P.eyeH + 0.55;
+    P.vel.x = Math.sin(v.yaw) * v.speed; P.vel.z = Math.cos(v.yaw) * v.speed; P.vel.y = 0; P.onGround = true; P.speedNow = 0; P.moveAmt = 0;
+    if ((inp.fire || inp.reload) && (P.mag.minigun || 0) <= 0 && P.reloadT <= 0) reloadGun(v);
+    if (P.reloadT > 0) P.reloadT -= dt;
+    else if (inp.fire && P.fireCool <= 0 && (P.mag.minigun || 0) > 0) { P.shoot(WEAPONS.minigun, inp); v.spin = 1; }
+    if (P.fireCool > 0) P.fireCool -= dt;
+    v.spin = Math.max(0, (v.spin || 0) - dt * 0.8); v.barrel = (v.barrel || 0) + v.spin * dt * 40;
+    P.recoil = Math.max(0, P.recoil - dt * 6); P.kick = Math.max(0, P.kick - dt * 8);
+    P.inter = { key: 'mech', label: 'Hold E: climb out', sub: 'Mech ' + Math.round(v.hp) + '/' + v.maxHp + ' hp · minigun ' + (P.mag.minigun || 0) + ' + ' + (v.cargo.ammo_r || 0) + ' rounds · R reload', hold: 0.8 };
+    if (inp.actHeld) { P.interT += dt; if (P.interT >= 0.8) { P.interT = 0; P._actUsed = true; leave(v, P); return; } } else { P.interT = 0; P._actUsed = false; }
+    Audio2.setListener(P.pos.x, P.pos.z, P.yaw);
+  }
+  // ---------- pooleli mech linnas: osad, kokkupanek ----------
+  const bayOf = () => (World.sites.city && World.sites.city.mechBay) || null;
+  function partName(k) { return MECH_PARTS[k] || 'mech part'; }
+  function partMesh() { if (!M) initMeshes(); return M.partCrate; }
+  function takePart(p) {
+    p.gone = true; const f = G.flags.mechFound = G.flags.mechFound || [];
+    if (!f.includes(p.data.part)) f.push(p.data.part);
+    const inst = (G.flags.mechInst || []).length, n = new Set([...f, ...(G.flags.mechInst || [])]).size;
+    Audio2.pickup(); UI.banner('Mech part found: ' + partName(p.data.part), n + ' / 5 parts · take it to the unfinished mech on the city plaza', 'good');
+    if (!G.flags.mechHint) { G.flags.mechHint = true; UI.msg('An old colony work mech stands half-built in the city square. Find all five parts in the city buildings and fit them to bring it to life.', 'money'); }
+    return inst;
+  }
+  function installParts() {
+    const f = G.flags.mechFound || [], ins = G.flags.mechInst = G.flags.mechInst || [];
+    for (const k of f) if (!ins.includes(k)) ins.push(k);
+    G.flags.mechFound = [];
+    Audio2.repair();
+    if (ins.length >= PART_KEYS.length) {
+      const b = bayOf(); G.flags.mechDone = true;
+      const v = spawn('mech', b.x, b.z, b.yaw, { cargo: { ammo_r: 900 } });
+      UI.banner('ATLAS MECH ONLINE', 'All five parts fitted. Climb in (E) – WASD walks, the mouse aims the minigun.', 'good'); Audio2.alarm && Audio2.alarm();
+      return v;
+    }
+    UI.toast('Parts fitted: ' + ins.length + ' / 5');
+    return null;
+  }
+  function bayMarker() {
+    const b = bayOf(); if (!b || G.flags.mechDone) return null;
+    const known = (G.flags.mechInst || []).length || (G.flags.mechFound || []).length || G.flags.mechSeen;
+    return known ? { x: b.x, z: b.z, icon: 'scrap', col: '#ff8a2a', label: 'Unfinished mech ' + (G.flags.mechInst || []).length + '/5', kind: 'bag' } : null;
+  }
+  function bayInteractions(consider) {
+    const b = bayOf(); if (!b || G.flags.mechDone) return;
+    const d = Math.hypot(b.x - Player.pos.x, b.z - Player.pos.z);
+    if (d < 45 && !G.flags.mechSeen) { G.flags.mechSeen = true; UI.msg('A half-built work mech stands in a gantry on the plaza. Its missing parts must be somewhere in the city.', 'money'); }
+    if (d > 7) return;
+    const ins = (G.flags.mechInst || []).length, f = (G.flags.mechFound || []).filter((k) => !(G.flags.mechInst || []).includes(k));
+    const miss = PART_KEYS.filter((k) => !(G.flags.mechInst || []).includes(k) && !f.includes(k)).map(partName);
+    if (f.length) consider({ key: 'mbay', label: 'Fit ' + f.length + ' mech part' + (f.length > 1 ? 's' : ''), sub: 'Fitted ' + ins + ' / 5' + (miss.length ? ' · still missing: ' + miss.join(', ') : ' · that completes it!'), hold: 2.5 + f.length, act: installParts, tick: () => FX.repair(b.x + rand(-1.5, 1.5), b.y + rand(1, 4), b.z + rand(-1.5, 1.5)) }, b.x, b.z, 6);
+    else consider({ key: 'mbay', label: 'Unfinished mech · ' + ins + ' / 5 parts', sub: 'Missing: ' + miss.join(', ') + ' – search the city buildings', disabled: true }, b.x, b.z, 6);
+  }
+  // pooleli mechi joonistus raamis (paigaldatud osad nähtavad)
+  const bayM = Array.from({ length: 10 }, () => M4.create());
+  function drawBay() {
+    const b = bayOf(); if (!b || G.flags.mechDone) return;
+    if (Math.hypot(GFX.cam.pos.x - b.x, GFX.cam.pos.z - b.z) > 500) return;
+    const ins = G.flags.mechInst || [], has = (k) => ins.includes(k);
+    drawMech({ x: b.x, y: b.y + 0.1, z: b.z, yaw: b.yaw, walkPh: 0, twist: 0.2, gunPitch: 0.25, barrel: 0, mm: bayM, dead: false, hurtT: 0 }, { legs: has('legs'), torso: has('torso') || has('cpu') || has('reactor'), gun: has('gun'), frame: true });
+  }
+  function drawMech(v, show) {
+    const ms = v.mm, R0 = ms[9], tint = v.dead ? [0.3, 0.27, 0.25, 0] : v.hurtT > 0 ? [1.6, 0.7, 0.6, 0] : null, o = { rust: v.dead ? 0.9 : 0.35 };
+    const ph = v.walkPh || 0, lift = Math.abs(Math.sin(ph)) * 0.12;
+    M4.compose(R0, v.x, v.y + 3.2 + lift - (show.legs ? 0 : 0), v.z, v.yaw, 0, 0);
+    GFX.draw(M.mPelvis, R0, tint, null, o);
+    if (show.legs) for (const sd of [1, -1]) {
+      const sw = Math.sin(ph + (sd > 0 ? 0 : Math.PI)) * 0.42, knee = Math.max(0, -Math.cos(ph + (sd > 0 ? 0 : Math.PI))) * 0.55 + 0.15;
+      const th = ms[sd > 0 ? 0 : 2], sh = ms[sd > 0 ? 1 : 3];
+      M4.child(th, R0, sd * 1.05, 0, 0, 0, -sw - 0.12, 0); GFX.draw(M.mThigh, th, tint, null, o);
+      M4.child(sh, th, 0, -1.55, 0, 0, knee, 0); GFX.draw(M.mShin, sh, tint, null, o);
+    }
+    if (show.torso) {
+      const T = ms[4]; M4.child(T, R0, 0, 0.3, 0, v.twist || 0, 0, 0);
+      if (!(Player.vehicle && Player.vehicle.mm === v.mm)) GFX.draw(M.mTorso, T, tint, null, o);
+      if (show.gun) for (const sd of [1, -1]) {
+        const A = ms[sd > 0 ? 5 : 6], Bm = ms[sd > 0 ? 7 : 8];
+        M4.child(A, T, sd * 1.6, 1.0, 0.1, 0, -(v.gunPitch || 0), 0); GFX.draw(M.mArm, A, tint, null, o);
+        M4.child(Bm, A, 0, 0, 1.0, 0, 0, (v.barrel || 0) * sd); GFX.draw(M.mBarrel, Bm, tint, null, o);
+      }
+    }
+  }
   // mängija kaamera sõidukis
   function camera(C) {
     const v = Player.vehicle;
     if (Player.seat === 1 && DEF[v.type].gun) return false;   // kuulipilduja: esimese isiku vaade
+    if (DEF[v.type].mechGun) return false;   // mech: kabiinivaade
     const ty = v.y + 1.7;
     const dist = 7.2, cp = Math.cos(Player.pitch), sp = Math.sin(Player.pitch);
     let cx = v.x - Math.sin(Player.yaw) * cp * dist, cz = v.z - Math.cos(Player.yaw) * cp * dist, cy = ty - sp * dist + 0.8;
@@ -542,6 +676,7 @@ const Vehicles = (() => {
   }
   // mängija interaktsioonid sõiduki juures (Player.findInteract kutsub)
   function interactions(consider) {
+    bayInteractions(consider);
     for (const v of list) {
       if (Math.hypot(v.x - Player.pos.x, v.z - Player.pos.z) > 5) continue;
       M4.compose(v.m, v.x, v.y, v.z, v.yaw, v.pitch, v.roll);
@@ -549,6 +684,12 @@ const Vehicles = (() => {
       const nm = nameOf(v).toLowerCase(), GN = DEF[v.type].gun;
       if (v.team !== 'crew' && v.seats.some(Boolean)) continue;
       if (v.dead) { consider({ key: 'vd' + v.id, label: 'Strip the ' + nm + ' wreck', sub: 'Get scrap back · a new buggy can be bought at the car lift', hold: 2.0, act: () => { const n = Math.min(40, Inv.room('scrap')); if (n > 0) Inv.add('scrap', n); list.splice(list.indexOf(v), 1); UI.toast('+' + n + ' scrap from the wreck'); Audio2.repair(); }, tick: () => FX.repair(v.x + rand(-1, 1), v.y + 0.8, v.z + rand(-1, 1)) }, v.x, v.z, 3.5); continue; }
+      if (DEF[v.type].walker) {
+        if (!v.seats[0]) consider({ key: 've' + v.id, label: 'Climb into the mech', sub: 'hp ' + Math.round(v.hp) + '/' + v.maxHp + ' · ammo ' + (v.cargo.ammo_r || 0), act: () => enter(v, 0) }, v.x, v.z, 4.5);
+        const rc = repairCost(v); if (rc > 0 && !v.seats[0]) consider({ key: 'vr' + v.id, label: 'Repair the mech', sub: rc + ' scrap', hold: 3, act: () => { if (!repair(v)) { UI.toast('Not enough scrap (' + rc + ')'); Audio2.deny(); } }, tick: () => FX.repair(v.x + rand(-1, 1), v.y + rand(1, 4), v.z + rand(-1, 1)) }, v.x, v.z, 5);
+        if (Inv.count('ammo_r')) consider({ key: 'va' + v.id, label: 'Load rifle ammo into the mech', sub: Inv.count('ammo_r') + ' rounds in your pack', hold: 0.8, act: () => { const n = Inv.take('ammo_r', Inv.count('ammo_r')) || 0; v.cargo.ammo_r = (v.cargo.ammo_r || 0) + n; UI.toast('+' + n + ' rounds in the mech'); } }, v.x, v.z, 5);
+        continue;
+      }
       if (!v.seats[0]) consider({ key: 've' + v.id, label: (v.team === 'crew' ? 'Drive the ' : 'Steal the ') + nm, sub: 'hp ' + Math.round(v.hp) + '/' + v.maxHp + ' · cargo: ' + cargoText(v), act: () => enter(v, 0) }, dp.x, dp.z, 3.4);
       if (!v.seats[1] && GN && v.team === 'crew') consider({ key: 'vg' + v.id, label: 'Man the machine gun', sub: 'ammo in cargo ' + (v.cargo.ammo_r || 0), act: () => enter(v, 1) }, rp.x + Math.sin(v.yaw) * 0.6, rp.z + Math.cos(v.yaw) * 0.6, 2.6);
       if (v.team !== 'crew') continue;
@@ -618,12 +759,12 @@ const Vehicles = (() => {
     const dOf = (v) => Math.hypot(v.x - e.pos.x, v.z - e.pos.z);
     // juba väljasõitev sõiduk sama sihtkohaga -> kõrvalistmele (kuulipilduja taha)
     for (const v of list) {
-      if (v.dead || v.team !== team || !v.ai || v.ai.go || !freeSeat(v, 1) || dOf(v) > WALK_R) continue;
+      if (v.dead || DEF[v.type].walker || v.team !== team || !v.ai || v.ai.go || !freeSeat(v, 1) || dOf(v) > WALK_R) continue;
       if (Math.hypot(v.ai.dest.x - x, v.ai.dest.z - z) > 40 && !(v.ai.home && Bases.at(x, z) === Bases.at(v.ai.dest.x, v.ai.dest.z) && Bases.at(x, z))) continue;
       claim(v, e, 1, x, z, goalCells, lv); return true;
     }
     // vaba sõiduk: ainult siis, kui sinna kõndimine on palju lühem kui teekond ise
-    const v = list.filter((q) => !q.dead && q.team === team && freeSeat(q, 0) && !q.seats[1] && q !== Player.vehicle && dOf(q) < WALK_R && dOf(q) < dist * 0.4)
+    const v = list.filter((q) => !q.dead && !DEF[q.type].walker && q.team === team && freeSeat(q, 0) && !q.seats[1] && q !== Player.vehicle && dOf(q) < WALK_R && dOf(q) < dist * 0.4)
       .sort((a, b) => dOf(a) - dOf(b))[0];
     if (!v) return false;
     // sihtpunkt: baasi puhul garaaži tõstuk (kui on), muidu otse
@@ -785,7 +926,9 @@ const Vehicles = (() => {
   const figs = [{ id: 9001, team: 'player', pos: { x: 0, y: 0, z: 0 }, yaw: 0, phase: 0, moveAmt: 0, aim: 0, pose: 'sit', hasGun: false, hurtT: 0, flash: 0, kind: 'human', seated: true }];
   function draw() {
     if (!M) initMeshes();
+    drawBay();
     for (const v of list) {
+      if (DEF[v.type].walker) { if (!v.mm) v.mm = Array.from({ length: 10 }, () => M4.create()); drawMech(v, { legs: true, torso: true, gun: true }); if (!v.dead && GFX.env.night > 0.35) GFX.addLight(v.x + Math.sin(v.yaw + (v.twist || 0)) * 8, v.y + 3, v.z + Math.cos(v.yaw + (v.twist || 0)) * 8, 18, 1, 0.9, 0.75, 1.8); continue; }
       M4.compose(v.m, v.x, v.y - (v.comp || 0), v.z, v.yaw, v.pitch, v.roll);
       const tint = v.dead ? [0.25, 0.22, 0.2, 0] : v.hurtT > 0 ? [1.6, 0.7, 0.6, 0] : null;
       const d = DEF[v.type];
@@ -822,5 +965,5 @@ const Vehicles = (() => {
   function reset() { for (const v of list) for (const e of v.seats) if (e && e !== Player) { e.inVehicle = null; e.ride = null; } list.length = 0; if (typeof Player !== 'undefined') { Player.vehicle = null; Player.seat = 0; } }
 
   return { DEF, list, initMeshes, spawn, near, update, draw, enter, leave, playerUpdate, camera, interactions, liftInteraction, serialize, deserialize, reset, cargoCount, sound,
-    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, walkStep, releaseClaim, freeGunPost, manGun, rivalBuy, teamVehicles, nameOf, cargoText };
+    canBuy, buy, repair, repairCost, sell, owned, vehicleOnLift, tryRide, walkStep, releaseClaim, freeGunPost, manGun, rivalBuy, teamVehicles, nameOf, cargoText, partName, partMesh, takePart, bayMarker, installParts };
 })();

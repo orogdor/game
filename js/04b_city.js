@@ -367,6 +367,25 @@ const City = (() => {
       gl.color(ACC[1], MAT.GLOW).push().tf((ax + sp.x) / 2, yy, (az + sp.z) / 2, yaw, 0, 0).box(1.43, 0, 0, 0.04, 0.4, L - 17).box(-1.43, 0, 0, 0.04, 0.4, L - 17).pop();
       for (const t of [0.35, 0.65]) { const px = sp.x + (ax - sp.x) * t, pz = sp.z + (az - sp.z) * t; b.color(FRAME, MAT.METAL).push().tf(px, Y(px, pz) - 0.3, pz, yaw, 0, 0).boxB(0, 0, 0, 1.4, yy - Y(px, pz) - 1.1, 1.4).pop(); World.addCol({ t: 'c', x: px, z: pz, r: 1.0, y0: y0 - 1, y1: yy, kind: 'struct' }); take(px, pz, 1.2); }
     }
+    // pooleli mech: kokkupanekuhall väljakul (osad on linna majadesse laiali)
+    { let bay = null;
+      for (let k = 0; k < 40 && !bay; k++) { const a = k / 40 * TAU + 0.3, rr = 40, x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr; if (free(x, z, 7.5) && !nearRadial(x, z, RW + 7.5)) bay = { x, z }; }
+      if (!bay) bay = { x: c.x + 36, z: c.z + 30 };
+      take(bay.x, bay.z, 7.5);
+      const yaw = Math.atan2(c.x - bay.x, c.z - bay.z), y0 = Y(bay.x, bay.z), fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+      c.mechBay = { x: bay.x, z: bay.z, y: y0, yaw };
+      b.push().tf(bay.x, y0, bay.z, yaw, 0, 0);
+      b.color([0.24, 0.24, 0.25], MAT.METAL).boxB(0, -0.2, 0, 9, 0.3, 9);
+      hazardZ(4.3, 0.1, 0, 0.4, 0.04, 9); hazardZ(-4.3, 0.1, 0, 0.4, 0.04, 9);
+      for (const sx of [-1, 1]) { b.color(STEEL, MAT.METAL).boxB(sx * 3.9, 0, -1.5, 0.9, 10, 0.9); b.color(STEEL, MAT.METAL).boxB(sx * 3.9, 0, 1.5, 0.6, 10, 0.6); for (let k = 0; k < 4; k++) b.color(FRAME, MAT.METAL).boxB(sx * 3.9, 2 + k * 2.2, 0, 0.3, 0.3, 3); }
+      b.color([0.86, 0.66, 0.12], MAT.METAL).boxB(0, 10, -1.5, 8.8, 0.8, 0.9); b.color(FRAME, MAT.METAL).boxB(0, 10, 1.5, 8.6, 0.5, 0.6);
+      b.color(DARK, MAT.METAL).boxB(1.2, 6.5, -1.5, 0.05, 3.5, 0.05); b.color(HY, MAT.METAL).boxB(1.2, 6.0, -1.5, 0.6, 0.5, 0.4);
+      for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) b.color(FRAME, MAT.METAL).boxB(sx * 2.6, 2.4 + k * 2.4, -2.2, 1.8, 0.12, 0.8);   // hoolduspoodiumid
+      b.color([0.3, 0.3, 0.32], MAT.WORN).boxB(-3.2, 0, 3.4, 1.4, 1.3, 0.9); gl.push().tf(bay.x, y0, bay.z, yaw, 0, 0).color(ACC[2], MAT.GLOW).boxB(-3.2, 1.0, 3.86, 0.9, 0.25, 0.02).pop();
+      b.pop();
+      for (const sx of [-1, 1]) for (const sz of [-1.5, 1.5]) World.addCol({ t: 'c', x: bay.x + rx * sx * 3.9 + fx * sz, z: bay.z + rz * sx * 3.9 + fz * sz, r: 0.6, y0: y0 - 1, y1: y0 + 10.5, kind: 'struct' });
+      beacon(bay.x + rx * 4.3, y0 + 10.7, bay.z + rz * 4.3); beacon(bay.x - rx * 4.3, y0 + 10.7, bay.z - rz * 4.3);
+    }
     monorail(140, 40);
     // kvartali tüübid: elamud, tööstus, tornid, kasvuhooned
     const THEMES = { res: [['hab', 6], ['hab2', 3], ['spire_s', 1], ['dish', 0.6]], ind: [['tanks', 3], ['cont', 3], ['hall', 3], ['crane', 1.2], ['hab', 1.5]],
@@ -500,6 +519,11 @@ const City = (() => {
       w.col = World.addCol({ t: 'c', x, z, r: 2.0, y0: y - 2, y1: y + 2, kind: 'wreck' });
       World.wrecks.push(w);
     }
+    // mechi osade kohad: 5 eri majas, üksteisest kaugel
+    { const pts = []; const pool = lootSpots.slice();
+      for (let t = 0; t < 400 && pts.length < 5 && pool.length; t++) { const q = pool[Math.floor(rng() * pool.length)]; if (pts.every((o) => Math.hypot(o.x - q.x, o.z - q.z) > 60)) pts.push(q); }
+      for (let t = 0; t < 50 && pts.length < 5 && pool.length; t++) { const q = pool[Math.floor(rng() * pool.length)]; if (!pts.includes(q)) pts.push(q); }
+      c.mechParts = pts; }
     mesh = b.build(); glow = gl.build(); domes = dm.build();
     // ---- väikesed mahajäetud asulad: 2–4 koloonia maja, vallijupid, vanaraud, veidi varustust ----
     b = new MB(); b.jit = 0; gl = new MB(); gl.jit = 0; dm = new MB(); dm.jit = 0;
@@ -568,6 +592,8 @@ const City = (() => {
   const LOOT = [['ammo_r', 60, 120], ['ammo_p', 40, 80], ['ammo_s', 12, 24], ['medkit', 1, 3], ['trauma', 1, 1], ['grenade', 1, 3], ['ration', 2, 4], ['stim', 1, 2], ['scrap', 15, 35],
     ['smg', 1, 1], ['shotgun', 1, 1], ['dmr', 1, 1], ['revolver', 1, 1], ['vest', 1, 1], ['helmet2', 1, 1], ['boots', 1, 1], ['pack_m', 1, 1], ['ammo_sn', 10, 20], ['ashot', 1, 1], ['plasma', 1, 1]];
   function spawnLoot() {
+    const parts = ['legs', 'torso', 'gun', 'reactor', 'cpu'], c = World.sites.city;
+    (c.mechParts || []).forEach((q, k) => { if (parts[k]) Ents.pickups.push({ kind: 'mechpart', x: q.x, y: Ents.groundY(q.x, q.z), z: q.z, data: { part: parts[k] }, id: Math.random(), city: true }); });
     for (const s of vLoot) if (Math.random() < 0.6) { const items = []; for (let q = 0; q < randi(1, 3); q++) { const [id, a, bb] = LOOT[Math.floor(Math.random() * 9)]; if (ITEMS[id]) items.push([id, randi(a, bb)]); } Ents.pickups.push({ kind: 'bag', x: s.x, y: Ents.groundY(s.x, s.z), z: s.z, data: { items }, id: Math.random(), city: true }); }
     const used = new Set();
     for (let k = 0; k < 18 && lootSpots.length; k++) {

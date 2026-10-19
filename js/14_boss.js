@@ -101,7 +101,7 @@ const Boss = (() => {
       }
     } else if (idx === 9) {
       // süda: soomusplaatide vahelt läbib ainult raske relv (sõiduki kuulipilduja, rööbaskahur); käsirelvad veerandi
-      const hv = src === Player ? (Player.weapon === 'bugmg' ? 1.6 : Player.weapon === 'rail' || Player.weapon === 'gl' ? 0.6 : 0.25) : 0.25;
+      const hv = src === Player ? (Player.weapon === 'bugmg' || Player.weapon === 'minigun' ? 1.6 : Player.weapon === 'rail' || Player.weapon === 'gl' ? 0.6 : 0.25) : 0.25;
       e.heartHp -= dmg * hv; e.heartHit = G.time.total;
       FX.sparks(x, y, z, [1, 0.4, 0.6], 10, 5);
       UI.hitMarker(false);
