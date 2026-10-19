@@ -184,7 +184,7 @@ const UI = (() => {
     out.push({ x: 0, z: 0, icon: 'house', col: '#eedfc6', label: 'Base', kind: 'base' });
     for (const s of Comets.sites) {
       if (!s.clusters.length) continue;
-      out.push({ x: s.x + s.ox, z: s.z + s.oz, icon: 'crystal', col: '#92d9ff', label: s.loose ? 'Diamonds' : 'Comet', kind: 'comet', approx: !s.exact });
+      out.push({ x: s.x + s.ox, z: s.z + s.oz, icon: 'crystal', col: '#92d9ff', label: s.loose ? 'Diamonds' : s.exact ? 'Comet' : 'Comet (rough area)', kind: 'comet', approx: !s.exact, r: s.r || 28 });
     }
     if (!G.flags.nestKnown && Boss.e && Boss.e.alive) out.push({ x: World.sites.nest.x, z: World.sites.nest.z, icon: 'heart', col: '#c58bff', label: 'Pillar of light?', kind: 'nest' });
     if (G.flags.nestKnown && !G.flags.stonesHome) out.push({ x: World.sites.nest.x, z: World.sites.nest.z, icon: 'heart', col: '#ff8fd0', label: 'Stoneheart', kind: 'nest' });
@@ -200,7 +200,8 @@ const UI = (() => {
     }
     const wm = Waves.marker(); if (wm) out.push({ x: wm.x, z: wm.z, icon: 'flag', col: '#9ccf5a', label: 'Swarm', kind: 'wave' });
     if (waypoint) out.push({ x: waypoint.x, z: waypoint.z, icon: 'pin', col: '#ddb45c', label: 'Waypoint', kind: 'wp' });
-    return out;
+    // sõjaudu: ainult nähtud kohad (baas, komeedid raadio järgi, valgussammas, parv ja teekoht alati)
+    return out.filter((m) => m.kind === 'base' || m.kind === 'comet' || m.kind === 'nest' || m.kind === 'wave' || m.kind === 'wp' || Fog.seen(m.x, m.z));
   }
   function updateCompass() {
     const W = $('compass').clientWidth;
@@ -248,10 +249,11 @@ const UI = (() => {
     const mpp = World.SIZE / World.RES; // meetrit pikslis
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(mapCanvas, (-World.HALF - px) * k, (-World.HALF - pz) * k, World.SIZE * k + mpp * k, World.SIZE * k + mpp * k);
+    if (Fog.isOn()) ctx.drawImage(Fog.canvas(), (-World.HALF - px) * k, (-World.HALF - pz) * k, World.SIZE * k, World.SIZE * k);
     // baasi ruumid
     ctx.fillStyle = 'rgba(238,223,198,.85)';
     for (const b of Bases.list) {
-      if (Math.abs(b.OX - px) > viewR + 50 || Math.abs(b.OZ - pz) > viewR + 50) continue;
+      if (Math.abs(b.OX - px) > viewR + 50 || Math.abs(b.OZ - pz) > viewR + 50 || b !== Base && !Fog.seen(b.OX, b.OZ)) continue;
       ctx.fillStyle = b === Base ? 'rgba(238,223,198,.85)' : 'rgba(255,120,95,.75)';
       for (const r of b.rooms.values()) for (const [i, j] of r.cells) ctx.fillRect((b.X0 + i * b.CS - px) * k, (b.Z0 + j * b.CS - pz) * k, b.CS * k + 0.6, b.CS * k + 0.6);
     }
@@ -272,7 +274,7 @@ const UI = (() => {
       const dx = m.x - px, dz = m.z - pz;
       let x = dx * k, z = dz * k; const d = Math.hypot(x, z);
       if (d > R - 9) { x *= (R - 9) / d; z *= (R - 9) / d; }
-      if (m.approx && d < R - 9) { ctx.strokeStyle = m.col; ctx.globalAlpha = 0.6; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, z, 28 * k, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
+      if (m.approx && d < R - 9) { ctx.strokeStyle = m.col; ctx.globalAlpha = 0.6; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, z, (m.r || 28) * k, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
       ctx.fillStyle = m.col; ctx.strokeStyle = '#120d0b'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, z, 5, 0, TAU); ctx.fill(); ctx.stroke();
     }
@@ -329,7 +331,7 @@ const UI = (() => {
     $('dmg').style.opacity = Math.max(dmgV, lowHp, Player.dead ? 0.8 : 0);
     if (dmgDirT > 0) { dmgDirT -= dt; if (dmgDirT <= 0) $('dmgDir').style.opacity = 0; }
     shakeV = Math.max(0, shakeV - dt * 1.6);
-    if (panelKind && G.mode !== 'title') { panelRefreshT -= dt; if (panelRefreshT <= 0) { panelRefreshT = 0.5; if ((panelKind === 'crew' && !(document.activeElement && document.activeElement.id === 'cheatIn')) || (panelKind === 'terminal' && panelTab === 'pank')) renderPanel(true); } }
+    if (panelKind && G.mode !== 'title') { panelRefreshT -= dt; if (panelRefreshT <= 0) { panelRefreshT = 0.5; if ((panelKind === 'crew' && !(document.activeElement && (document.activeElement.id === 'cheatIn' || document.activeElement.tagName === 'SELECT'))) || (panelKind === 'terminal' && panelTab === 'pank')) renderPanel(true); } }
   }
   function updatePrompt() {
     const it = Player.inter;
@@ -661,16 +663,35 @@ const UI = (() => {
         ${Levels.badges(c, false)}
         <div class="money">${c.wage} ₵ per day${c.bed ? '' : ' · <span style="color:var(--danger)">no bed</span>'}</div>
         ${crewGear(m)}
+        ${jobSel(m)}
         <div class="row">${btn('fol:' + m.id, c.follow ? 'Send back to work' : 'Ask to follow', c.follow ? { primary: true } : {})}${btn('fire:' + m.id, fireConfirm === m.id ? 'Kinnita: vallanda' : 'Dismiss')}</div></div>`;
     }
     h += '</div>';
     h += `<div class="row" style="margin-top:14px"><input id="cheatIn" placeholder="Code" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);color:inherit;font:inherit">${btn('cheat', 'OK')}</div>`;
     body.innerHTML = h;
+    for (const sel of body.querySelectorAll('select.jobsel')) sel.onchange = () => {
+      const m = ms.find((q) => String(q.id) === sel.dataset.id); if (!m) return;
+      const c = m.crew, slot = sel.dataset.slot, v = sel.value || null;
+      c[slot] = v === 'auto' && slot !== 'job' ? null : v;
+      if (slot === 'job' && (!v || v === 'auto')) { c.job2 = null; c.job3 = null; }
+      if (c.task && !c.follow && !(c.task.type === 'post' && !c.task.watch) && c.task.type !== 'sleep') c.task.done = true;
+      Audio2.ui(); toast(c.name.split(' ')[0] + ': ' + (c.job && c.job !== 'auto' ? [c.job, c.job2, c.job3].filter(Boolean).map((j) => JOBS[j].name).join(' → ') : 'decides by themselves'));
+      sel.blur(); renderPanel(true);
+    };
     const ci = $('cheatIn'); if (ci) ci.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { tryCode(ci.value); ci.value = ''; } };
     bindActs(body, { cheat: () => { const c = $('cheatIn'); if (c) { tryCode(c.value); c.value = ''; } }, ceq: (a) => { const [id, key] = a.split(':'); const m = ms.find((q) => String(q.id) === id); if (m) cycleCrewGear(m, key); renderPanel(true); },
       fol: (id) => { const m = ms.find((q) => String(q.id) === id); if (m) Crew.setFollow(m, !m.crew.follow); renderPanel(true); },
       folall: () => { const on = ms.some((m) => !m.crew.follow); for (const m of ms) if (m.crew.follow !== on) Crew.setFollow(m, on); renderPanel(true); },
       fire: (id) => { const m = ms.find((q) => String(q.id) === id); if (!m) return; if (fireConfirm === m.id) { Crew.fire(m); fireConfirm = null; } else fireConfirm = m.id; renderPanel(true); } });
+  }
+  // ametid: põhiamet + 2 vähemtähtsat
+  function jobSel(m) {
+    const c = m.crew, main = c.job && c.job !== 'auto';
+    const opt = (cur, none) => (none ? `<option value="">— none —</option>` : '') + Object.keys(JOBS).filter((j) => !none || j !== 'auto').map((j) => `<option value="${j}" ${cur === j ? 'selected' : ''}>${JOBS[j].name}</option>`).join('');
+    const sel = (slot, cur, none, dis) => `<select class="jobsel" data-id="${m.id}" data-slot="${slot}" ${dis ? 'disabled' : ''} title="${slot === 'job' ? 'Main job' : slot === 'job2' ? '2nd job – when the main job has nothing to do' : '3rd job – last choice'}">${opt(cur, none)}</select>`;
+    const auto = ROLE_JOB[c.role] === 'miner' ? 'diamonds + scrap' : (JOBS[ROLE_JOB[c.role]] || {}).name || '';
+    return `<div class="jobs"><span class="jl">Job · then 2nd / 3rd</span>${sel('job', c.job || 'auto', false)}${sel('job2', c.job2 || '', true, !main)}${sel('job3', c.job3 || '', true, !main || !c.job2)}</div>
+      <div class="note jdesc">${main ? esc(JOBS[c.job].desc) : 'Automatic: works as a ' + ROLES[c.role].name.toLowerCase() + ' (' + auto.toLowerCase() + ').'}</div>`;
   }
   // meeskonna varustus: klõps vahetab hoidlas oleva järgmise eseme vastu (vana läheb hoidlasse)
   const CREW_EQ = [['helmet', 'Helmet'], ['vest', 'Vest'], ['gloves', 'Gloves'], ['boots', 'Boots'], ['pack', 'Bag']];
@@ -696,6 +717,7 @@ const UI = (() => {
     $('pTitle').textContent = 'Map'; $('pTabs').innerHTML = '';
     body.innerHTML = `<canvas id="mapCv" width="640" height="640"></canvas>
       <div class="legend"><span><i style="background:#eedfc6"></i>Base</span><span><i style="background:#92d9ff"></i>Comet</span><span><i style="background:#ff6d55"></i>Krell-Varga</span><span><i style="background:#a9a39a"></i>Old city</span><span><i style="background:#b796ff"></i>Clan</span><span><i style="background:#ff8fd0"></i>Stoneheart</span><span><i style="background:#ddb45c"></i>Waypoint / items</span><span><i style="background:#9a8f80"></i>Wreck</span></div>
+      <div class="note">Dark areas are unexplored – they clear where you or your crew have been. Scouts explore by themselves; a circle means only the rough area is known.</div>
       <div class="row"><div class="grow note">Tap the map to mark a waypoint on the compass.</div>${btn('clear', 'Remove waypoint', { disabled: !waypoint })}</div>`;
     const cv = $('mapCv');
     drawBigMap(cv);
@@ -712,15 +734,16 @@ const UI = (() => {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(mapCanvas, 0, 0, S, S);
     ctx.fillStyle = 'rgba(17,13,11,.18)'; ctx.fillRect(0, 0, S, S);
+    if (Fog.isOn()) ctx.drawImage(Fog.canvas(), 0, 0, S, S);
     const P = (x, z) => [(x + World.HALF) * k, (z + World.HALF) * k];
-    for (const w of World.wrecks) { if (w.gone || w.scrap <= 0) continue; const [x, y] = P(w.x, w.z); ctx.fillStyle = w.scrap > 0 ? '#9a8f80' : '#5a5148'; ctx.fillRect(x - 3, y - 3, 6, 6); }
+    for (const w of World.wrecks) { if (w.gone || w.scrap <= 0 || !Fog.seen(w.x, w.z)) continue; const [x, y] = P(w.x, w.z); ctx.fillStyle = w.scrap > 0 ? '#9a8f80' : '#5a5148'; ctx.fillRect(x - 3, y - 3, 6, 6); }
     // rauamaak: nähtud kivid; maagipuuriga tuleb kaasa uuringukaart (kõik kivid)
-    for (const o of World.ores) { if (o.gone || o.amount <= 0 || !(o.known || G.flags.drill)) continue; const [x, y] = P(o.x, o.z); ctx.fillStyle = '#c8643c'; ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x + 4, y + 3); ctx.lineTo(x - 4, y + 3); ctx.closePath(); ctx.fill(); }
+    for (const o of World.ores) { if (o.gone || o.amount <= 0 || !(o.known || G.flags.drill && Fog.seen(o.x, o.z))) continue; const [x, y] = P(o.x, o.z); ctx.fillStyle = '#c8643c'; ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x + 4, y + 3); ctx.lineTo(x - 4, y + 3); ctx.closePath(); ctx.fill(); }
     ctx.fillStyle = 'rgba(238,223,198,.9)';
-    for (const b of Bases.list) { ctx.fillStyle = b === Base ? 'rgba(238,223,198,.9)' : 'rgba(255,120,95,.85)'; for (const r of b.rooms.values()) for (const [ci, cj] of r.cells) { const [x, y] = P(b.X0 + ci * b.CS, b.Z0 + cj * b.CS); ctx.fillRect(x, y, b.CS * k + 0.5, b.CS * k + 0.5); } }
+    for (const b of Bases.list) { if (b !== Base && !Fog.seen(b.OX, b.OZ)) continue; ctx.fillStyle = b === Base ? 'rgba(238,223,198,.9)' : 'rgba(255,120,95,.85)'; for (const r of b.rooms.values()) for (const [ci, cj] of r.cells) { const [x, y] = P(b.X0 + ci * b.CS, b.Z0 + cj * b.CS); ctx.fillRect(x, y, b.CS * k + 0.5, b.CS * k + 0.5); } }
     for (const m of markers()) {
       const [x, y] = P(m.x, m.z);
-      if (m.approx) { ctx.strokeStyle = m.col; ctx.lineWidth = 2; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.arc(x, y, 28 * k, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
+      if (m.approx) { ctx.strokeStyle = m.col; ctx.lineWidth = 2; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.arc(x, y, Math.max(5, (m.r || 28) * k), 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
       ctx.fillStyle = m.col; ctx.strokeStyle = '#120d0b'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.arc(x, y, m.kind === 'base' ? 8 : 6.5, 0, TAU); ctx.fill(); ctx.stroke();
       ctx.font = '600 13px "Barlow Semi Condensed", sans-serif'; ctx.fillStyle = '#eedfc6'; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 3;
@@ -945,6 +968,7 @@ const UI = (() => {
       <h4>The story</h4><p>This was a colony world getting rich fast. Then a huge ship that was refuelling in orbit came down in the desert – and out of the wreck crawled the <b>Stoneheart</b>, a giant alien. Its workers, the acid mantises and the bug swarms, took the planet over. The colonists fled and left everything behind.</p>
       <p>Now someone has invented the <b>base heart</b>: a device whose hum keeps the sandworms away from buildings. People can settle here again. Whoever brings in the Stoneheart's heartstones – the proof that it is dead – gets the colonisation rights to the whole planet. That proof is worth a fortune.</p>
       <p>The ruins of the <b>old colony city</b> lie at the edge of the map, farther out than any camp. The noise and the lights draw aliens there, but the city is full of scrap and abandoned gear. Abandoned <b>villages</b> each hide one colony technology: the farmstead a pressure cooker (faster cooking), the mining camp a diamond drill head, the workshop a plasma cutter, the medical station an auto-doctor and the relay station a trade uplink – plus credit chips and scrap. Watch out for acid gliders that dive from the sky, poison bloaters that burst when they get close (shoot them from afar) and armoured siege beetles that shell buildings with acid – hit them from the side or back. The deadliest flyer is the <b>motion hunter</b>: it patrols a fixed route high over the desert and sees only things that MOVE – if it shrieks, stand still and it loses you (it also hunts goats). Sand eels swim under the dunes (watch for moving spines), stone spitters rooted in place shoot acid, brood mothers drop fast larvae, and at night the near-invisible shade-stalker blinks behind you to strike. Old <b>road tunnels</b> lead through the mountains – hippo-sized burrow beasts live in them, but the tunnel crews left gear behind that you can't buy anywhere (an arc thrower and an exo rig). A half-built work <b>mech</b> stands in a gantry on the city plaza: find its five parts in the city buildings, fit them and you get a walking armour with a minigun.</p>
+      <p><b>Jobs and exploring.</b> The map only shows what you or your crew have actually seen – the rest stays dark. In the Crew panel give each hired person a <b>job</b> (plus an optional 2nd and 3rd job they do when the main one has nothing to do): Automatic, Hunter, Diamond hunter, Scrap collector, Base defender, Scout, Mechanic, Cook, Farmer, Medic or Researcher. People with the same job head out together in groups of 2–3. The radar now only pins comets near the base exactly – farther away it shows a rough circle, and a <b>scout</b> (or you) has to go and find the exact spot before diamond hunters go there. Base defenders stay home and man towers, MG nests and ramparts even between attacks.</p>
       <h4>Objective</h4><p>Keep the station and its heart alive, pay the bank its instalments and kill the Stoneheart. Its heartstones prove the kill and wipe out the whole debt. Two rivals are hunting the same thing.</p>
       <h4>Phone controls</h4><ul><li>Left thumb: move. Push all the way to run.</li><li>Right side: look around. Slide your finger on the fire button to aim at the same time.</li><li>The action button appears when there's something to do. Some actions must be held.</li><li>The hammer opens building, the minimap opens the big map.</li></ul>
       <h4>Computer controls</h4><ul><li><kbd>WASD</kbd> move, <kbd>Shift</kbd> run, <kbd>Space</kbd> jump, mouse to look and shoot, right button or <kbd>Z</kbd> aims down the sights (more accurate, slower).</li><li><kbd>V</kbd> call nearby companions to follow you (press again to send them back). In front of a companion <kbd>E</kbd> calls one.</li><li><kbd>E</kbd> action (hold), <kbd>R</kbd> reload, <kbd>Q</kbd> switch weapon.</li><li><kbd>B</kbd> build, <kbd>T</kbd> terminal, <kbd>C</kbd> crew, <kbd>M</kbd> map, <kbd>Esc</kbd> pause.</li><li>While building: <kbd>WASD</kbd> move the camera, <kbd>Q</kbd>/<kbd>E</kbd> rotate, <kbd>R</kbd> rotate item, <kbd>Ctrl+Z</kbd> undo.</li></ul>

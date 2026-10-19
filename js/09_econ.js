@@ -88,6 +88,21 @@ const ROLES = {
   arst: { name: 'Medic', wage: 32, desc: 'Heals the wounded and you too.' },
   teadlane: { name: 'Scientist', wage: 40, desc: 'Speeds up the deep scanner and polishes crystals.' },
 };
+// ametid, mida mängija saab palgatud inimesele meeskonna menüüs anda (1 põhiamet + kuni 2 vähemtähtsat)
+const JOBS = {
+  auto: { name: 'Automatic', short: 'Auto', desc: 'Decides by themselves based on their trade.' },
+  hunter: { name: 'Hunter', short: 'Hunt', desc: 'Hunts goats and aliens, harvests acid glands, brings food home.' },
+  diamonds: { name: 'Diamond hunter', short: 'Diam', desc: 'Collects comet diamonds from known sites and polishes them on the diamond polisher.' },
+  scrap: { name: 'Scrap collector', short: 'Scrap', desc: 'Strips wrecks for scrap and drills iron ore.' },
+  guard: { name: 'Base defender', short: 'Guard', desc: 'Stays near the base: patrols, mans towers, MG nests and ramparts day and night.' },
+  scout: { name: 'Scout', short: 'Scout', desc: 'Explores the map, reveals new areas and pins down the exact spots of comets the radar only roughly sees.' },
+  mechanic: { name: 'Mechanic', short: 'Mech', desc: 'Repairs doors, turrets and generators; makes scrap at the workbench.' },
+  cook: { name: 'Cook', short: 'Cook', desc: 'Cooks meat into meals.' },
+  farmer: { name: 'Farmer', short: 'Farm', desc: 'Tends the hydroponics so they grow food faster.' },
+  medic: { name: 'Medic', short: 'Med', desc: 'Heals wounded crew and you.' },
+  research: { name: 'Researcher', short: 'Sci', desc: 'Works the deep scanner and polishes diamonds.' },
+};
+const ROLE_JOB = { valvur: 'guard', jahimees: 'hunter', kaevur: 'miner', insener: 'mechanic', kokk: 'cook', arst: 'medic', teadlane: 'research' };
 const TRAITS = {
   tapne: { name: 'Marksman', desc: 'Shoots more accurately and hits harder.' },
   kiire: { name: 'Quick feet', desc: 'Moves a quarter faster.' },

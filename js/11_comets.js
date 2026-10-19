@@ -39,7 +39,10 @@ const Comets = (() => {
     World.deformCrater(x, z, 7.5, 1.8);
     const y = World.heightAt(x, z);
     const radar = Base.objsOfType('radar').some((o) => o.on);
-    const s = { id: nextId++, x, z, y, clusters: [], age: 0, exact: radar, ox: radar ? 0 : rand(-28, 28), oz: radar ? 0 : rand(-28, 28), claimed: {} };
+    // radar näeb täpselt ainult baasi lähedal (220 m); kaugemal annab umbkaudse ala, ilma radarita veel laiema
+    const near = Math.hypot(x, z) < 220, exact = radar && near, rr = exact ? 0 : radar ? 30 : 55;
+    const oa = rand(0, TAU), od = rand(0.35, 0.85) * rr;
+    const s = { id: nextId++, x, z, y, clusters: [], age: 0, exact, r: rr, ox: Math.cos(oa) * od, oz: Math.sin(oa) * od, claimed: {} };
     const n = randi(10, 14);
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), r = i === 0 ? 0 : rand(2, 7.5);
@@ -54,7 +57,7 @@ const Comets = (() => {
     const d = Math.hypot(x - Player.pos.x, z - Player.pos.z);
     UI.shake(clamp(1.4 - d / 250, 0.15, 1.2));
     G.stats.comets++;
-    UI.msg(radar ? 'Radar: a comet fell. The exact location is on the map.' : 'A comet fell! The rough area is on the map. A radar mast would show the exact spot.', 'comet');
+    UI.msg(exact ? 'Radar: a comet fell close by. The exact location is on the map.' : radar ? 'Radar: a comet fell far away – only the rough area is known. Send a scout or go look yourself.' : 'A comet fell! Only a wide rough area is on the map. A radar mast narrows it; scouts find the exact spot.', 'comet');
     if (G.time.day >= 2 && Math.random() < 0.7) {
       for (let i = 0; i < randi(1, 2); i++) { const a = rand(0, TAU); Spawner.stalker(x + Math.cos(a) * rand(10, 20), z + Math.sin(a) * rand(10, 20), 'buried'); }
     }
@@ -149,13 +152,13 @@ const Comets = (() => {
   function takeUnits(cl, n) { const k = Math.min(n, cl.amount); cl.amount -= k; if (k) FX.sparks(cl.x, cl.y + 0.6, cl.z, [0.6, 0.85, 1], 4, 3); return k; }
   function siteTotal(s) { return s.clusters.reduce((a, c) => a + c.amount, 0); }
   function activeSites() { return sites.filter((s) => !s.loose && siteTotal(s) > 0); }
-  function serialize() { return { timer, sites: sites.map((s) => ({ x: s.x, z: s.z, exact: s.exact, ox: s.ox, oz: s.oz, loose: !!s.loose, clusters: s.clusters.map((c) => [c.x, c.z, c.amount, c.yaw]) })) }; }
+  function serialize() { return { timer, sites: sites.map((s) => ({ x: s.x, z: s.z, exact: s.exact, r: s.r, ox: s.ox, oz: s.oz, loose: !!s.loose, clusters: s.clusters.map((c) => [c.x, c.z, c.amount, c.yaw]) })) }; }
   function deserialize(d) {
     sites.length = 0; flying.length = 0;
     timer = d.timer || 120;
     for (const sd of d.sites || []) {
       if (!sd.loose) World.deformCrater(sd.x, sd.z, 7.5, 1.8);
-      const s = { id: nextId++, x: sd.x, z: sd.z, y: World.heightAt(sd.x, sd.z), clusters: [], age: 0, exact: sd.exact, ox: sd.ox, oz: sd.oz, loose: sd.loose, claimed: {} };
+      const s = { id: nextId++, x: sd.x, z: sd.z, y: World.heightAt(sd.x, sd.z), clusters: [], age: 0, exact: sd.exact, r: sd.r || 28, ox: sd.ox, oz: sd.oz, loose: sd.loose, claimed: {} };
       for (const c of sd.clusters) s.clusters.push({ id: clusterId++, x: c[0], z: c[1], y: World.heightAt(c[0], c[1]) - 0.15, amount: c[2], yaw: c[3], m: M4.create(), site: s });
       sites.push(s);
     }

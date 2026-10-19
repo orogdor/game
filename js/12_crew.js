@@ -553,8 +553,8 @@ const Crew = (() => {
 
   // ---------- väljasõidud gruppides ----------
   // korjama / jahile minnakse võimalusel mitmekesi: sama sihtmärgi poole minejad ühinevad, vabad kaaslased kutsutakse kaasa
-  const OUT_TYPES = { mine: 1, salvage: 1, hunt: 1, drill: 1 }, IDLE_TYPES = { leisure: 1, wander: 1, explore: 1, sunset: 1, slack: 1, quiet: 1, warm: 1, tidy: 1 };
-  const goalOf = (k) => (k.type === 'salvage' ? k.wreck : k.type === 'drill' ? k.ore : k.type === 'mine' ? k.site : k.target);
+  const OUT_TYPES = { mine: 1, salvage: 1, hunt: 1, drill: 1, scout: 1 }, IDLE_TYPES = { leisure: 1, wander: 1, explore: 1, sunset: 1, slack: 1, quiet: 1, warm: 1, tidy: 1 };
+  const goalOf = (k) => (k.type === 'salvage' ? k.wreck : k.type === 'drill' ? k.ore : k.type === 'mine' ? k.site : k.type === 'scout' ? k.spot : k.target);
   function outingOf(e, type, pred) {
     for (const m of members()) {
       if (m === e || !m.crew.task || m.crew.task.type !== type || m.crew.task.done || (m.crew.task.step || 0) > 1) continue;
@@ -567,22 +567,28 @@ const Crew = (() => {
   function canJoin(m) {
     const c = m.crew, k = c.task;
     if (m.downed || c.follow || c.carry > 0 || m.hp < m.maxHp * 0.6 || c.energy < 25 || c.hunger < 35 || c.thirst < 35) return false;
-    if (c.role === 'valvur' || c.role === 'arst' || c.trait === 'argpyks' || fearOf(c) > 0.78) return false;
+    const jk = jobKey(c);
+    if (jk === 'guard' || jk === 'medic' || c.trait === 'argpyks' || fearOf(c) > 0.78) return false;
     return !k || k.done || !!IDLE_TYPES[k.type];
   }
   // e alustab väljasõitu: kutsu 1–2 vaba kaaslast kaasa (eelistatult sama ameti omad)
+  // ametikaaslased liiguvad 2–3 kaupa: sama ametiga vabad kaaslased tulevad alati kaasa, automaatsed vahel; teise ametiga inimesed ei tule
   function expedition(e, task) {
     task.goal = goalOf(task);
-    const near = members().filter((m) => m !== e && canJoin(m) && Math.hypot(m.pos.x - e.pos.x, m.pos.z - e.pos.z) < 45)
-      .sort((a, b) => (b.crew.role === e.crew.role) - (a.crew.role === e.crew.role) || Math.hypot(a.pos.x - e.pos.x, a.pos.z - e.pos.z) - Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z));
+    const jk = jobKey(e.crew);
+    const same = (m) => jobKey(m.crew) === jk;
+    const near = members().filter((m) => m !== e && canJoin(m) && Math.hypot(m.pos.x - e.pos.x, m.pos.z - e.pos.z) < (task.type === 'scout' ? 70 : 45))
+      .filter((m) => same(m) || !m.crew.job || m.crew.job === 'auto')
+      .sort((a, b) => (same(b) - same(a)) || Math.hypot(a.pos.x - e.pos.x, a.pos.z - e.pos.z) - Math.hypot(b.pos.x - e.pos.x, b.pos.z - e.pos.z));
     let n = 0;
     for (const m of near) {
-      if (n >= (task.type === 'hunt' ? 1 : 2)) break;
-      if (m.crew.role !== e.crew.role && Math.random() < 0.5) continue;
+      if (n >= 2) break;
+      if (!same(m) && (task.type === 'hunt' && n >= 1 || Math.random() < 0.5)) continue;
       if (m.crew.task && m.crew.task.type === 'gchat') leaveGroup(m);
       if (m.pose === 'sit' || m.pose === 'lie') m.pose = 'stand';
-      m.crew.task = Object.assign({}, task, { step: 0, t: 0, buddy: e, helper: m.crew.role !== e.crew.role });
-      say(m, pick(['Wait up, I\'m coming.', 'I\'ll come along.', 'Better not go alone.', 'Right behind you.']), 6);
+      if (m.crew.task) m.crew.task.done = true;
+      m.crew.task = Object.assign({}, task, { step: 0, t: 0, buddy: e, helper: !same(m) });
+      say(m, pick(same(m) ? ['Wait up, I\'m coming.', 'Same job — I\'ll come along.', 'Better not go alone.', 'Right behind you.'] : ['I\'ll lend a hand.', 'I\'ll come along.']), 6);
       n++;
     }
     if (n) task.buddy = task.buddy || near[0];
@@ -600,6 +606,126 @@ const Crew = (() => {
     return me < him ? sp * (gap > 12 ? 0.35 : 0.65) : sp * (gap > 12 ? 1.35 : 1.15);
   }
 
+  // ---------- ametid ----------
+  // jobKey: mängija antud põhiamet või (automaatne) elukutsest tulenev
+  const jobList = (c) => (c.job && c.job !== 'auto' ? [c.job, c.job2, c.job3].filter((j, i, a) => j && j !== 'auto' && JOBS[j] && a.indexOf(j) === i) : []);
+  const jobKey = (c) => (c.job && c.job !== 'auto' ? c.job : ROLE_JOB[c.role] || 'auto');
+  const byDist = (e) => (a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z);
+  function jobHunt(e, night) {
+    const c = e.crew;
+    { const dead = Ents.list.find((o) => o.kind === 'alien' && !o.alive && o.harvestable && !o.claimed && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 70); if (dead && !(c.carry > 0)) { dead.claimed = e.id; return { type: 'hunt', step: 0, target: dead, t: 0 }; } }
+    if (night) return null;
+    const need = (G.res.food + G.res.meat) < count() * 4 + 8;
+    { const o = outingOf(e, 'hunt', (g) => g.alive && Math.hypot(g.pos.x, g.pos.z) < 420); if (o) return { type: 'hunt', step: 0, target: o.crew.task.target, t: 0, buddy: o, goal: o.crew.task.target }; }
+    if (!need && Math.random() < 0.8 * (1 - fearOf(c))) {
+      const al = Aliens.nearestPack(0, 0, 420);
+      if (al && Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack).length <= (fearOf(c) < 0.3 ? 3 : 2)) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
+    }
+    if (need || Math.random() < (c.job === 'hunter' ? 0.75 : 0.4)) {
+      let best = null, bd = 240;
+      for (const g of Ents.list) if (g.alive && (g.kind === 'goat' || g.kind === 'ram')) { const d = Math.hypot(g.pos.x, g.pos.z); const dd = Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z); if (d < 420 && dd < bd) { bd = dd; best = g; } }
+      if (best) return expedition(e, { type: 'hunt', step: 0, target: best, t: 0 });
+    }
+    return null;
+  }
+  // teemandid: ainult täpselt teada leiukohad (raadiusega 150 m baasist ka umbkaudsed); automaatne kaevur läheb vanaviisi ka umbkaudsele kohale
+  function jobDiamonds(e, night, strict) {
+    if (night) return null;
+    { const o = outingOf(e, 'mine'); if (o) return { type: 'mine', step: 0, site: o.crew.task.site, t: 0, buddy: o, goal: o.crew.task.site }; }
+    const all = Comets.activeSites().filter((s) => Math.hypot(s.x, s.z) < 560);
+    const sites = all.filter((s) => s.exact || Math.hypot(s.x, s.z) < 150 || !strict && s.age > 20);
+    if (sites.length) { sites.sort(byDist(e)); return expedition(e, { type: 'mine', step: 0, site: sites[0], t: 0 }); }
+    if (strict && all.length && !members().some((m) => m.crew.job === 'scout')) {   // pole avastajat: otsib ise
+      all.sort(byDist(e)); const s = all[0];
+      return expedition(e, { type: 'scout', step: 0, spot: { x: s.x + s.ox, z: s.z + s.oz }, site: s, t: 0 });
+    }
+    return null;
+  }
+  function jobPolish(e) {
+    const rf = nearestObj(e, 'lihvija', (o) => o.on);
+    if (rf && G.res.kris > 0) return { type: 'refine', step: 0, obj: rf, t: 0 };
+    return null;
+  }
+  function jobScrap(e, night) {
+    if (night) return null;
+    { const o = outingOf(e, 'salvage', (w) => w.scrap > 0 && !w.gone); if (o) return { type: 'salvage', step: 0, wreck: o.crew.task.wreck, t: 0, buddy: o, goal: o.crew.task.wreck }; }
+    { const o = outingOf(e, 'drill', (q) => q.amount > 0 && !q.gone); if (o) return { type: 'drill', step: 0, ore: o.crew.task.ore, t: 0, buddy: o, goal: o.crew.task.ore }; }
+    const R = e.crew.job === 'scrap' ? 520 : 320;
+    const wr = World.wrecks.filter((w) => w.scrap > 0 && !w.gone && Math.hypot(w.x, w.z) < R).sort(byDist(e))[0];
+    if (G.flags.drill) {
+      const ore = World.ores.filter((q) => q.amount > 0 && !q.gone && Math.hypot(q.x, q.z) < R + 40).sort(byDist(e))[0];
+      if (ore && (!wr || (G.res.ore || 0) < 30 && Math.random() < 0.6)) return expedition(e, { type: 'drill', step: 0, ore, t: 0 });
+    }
+    if (wr) return expedition(e, { type: 'salvage', step: 0, wreck: wr, t: 0 });
+    return null;
+  }
+  function jobGuard(e, night) {
+    const r = Math.random();
+    if (r < (night ? 0.6 : 0.45)) { const p = freePost(e); if (p) return { type: 'post', step: 0, obj: p, watch: true, t: rand(70, 140) }; }
+    if (r < 0.75 && !night) return { type: 'perimeter', step: 0 };
+    return { type: 'patrol', step: 0 };
+  }
+  // avastaja: 1) umbkaudselt teada komeedid  2) avastamata kohad (külad, linn, tunnelid)  3) juhuslik tundmatu ala
+  function jobScout(e, night) {
+    if (night) return null;
+    { const o = outingOf(e, 'scout'); if (o) return Object.assign({}, o.crew.task, { step: 0, t: 0, buddy: o }); }
+    const late = Econ.hour() > 15.5;
+    const taken = new Set(members().filter((m) => m.crew.task && m.crew.task.type === 'scout').map((m) => m.crew.task.spot));
+    const st = Comets.activeSites().filter((s) => !s.exact && Math.hypot(s.x, s.z) < (late ? 300 : 900) && ![...taken].some((p) => p && p.site === s)).sort(byDist(e))[0];
+    if (st) { const spot = { x: st.x + st.ox, z: st.z + st.oz, site: st }; return expedition(e, { type: 'scout', step: 0, spot, site: st, t: 0 }); }
+    const lim = late ? 180 : 260 + Math.min(G.time.day, 12) * 45;
+    const cand = [];
+    for (const v of World.sites.villages || []) cand.push({ x: v.x, z: v.z });
+    if (World.sites.city && World.sites.city.x < 1e4) cand.push({ x: World.sites.city.x, z: World.sites.city.z });
+    for (const t of World.sites.tunnels || []) { cand.push({ x: t.ax, z: t.az }); cand.push({ x: t.bx, z: t.bz }); }
+    for (let i = 0; i < 26; i++) { const a = rand(0, TAU), d = rand(70, lim); cand.push({ x: Math.cos(a) * d, z: Math.sin(a) * d }); }
+    const ok = cand.filter((p) => Math.hypot(p.x, p.z) < lim + 200 && !Fog.seen(p.x, p.z) && Math.abs(p.x) < World.HALF - 40 && Math.abs(p.z) < World.HALF - 40).sort(byDist(e));
+    const p = ok[0];
+    if (p) return expedition(e, { type: 'scout', step: 0, spot: { x: p.x, z: p.z }, t: 0 });
+    return null;
+  }
+  function doJob(e, j, night) {
+    const c = e.crew;
+    switch (j) {
+      case 'hunter': return jobHunt(e, night);
+      case 'diamonds': return jobDiamonds(e, night, true) || jobPolish(e);
+      case 'miner': return jobDiamonds(e, night, false) || jobScrap(e, night);
+      case 'scrap': return jobScrap(e, night);
+      case 'guard': return c.job ? jobGuard(e, night) : { type: 'patrol', step: 0 };
+      case 'scout': return jobScout(e, night);
+      case 'mechanic': {
+        { const bd = Base.doors.find((d) => d.st.broken || d.st.hp < Base.DOOR_HP * 0.7 || Object.keys(d.st.hack).length); if (bd && G.res.scrap >= 5 && !(Waves.info() && Waves.info().warned && !Waves.info().done)) return { type: 'fixdoor', step: 0, d: bd, t: 0 }; }
+        const dmg = [...Base.objs.values()].find((o) => ((o.type === 'kahur' || o.type === 'myyrturel') && o.hp < o.maxHp) || (o.broken && o.type === 'vanagen'));
+        if (dmg && G.res.scrap >= 5) return { type: 'repair', step: 0, obj: dmg, t: 0 };
+        const wb = nearestObj(e, 'toolaud', (o) => o.on);
+        if (wb) return { type: 'craft', step: 0, obj: wb, t: 0 };
+        return null;
+      }
+      case 'cook': {
+        const st = nearestObj(e, 'pliit', (o) => o.on);
+        if (st && G.res.meat > 0) return { type: 'cook', step: 0, obj: st, t: 0 };
+        return null;
+      }
+      case 'farmer': {
+        const ks = Base.objsOfType('kasvu').filter((o) => o.on && !members().some((m) => m !== e && m.crew.task && m.crew.task.type === 'tend' && m.crew.task.obj === o));
+        if (ks.length) return { type: 'tend', step: 0, obj: pick(ks), t: 0 };
+        return null;
+      }
+      case 'medic': {
+        const hurt = members().find((m) => m !== e && m.hp < m.maxHp * 0.75);
+        if (hurt) return { type: 'heal', step: 0, target: hurt, t: 0 };
+        if (Player.hp < Player.maxHp * 0.7 && !Player.dead && Math.hypot(Player.pos.x, Player.pos.z) < 60) return { type: 'heal', step: 0, target: Player, t: 0 };
+        return null;
+      }
+      case 'research': {
+        const sc = nearestObj(e, 'skanner', (o) => o.on);
+        if (sc && !G.scan.found) return { type: 'scan', step: 0, obj: sc, t: 0 };
+        return jobPolish(e);
+      }
+    }
+    return null;
+  }
+
   function chooseTask(e) {
     const c = e.crew;
     if (c.follow) return { type: 'follow', step: 0, rt: 0 };
@@ -608,10 +734,10 @@ const Crew = (() => {
     const wi = Waves.info();
     const waveSoon = wi && !wi.none && !wi.done && wi.warned;
     if (waveSoon) {
-      if (c.role === 'arst') { const rv = nearestObj(e, 'ravila'); if (rv) return { type: 'standby', step: 0, obj: rv }; }
-      const fighter0 = c.role === 'valvur' || c.role === 'jahimees' || c.trait === 'veteran' || c.trait === 'tapne' || c.trait === 'tugev';
+      if (jobKey(c) === 'medic') { const rv = nearestObj(e, 'ravila'); if (rv) return { type: 'standby', step: 0, obj: rv }; }
+      const fighter0 = jobKey(c) === 'guard' || jobKey(c) === 'hunter' || c.trait === 'veteran' || c.trait === 'tapne' || c.trait === 'tugev';
       if (fighter0 && now() - (c.armedT || -1e9) > 200) { const lk = nearestObj(e, 'relvakapp'); if (lk) return { type: 'arm', step: 0, obj: lk }; }
-      const fighter = c.role === 'valvur' || c.role === 'jahimees' || c.trait === 'veteran' || c.trait === 'tapne' || c.trait === 'tugev';
+      const fighter = jobKey(c) === 'guard' || jobKey(c) === 'hunter' || c.trait === 'veteran' || c.trait === 'tapne' || c.trait === 'tugev';
       if (fighter || !Base.isInside(e.pos.x, e.pos.z) && c.trait !== 'argpyks') {
         const post = freePost(e);
         if (post) return { type: 'post', step: 0, obj: post };
@@ -638,74 +764,14 @@ const Crew = (() => {
     if (e.hp < e.maxHp * 0.5) { const o = nearestObj(e, 'diivan') || nearestObj(e, 'laud') || nearestObj(e, 'ravila'); if (o) return { type: 'leisure', step: 0, obj: o, t: 25 }; return { type: 'wander', step: 0, t: 20 }; }
     // ametitöö (tööpäev 8–18; õhtu on vaba aeg, valvurid ja öökullid erand)
     const night = Econ.isNight();
-    const offDuty = (hr >= 18.5 || hr < 7.5) && c.role !== 'valvur' && c.trait !== 'ookull' && !(c.role === 'arst');
+    const jk = jobKey(c);
+    const offDuty = (hr >= 18.5 || hr < 7.5) && jk !== 'guard' && c.trait !== 'ookull' && jk !== 'medic';
     if (!offDuty && c.trait === 'laisk' && Math.random() < 0.3) return { type: 'slack', step: 0, obj: nearestObj(e, 'diivan'), t: rand(15, 30) };
     if (!offDuty && c.trait === 'veteran' && !night && Math.random() < 0.25) return { type: 'perimeter', step: 0 };
-    if (!offDuty) switch (c.role) {
-      case 'valvur': return { type: 'patrol', step: 0 };
-      case 'jahimees': {
-        // pärast lahingut: lähedal lebavast surnud kullist happenäärmed kaasa
-        { const dead = Ents.list.find((o) => o.kind === 'alien' && !o.alive && o.harvestable && !o.claimed && Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 70); if (dead && !(c.carry > 0)) { dead.claimed = e.id; return { type: 'hunt', step: 0, target: dead, t: 0 }; } }
-        if (night) break;
-        const need = (G.res.food + G.res.meat) < count() * 4 + 8;
-        { const o = outingOf(e, 'hunt', (g) => g.alive && Math.hypot(g.pos.x, g.pos.z) < 420); if (o) return { type: 'hunt', step: 0, target: o.crew.task.target, t: 0, buddy: o, goal: o.crew.task.target }; }
-        // tulnukajaht: happenäärmed on hea raha (kui toitu on piisavalt)
-        if (!need && Math.random() < 0.8 * (1 - fearOf(c))) {
-          const al = Aliens.nearestPack(0, 0, 420);
-          if (al && Ents.list.filter((o) => o.kind === 'alien' && o.alive && o.pack === al.pack).length <= (fearOf(c) < 0.3 ? 3 : 2)) return expedition(e, { type: 'hunt', step: 0, target: al, t: 0 });
-        }
-        if (need || Math.random() < 0.4) {
-          let best = null, bd = 240;
-          for (const g of Ents.list) if (g.alive && (g.kind === 'goat' || g.kind === 'ram')) { const d = Math.hypot(g.pos.x, g.pos.z); const dd = Math.hypot(g.pos.x - e.pos.x, g.pos.z - e.pos.z); if (d < 420 && dd < bd) { bd = dd; best = g; } }
-          if (best) return expedition(e, { type: 'hunt', step: 0, target: best, t: 0 });
-        }
-        break;
-      }
-      case 'kaevur': {
-        if (night) break;
-        { const o = outingOf(e, 'mine'); if (o) return { type: 'mine', step: 0, site: o.crew.task.site, t: 0, buddy: o, goal: o.crew.task.site }; }
-        { const o = outingOf(e, 'salvage', (w) => w.scrap > 0 && !w.gone); if (o) return { type: 'salvage', step: 0, wreck: o.crew.task.wreck, t: 0, buddy: o, goal: o.crew.task.wreck }; }
-        const sites = Comets.activeSites().filter((s) => Math.hypot(s.x, s.z) < 480 && (s.exact || s.age > 20));
-        if (sites.length) {
-          sites.sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z));
-          return expedition(e, { type: 'mine', step: 0, site: sites[0], t: 0 });
-        }
-        { const o = outingOf(e, 'drill', (q) => q.amount > 0 && !q.gone); if (o) return { type: 'drill', step: 0, ore: o.crew.task.ore, t: 0, buddy: o, goal: o.crew.task.ore }; }
-        const wr = World.wrecks.filter((w) => w.scrap > 0 && !w.gone && Math.hypot(w.x, w.z) < 320).sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
-        // maagipuur ostetud: rauamaak (eriti kui vrakke pole või maaki hoidlas vähe)
-        if (G.flags.drill) {
-          const ore = World.ores.filter((q) => q.amount > 0 && !q.gone && Math.hypot(q.x, q.z) < 360).sort((a, b) => Math.hypot(a.x - e.pos.x, a.z - e.pos.z) - Math.hypot(b.x - e.pos.x, b.z - e.pos.z))[0];
-          if (ore && (!wr || (G.res.ore || 0) < 30 && Math.random() < 0.6)) return expedition(e, { type: 'drill', step: 0, ore, t: 0 });
-        }
-        if (wr) return expedition(e, { type: 'salvage', step: 0, wreck: wr, t: 0 });
-        break;
-      }
-      case 'insener': {
-        { const bd = Base.doors.find((d) => d.st.broken || d.st.hp < Base.DOOR_HP * 0.7 || Object.keys(d.st.hack).length); if (bd && G.res.scrap >= 5 && !(Waves.info() && Waves.info().warned && !Waves.info().done)) return { type: 'fixdoor', step: 0, d: bd, t: 0 }; }
-        const dmg = [...Base.objs.values()].find((o) => ((o.type === 'kahur' || o.type === 'myyrturel') && o.hp < o.maxHp) || (o.broken && o.type === 'vanagen'));
-        if (dmg && G.res.scrap >= 5) return { type: 'repair', step: 0, obj: dmg, t: 0 };
-        const wb = nearestObj(e, 'toolaud', (o) => o.on);
-        if (wb) return { type: 'craft', step: 0, obj: wb, t: 0 };
-        break;
-      }
-      case 'kokk': {
-        const st = nearestObj(e, 'pliit', (o) => o.on);
-        if (st && G.res.meat > 0) return { type: 'cook', step: 0, obj: st, t: 0 };
-        break;
-      }
-      case 'arst': {
-        const hurt = members().find((m) => m !== e && m.hp < m.maxHp * 0.75);
-        if (hurt) return { type: 'heal', step: 0, target: hurt, t: 0 };
-        if (Player.hp < Player.maxHp * 0.7 && !Player.dead && Math.hypot(Player.pos.x, Player.pos.z) < 60) return { type: 'heal', step: 0, target: Player, t: 0 };
-        break;
-      }
-      case 'teadlane': {
-        const sc = nearestObj(e, 'skanner', (o) => o.on);
-        if (sc && !G.scan.found) return { type: 'scan', step: 0, obj: sc, t: 0 };
-        const rf = nearestObj(e, 'lihvija', (o) => o.on);
-        if (rf && G.res.kris > 0) return { type: 'refine', step: 0, obj: rf, t: 0 };
-        break;
-      }
+    if (!offDuty) {
+      const jl = jobList(c);
+      if (jl.length) { for (const j of jl) { const t = doJob(e, j, night); if (t) return t; } }
+      else { const t = doJob(e, ROLE_JOB[c.role], night); if (t) return t; }
     }
     // spioon öösel
     if (c.spy && night && !c.stoleTonight && Econ.hour() > 1 && Econ.hour() < 4 && Math.random() < 0.3) {
@@ -1323,13 +1389,13 @@ const Crew = (() => {
         }
         return;
       }
-      case 'repair': case 'craft': case 'cook': case 'scan': case 'refine': case 'steal': case 'leisure': {
+      case 'repair': case 'craft': case 'cook': case 'scan': case 'refine': case 'steal': case 'leisure': case 'tend': {
         const o = k.obj;
         if (!o || !Base.objs.has(o.id)) { k.done = true; return; }
         if (k.step === 0) {
           if (!goObj(e, o)) { k.done = true; return; }
           k.step = 1;
-          setAct(e, { repair: 'Going to repair', craft: 'Going to the workshop', cook: 'Going to the kitchen', scan: 'Going to the scanner', refine: 'Going to polish', steal: 'Sneaking around', leisure: 'Resting' }[k.type]);
+          setAct(e, { repair: 'Going to repair', craft: 'Going to the workshop', cook: 'Going to the kitchen', scan: 'Going to the scanner', refine: 'Going to polish', tend: 'Going to the hydroponics', steal: 'Sneaking around', leisure: 'Resting' }[k.type]);
         } else if (k.step === 1) {
           if (Ents.stepMove(e, dt, sp)) { k.step = 2; k.w = 0; if (k.type === 'leisure' && (o.type === 'diivan' || o.type === 'laud')) e.pose = 'sit'; }
         } else {
@@ -1353,6 +1419,11 @@ const Crew = (() => {
             setAct(e, 'Cooking'); o.data.cooking = 1; e.gesture = 'interact';
             if (Math.random() < 0.2) FX.smoke(o.cx, 1.3, o.cz);
             if (k.w > (hasTech('cook') ? 3.5 : 7)) { k.w = 0; if (G.res.meat > 0) { G.res.meat--; G.res.food += hasTech('cook') ? 3 : 2; } if (G.res.meat <= 0 || (k.n = (k.n || 0) + 1) >= 4) { k.done = true; o.data.cooking = 0; } }
+          } else if (k.type === 'tend') {
+            setAct(e, 'Tending the hydroponics'); e.gesture = k.w % 6 < 3 ? 'interact' : 'fix';
+            if (!o.on) { k.done = true; return; }
+            o.data.grow = (o.data.grow || 0) + dt * 0.012 * workMult(c);
+            if (k.w > 35) k.done = true;
           } else if (k.type === 'scan') {
             setAct(e, 'Studying scanner data');
             if (!o.on || G.scan.found || k.w > 40 || isSleepTime(c)) k.done = true;
@@ -1466,7 +1537,7 @@ const Crew = (() => {
       case 'post': {
         const o = k.obj;
         const wi = Waves.info();
-        const over = !wi || wi.none || wi.done;
+        const over = k.watch ? (k.t -= dt) <= 0 || isSleepTime(c) : !wi || wi.none || wi.done;
         if (!o || !Base.objs.has(o.id) || over) {
           if (e.onPost === 'torn' && o) { const u = Base.useCells(o)[0]; if (u) { const cc = Base.cellCenter(u[0], u[1]); e.pos.x = cc.x; e.pos.z = cc.z; e.pos.y = Ents.groundY(cc.x, cc.z); } }
           e.onPost = null; if (o) o.data.manned = 0; k.done = true; return;
@@ -1483,7 +1554,8 @@ const Crew = (() => {
         } else {
           e.moveAmt = 0; e.onPost = o.type;
           if (o.type === 'torn' || o.type === 'vallikaik') e.pos.y = Ents.groundY(e.pos.x, e.pos.z, e.pos.y);
-          const wd = wi.dir; Ents.face(e, Math.cos(wd) * 200, Math.sin(wd) * 200, dt, 1.5);
+          if (wi && !wi.none && !wi.done && wi.dir !== undefined) { const wd = wi.dir; Ents.face(e, Math.cos(wd) * 200, Math.sin(wd) * 200, dt, 1.5); }
+          else { const a = G.time.total * 0.12 + e.id * 1.7; Ents.face(e, e.pos.x + Math.cos(a) * 60, e.pos.z + Math.sin(a) * 60, dt, 0.8); }
           setAct(e, o.type === 'torn' ? 'Guarding in the tower' : o.type === 'kmpesa' ? 'Manning the machine gun' : 'Guarding on the rampart');
         }
         return;
@@ -1539,6 +1611,34 @@ const Crew = (() => {
         if (k.step === 0) { const a = rand(0, TAU), R = Math.max(16, Base.bounds() + 8); Ents.goTo(e, Math.cos(a) * R, Math.sin(a) * R); k.step = 1; k.mt = 0; setAct(e, 'Going into the desert to relieve themselves'); }
         else if (k.step === 1) { k.mt += dt; if (Ents.stepMove(e, dt, sp) || k.mt > 30) { k.step = 2; k.w = 0; } }
         else { k.w += dt; e.moveAmt = 0; setAct(e, 'Relieving themselves'); if (k.w > 5) { c.bladder = 100; c.morale = Math.max(0, c.morale - 2); k.done = true; } }
+        return;
+      }
+      case 'scout': {   // avastaja: läheb tundmatusse kohta, vaatab ringi (udu kaob, komeedi täpne koht selgub)
+        e.hasGun = true;
+        const sp0 = k.spot;
+        if (!sp0 || Econ.isNight() && k.step < 2) { k.done = true; return; }
+        if (k.step === 0) {
+          Ents.goTo(e, sp0.x + rand(-6, 6), sp0.z + rand(-6, 6)); k.step = 1; k.mt = 0; k.tries = k.tries || 0;
+          k.lim = 25 + Math.hypot(sp0.x - e.pos.x, sp0.z - e.pos.z) / Math.max(1, sp) * 1.6;
+          setAct(e, k.site ? 'Searching for a comet' + (k.buddy ? ' with ' + first(k.buddy) : '') : 'Scouting' + (k.buddy ? ' with ' + first(k.buddy) : ''));
+        } else if (k.step === 1) {
+          k.mt += dt;
+          if (k.site && k.site.exact) { k.step = 2; k.lt = 0; }
+          else if (Ents.stepMove(e, dt, groupSpeed(e, k, sp * 1.05)) || k.mt > k.lim) { k.step = 2; k.lt = 0; }
+        } else {
+          e.moveAmt = Math.max(0, e.moveAmt - dt * 4);
+          k.lt += dt;
+          e.yaw += Math.sin(k.lt * 0.7 + e.id) * dt * 0.8;
+          e.gesture = k.lt < 3 ? 'look' : null;
+          setAct(e, k.site && k.site.exact ? 'Found the comet!' : 'Looking around');
+          if (k.lt > 5) {
+            e.gesture = null;
+            // komeeti ei leitud: proovi lähedal teist kohta (kuni 4 korda)
+            if (k.site && !k.site.exact && k.tries < 4 && !Econ.isNight()) { k.tries++; const a = rand(0, TAU); k.spot = { x: k.site.x + k.site.ox + Math.cos(a) * rand(15, 35), z: k.site.z + k.site.oz + Math.sin(a) * rand(15, 35) }; k.step = 0; return; }
+            if (c.job === 'scout') Levels.add && Levels.add(c, 'legs', 3);
+            k.done = true;
+          }
+        }
         return;
       }
       case 'explore': {
