@@ -248,7 +248,7 @@ const Game = (() => {
 
   function resetState() {
     G.time = { day: 1, t: 0.03, total: 0 };
-    G.res = { cr: 150, scrap: 120, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
+    G.res = { cr: 460, scrap: 270, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
     G.carry = { kris: 0, scrap: 0, meat: 0, stones: 0 };
     G.dk = DIFFS[G.diff] || DIFFS.tavaline;
     G.debt = { left: Math.round(30000 * G.dk.debt), nextDay: 4, amount: 0, idx: 0, grace: false, warned: false };
@@ -288,15 +288,25 @@ const Game = (() => {
     Crew.starters();
     Player.reset(-1, 1.5, Math.PI); Player.fillMags();
     Player.yaw = Math.PI;
+    G.gid = 'g' + Date.now().toString(36);
+    // ettevalmistus: aeg seisab, ehita algbaas (2 tuba, automaatkahur, olme) – siis algab päev 1
+    G.flags.prep = true;
     startPlay();
+    Build.enter();
+    UI.banner('Plan your base', 'Time is frozen. Build two rooms, an autocannon and the basics, then press Start.');
+    UI.msg('Before day 1: the materials in storage are enough for about two rooms, one autocannon and the basic fittings (stove, water, toilet). Time does not run until you press Start.', 'good');
+    Objectives.check();
+    Save.save();
+  }
+  // ettevalmistus läbi: päev 1 algab
+  function beginDay1() {
+    G.flags.prep = false;
     UI.banner('Day 1', 'Mining station K-7 is yours. Bring it back to life.');
     setTimeout(() => { if (G.mode === 'play') UI.msg('This planet was abandoned when the Stoneheart\'s aliens took it over. The base heart\'s hum keeps the sandworms away – guard it.', 'warn'); }, 3000);
     setTimeout(() => { if (G.mode === 'play') UI.msg('Whoever brings in the Stoneheart\'s heartstones – proof of the kill – gets the colonisation rights. And your debt is gone.', 'good'); }, 9000);
-    UI.msg('The main building is dark and rusty. The generator is broken, but there is scrap in storage.', 'warn');
-    setTimeout(() => { if (G.mode === 'play') UI.msg('Your three crew already know their jobs: two collect scrap and diamonds, one hunts. Open Build (B) and grow the base – change their jobs in the Crew panel (C).', 'good'); }, 4500);
+    UI.msg('The old generator is broken – repair it so the lights and the autocannon get power.', 'warn');
+    setTimeout(() => { if (G.mode === 'play') UI.msg('Your three crew already know their jobs: two collect scrap and diamonds, one hunts. Change their jobs in the Crew panel (C).', 'good'); }, 4500);
     setTimeout(() => { if (G.mode === 'play') UI.msg('Bank: first debt payment ' + fmtInt(G.debt.amount) + ' ₵ is due on the morning of day 4.', 'money'); }, 6000);
-    Objectives.check();
-    G.gid = 'g' + Date.now().toString(36);
     Save.save();
   }
   function continueGame(d) {
@@ -332,7 +342,7 @@ const Game = (() => {
     Player.hp = d.player.hp || Player.maxHp;
     if (d.pmag) Object.assign(Player.mag, d.pmag); else Player.fillMags();
     startPlay();
-    UI.banner('Day ' + G.time.day, Econ.dayLine());
+    if (G.flags.prep) { Build.enter(); UI.banner('Plan your base', 'Time is frozen until you press Start.'); } else UI.banner('Day ' + G.time.day, Econ.dayLine());
     Objectives.check();
   }
   function startPlay() {
@@ -388,7 +398,7 @@ const Game = (() => {
   }
   function toggleBuild() {
     if (G.mode === 'play' && !Player.dead) { UI.closePanel(); Build.enter(); }
-    else if (G.mode === 'build') Build.exit();
+    else if (G.mode === 'build' && !G.flags.prep) Build.exit();
   }
   function over(kind, r) {
     if (G.mode === 'over') return;
@@ -448,7 +458,7 @@ const Game = (() => {
       else if (P('KeyM')) UI.openMap();
       else if (P('Escape') || P('KeyP')) UI.openMenu();
     } else if (G.mode === 'build') {
-      if (P('Escape') || P('KeyB')) Build.exit();
+      if ((P('Escape') || P('KeyB')) && !G.flags.prep) Build.exit();   // ettevalmistuses ainult nupp "Start day 1"
     }
   }
   const humans = [];
@@ -578,5 +588,5 @@ const Game = (() => {
       if (G.mode === 'play' && !G.paused) { Player.update(dt, Object.assign({}, idle, inp || {})); simulate(dt); GFX.partAdd.update(dt); GFX.partAlpha.update(dt); }
     }
   }
-  return { boot, newGame, continueGame, toTitle, toggleBuild, over, victory, stonesHome, quality, setQuality, applyGfx, resize, debugTick, get pixels() { return [GFX.S.w, GFX.S.h]; } };
+  return { beginDay1, boot, newGame, continueGame, toTitle, toggleBuild, over, victory, stonesHome, quality, setQuality, applyGfx, resize, debugTick, get pixels() { return [GFX.S.w, GFX.S.h]; } };
 })();

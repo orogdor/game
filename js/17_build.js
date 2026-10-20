@@ -47,6 +47,7 @@ const Build = (() => {
     S.level = 0; Base.viewLevel = 0;
     G.mode = 'play';
     UI.showBuild(false);
+    if (G.flags.prep) Game.beginDay1();
     Crew.assignBeds();
     Base.updatePower(!Econ.isNight());
     for (const m of Crew.members()) m.path = null;

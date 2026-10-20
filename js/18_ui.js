@@ -68,10 +68,10 @@ const UI = (() => {
     $('pClose').onclick = () => { Audio2.ui(); closePanel(); };
     $('panel').addEventListener('pointerdown', (e) => { if (e.target === $('panel')) closePanel(); });
     // ehitusriba
-    $('bTop').innerHTML = `<span class="ttl">BUILD</span><span id="bRes" style="display:flex;gap:5px;flex-wrap:wrap"></span><span class="sp"></span>
+    $('bTop').innerHTML = `<span class="ttl" id="bTtl">BUILD</span><span id="bRes" style="display:flex;gap:5px;flex-wrap:wrap"></span><span class="sp"></span>
       <button class="bbtn" id="bUndo" aria-label="Võta tagasi">${ICON.undo}<span>Back</span></button>
       <button class="bbtn" id="bRotL" aria-label="Pööra kaamerat vasakule">${ICON.rotL}</button><button class="bbtn" id="bRotR" aria-label="Pööra kaamerat paremale">${ICON.rotR}</button>
-      <button class="bbtn primary" id="bDone">${ICON.check}<span>Done</span></button>`;
+      <button class="bbtn primary" id="bDone">${ICON.check}<span id="bDoneT">Done</span></button>`;
     $('bUndo').onclick = () => Build.doUndo();
     $('bRotL').onclick = () => { Build.cam.vyaw = 2.4; };
     $('bRotR').onclick = () => { Build.cam.vyaw = -2.4; };
@@ -759,7 +759,7 @@ const UI = (() => {
     ctx.restore();
     ctx.font = '700 15px "Big Shoulders Stencil Display", sans-serif'; ctx.fillStyle = 'rgba(238,223,198,.8)'; ctx.fillText('N', S / 2 - 4, 18);
   }
-  function openMenu() { if (G.mode === 'build') { Build.exit(); } openPanel('menu', 'menu'); }
+  function openMenu() { if (G.mode === 'build' && !G.flags.prep) { Build.exit(); } openPanel('menu', 'menu'); }
   function renderMenu(body) {
     $('pTitle').textContent = 'Pause';
     tabs([['menu', 'Menu'], ['seaded', 'Settings'], ['logi', 'Radio log']], panelTab);
@@ -985,7 +985,7 @@ const UI = (() => {
   function showBuild(on) {
     $('build').hidden = !on;
     $('hud').hidden = on;
-    if (on) { $('bRes').innerHTML = resChips(); }
+    if (on) { $('bRes').innerHTML = resChips(); $('bTtl').textContent = G.flags.prep ? 'PLAN YOUR BASE' : 'BUILD'; $('bDoneT').textContent = G.flags.prep ? 'Start day 1' : 'Done'; }
     else showHUD(true);
   }
   // ehitusmenüü: tööriistad rühmadena (Toad / Uksed ja aknad / Esemed / Kujundus / Lammuta),

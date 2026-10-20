@@ -258,7 +258,8 @@ const Fauna2 = (() => {
       if (up < 0.1 && !dead) { M4.compose(R0, e.pos.x, e.pos.y - 0.25, e.pos.z, e.yaw, 0, 0); GFX.draw(M.eelFin, R0, tint, null, o); return; }
       M4.compose(R0, e.pos.x, e.pos.y - 1.0 + up * 1.4, e.pos.z, e.yaw, -0.5 * up, 0); GFX.draw(M.eel, R0, tint, null, o); return;
     }
-    if (e.kind === 'spitter') { const op = e.open || 0; M4.compose(R0, e.pos.x, e.pos.y, e.pos.z, e.yaw, 0, 0, 1, 1 + op * 0.15, 1); GFX.draw(M.spitter, R0, tint, null, o); if (!dead && GFX.env.night > 0.3) GFX.addLight(e.pos.x, e.pos.y + 3.2, e.pos.z, 6, 0.5, 1.0, 0.25, 1.0); return; }
+    if (e.kind === 'spitter') { const op = e.open || 0, tt = G.time.total + e.id * 1.7, br = dead ? 0 : Math.sin(tt * 1.7) * 0.035;   // hingab ja õõtsub ka rahuolekus
+      M4.compose(R0, e.pos.x, e.pos.y, e.pos.z, e.yaw + (dead ? 0 : Math.sin(tt * 0.6) * 0.12), dead ? 0 : Math.sin(tt * 0.9) * 0.04, dead ? 0 : Math.cos(tt * 0.7) * 0.04, 1 - br * 0.5, 1 + op * 0.15 + br, 1 - br * 0.5); GFX.draw(M.spitter, R0, tint, null, o); if (!dead && GFX.env.night > 0.3) GFX.addLight(e.pos.x, e.pos.y + 3.2, e.pos.z, 6, 0.5, 1.0, 0.25, 1.0); return; }
     if (e.kind === 'mother') {
       M4.compose(R0, e.pos.x, e.pos.y + Math.sin(e.phase) * 0.05, e.pos.z, e.yaw, 0, dead ? 0.5 : 0); GFX.draw(M.mother, R0, tint, null, o);
       for (let k = 0; k < 6; k++) { const sd = k < 3 ? 1 : -1, i = k % 3; M4.child(ms[k], R0, sd * 1.6, 1.6, 1.2 - i * 1.4, 0, Math.sin(e.phase * 1.3 + i * 2 + (sd > 0 ? 0 : Math.PI)) * 0.3 * e.moveAmt, sd * 0.45); GFX.draw(M.mleg, ms[k], tint, null, o); }
