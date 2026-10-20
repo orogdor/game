@@ -10,7 +10,7 @@ const DIFFS = {
 const G = {
   mode: 'title', seed: 1, diff: 'tavaline', dk: DIFFS.tavaline,
   time: { day: 1, t: 0.03, total: 0 },
-  res: { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0 },
+  res: { cr: 150, scrap: 120, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0 },
   carry: { kris: 0, scrap: 0, meat: 0, stones: 0 },
   debt: { left: 30000, nextDay: 4, amount: 200, idx: 0, grace: false, warned: false },
   up: { rifle: 1, rail: false, armor: 0 },

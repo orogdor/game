@@ -248,7 +248,7 @@ const Game = (() => {
 
   function resetState() {
     G.time = { day: 1, t: 0.03, total: 0 };
-    G.res = { cr: 150, scrap: 40, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
+    G.res = { cr: 150, scrap: 120, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
     G.carry = { kris: 0, scrap: 0, meat: 0, stones: 0 };
     G.dk = DIFFS[G.diff] || DIFFS.tavaline;
     G.debt = { left: Math.round(30000 * G.dk.debt), nextDay: 4, amount: 0, idx: 0, grace: false, warned: false };
@@ -285,13 +285,15 @@ const Game = (() => {
     Boss.spawn();
     Econ.genCandidates();
     Inv.startKit();
+    Crew.starters();
     Player.reset(-1, 1.5, Math.PI); Player.fillMags();
     Player.yaw = Math.PI;
     startPlay();
     UI.banner('Day 1', 'Mining station K-7 is yours. Bring it back to life.');
     setTimeout(() => { if (G.mode === 'play') UI.msg('This planet was abandoned when the Stoneheart\'s aliens took it over. The base heart\'s hum keeps the sandworms away – guard it.', 'warn'); }, 3000);
     setTimeout(() => { if (G.mode === 'play') UI.msg('Whoever brings in the Stoneheart\'s heartstones – proof of the kill – gets the colonisation rights. And your debt is gone.', 'good'); }, 9000);
-    UI.msg('The main building is dark and rusty. The generator is broken, but there are 40 scrap in storage.', 'warn');
+    UI.msg('The main building is dark and rusty. The generator is broken, but there is scrap in storage.', 'warn');
+    setTimeout(() => { if (G.mode === 'play') UI.msg('Your three crew already know their jobs: two collect scrap and diamonds, one hunts. Open Build (B) and grow the base – change their jobs in the Crew panel (C).', 'good'); }, 4500);
     setTimeout(() => { if (G.mode === 'play') UI.msg('Bank: first debt payment ' + fmtInt(G.debt.amount) + ' ₵ is due on the morning of day 4.', 'money'); }, 6000);
     Objectives.check();
     G.gid = 'g' + Date.now().toString(36);

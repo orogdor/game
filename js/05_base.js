@@ -1618,6 +1618,8 @@ function createBase(opt) {
     addObj('terminal', 20, 18, 0, { broken: true });
     addObj('hoidla', 21, 20, 3);
     addObj('voodi', 17, 20, 1);
+    addObj('nari', 17, 21, 1);   // algmeeskond: 3 voodikohta (+ mängija voodi)
+    addObj('voodi', 18, 21, 1);
     return r;
   }
   function reset() {
