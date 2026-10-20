@@ -57,9 +57,9 @@ const OBJ = {
   raadiojaam: { name: 'Radio station', cat: 'kaitse', cost: { s: 30, c: 110 }, size: [1, 1], where: 'in', power: 1, h: 2.5, useLabel: 'Listen to the radio', desc: 'Radio sweeps (3 a day) pinpoint comet impact sites and warn about rival raids. Command post item.' },
   piljard: { name: 'Pool table', cat: 'elu', cost: { s: 30, c: 120 }, size: [2, 1], where: 'in', power: 0, h: 0.85, useLabel: 'Play pool', desc: 'An evening game: +8 morale and better relations with people nearby. Rec room item.' },
   toovanker: { name: 'Tool cart', cat: 'garaaz', cost: { s: 25, c: 60 }, size: [1, 1], where: 'in', power: 0, h: 1.1, useLabel: 'Fix the vehicle', desc: 'Crew fix damaged vehicles parked next to it for free (+150 hp a job). Garage item.' },
-  terminal: { name: 'Comms terminal', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.6 },
-  hoidla: { name: 'Storage', fixed: true, size: [1, 1], where: 'in', power: 0, h: 1.4 },
-  vanagen: { name: 'Old generator', fixed: true, size: [2, 1], where: 'in', power: -4, h: 2.1 },
+  terminal: { name: 'Comms terminal', fixed: true, start: true, cat: 'start', cost: { s: 0, c: 0 }, size: [1, 1], where: 'in', power: 0, h: 1.6, desc: 'Salvaged from the old station – needs 15 scrap to repair. Trade, hiring and the bank. Place it in your first room.' },
+  hoidla: { name: 'Storage', fixed: true, start: true, cat: 'start', cost: { s: 0, c: 0 }, size: [1, 1], where: 'in', power: 0, h: 1.4, desc: 'Storage shelves: everything the crew brings home goes here. Place it in your first room.' },
+  vanagen: { name: 'Old generator', fixed: true, start: true, cat: 'start', cost: { s: 0, c: 0 }, size: [2, 1], where: 'in', power: -4, h: 2.1, desc: 'Broken but repairable (25 scrap): 4 power for lights and the autocannon. Place it indoors.' },
 };
 // tubade ülesanded: kui toas on AINULT lubatud esemed ja nõutud asjad olemas, annab tuba boonuse
 const ROOM_PURPOSES = {
@@ -1607,7 +1607,9 @@ function createBase(opt) {
   }
 
   // ---------- algne roostes peahoone ----------
-  function setupStart() {
+  // uus mäng: tühi krunt – mängija ehitab esimese toa ja paigutab terminali, riiuli ja generaatori ise
+  function setupStart() { reset(); return null; }
+  function setupStartOld() {
     reset();
     const r = addRoom(17, 18, 21, 21, 0, 1.0);
     for (const k of [...openings.keys()]) openings.delete(k);

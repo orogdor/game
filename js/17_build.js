@@ -39,10 +39,12 @@ const Build = (() => {
     S.level = 0; Base.viewLevel = 0;
     undo.length = 0;
     UI.showBuild(true);
+    if (G.flags.prep) S.cat = Object.keys(OBJ).some((k) => OBJ[k].start && !Base.objsOfType(k).length) ? 'start' : 'elu';
     setTool(Input.isTouch ? 'look' : 'wall');
     G.flags.builtOnce = true;
   }
   function exit() {
+    if (G.flags.prep) { const p = UI.prepCheck(); if (!p.ok) { deny('Before day 1 you still need: ' + p.items.filter((x) => !x[1]).map((x) => x[0]).join(', ')); return; } }
     pending = null; drag = null; GFX.cam.shiftY = 0;
     S.level = 0; Base.viewLevel = 0;
     G.mode = 'play';
@@ -78,7 +80,9 @@ const Build = (() => {
   }
 
   // ---------- kaamera ----------
+  let prepT = 0;
   function update(dt) {
+    if (G.flags.prep && (prepT -= dt) <= 0) { prepT = 0.3; UI.prepBar(); }
     const k = (c) => Input.keys.has(c);
     const sp = cam.dist * 0.9 * dt;
     const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
@@ -347,7 +351,7 @@ const Build = (() => {
       const ref = { s: 0, c: 0, k: 0 }; for (const q of res.removed) { const h = half(OBJ[q.type].cost || {}); ref.s += h.s; ref.c += h.c; ref.k += h.k; }
       pay(ref, -1); UI.toast(OBJ[type].name + ' replaced ' + res.removed.map((q) => OBJ[q.type].name.toLowerCase()).join(', ') + ' · refund ' + costStr(ref));
       undo.length = 0;
-    } else { pay(cost); o = Base.addObj(type, i, j, rot, lv ? { lv: 1 } : null); undo.push({ type: 'obj', id: o.id, cost }); }
+    } else { pay(cost); o = Base.addObj(type, i, j, rot, Object.assign(lv ? { lv: 1 } : {}, type === 'terminal' || type === 'vanagen' ? { broken: true } : {})); undo.push({ type: 'obj', id: o.id, cost }); if (OBJ[type].start) { S.item = null; S.cat = Object.keys(OBJ).some((k) => OBJ[k].start && !Base.objsOfType(k).length) ? 'start' : 'elu'; UI.buildTools && UI.buildTools(S); } }
     Audio2.build();
     FX.dust(o.cx, o.y + 0.3, o.cz, 8, 1);
     if (Input.isTouch) { pending = null; UI.buildConfirm(null); }
@@ -486,7 +490,7 @@ const Build = (() => {
     }
     if (tg.kind === 'obj') {
       const o = tg.o;
-      if (OBJ[o.type].fixed) { deny(OBJ[o.type].name + ' is part of the main building and stays.'); return; }
+      if (OBJ[o.type].fixed && !G.flags.prep) { deny(OBJ[o.type].name + ' is part of the main building and stays.'); return; }
       const ref = half(OBJ[o.type].cost);
       pay(ref, -1);
       Base.removeObj(o.id);

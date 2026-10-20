@@ -985,7 +985,7 @@ const UI = (() => {
   function showBuild(on) {
     $('build').hidden = !on;
     $('hud').hidden = on;
-    if (on) { $('bRes').innerHTML = resChips(); $('bTtl').textContent = G.flags.prep ? 'PLAN YOUR BASE' : 'BUILD'; $('bDoneT').textContent = G.flags.prep ? 'Start day 1' : 'Done'; }
+    if (on) { $('bRes').innerHTML = resChips(); $('bTtl').textContent = G.flags.prep ? 'PLAN YOUR BASE' : 'BUILD'; if (!G.flags.prep) $('bDone').classList.remove('na'); prepBar(); $('bDoneT').textContent = G.flags.prep ? 'Start day 1' : 'Done'; }
     else showHUD(true);
   }
   // ehitusmenüü: tööriistad rühmadena (Toad / Uksed ja aknad / Esemed / Kujundus / Lammuta),
@@ -999,13 +999,27 @@ const UI = (() => {
   const bLast = {};
   function bGroupOf(t) { for (const g of BGROUPS) if (g[3].some(([k]) => k === t)) return g[0]; return null; }
   function itemMatches(S, k, d) {
-    if (d.fixed) return false;
+    if (d.fixed && !(d.start && G.flags.prep && !Base.objsOfType(k).length)) return false;
+    if (G.flags.prep && S.cat === 'start' && !(S.q || '').trim()) return !!d.start;
     if (S.level && (d.where === 'out' || d.needsUpper)) return false;
     const q = (S.q || '').trim().toLowerCase();
     if (q) return (d.name + ' ' + (d.desc || '') + ' ' + k).toLowerCase().includes(q);
     if (S.cat === 'all') return true;
     if (S.cat === 'recent') return (S.recent || []).includes(k);
     return d.cat === S.cat;
+  }
+  // ettevalmistuse kontrollnimekiri: mis peab enne päeva 1 valmis olema
+  function prepCheck() {
+    const inRoom = (t) => Base.objsOfType(t).some((o) => Base.roomAt(o.i, o.j) > 0);
+    const items = [['First room', Base.rooms.size >= 1], ['Terminal', inRoom('terminal')], ['Storage', inRoom('hoidla')], ['Generator', inRoom('vanagen')], ['Beds ' + Math.min(4, Base.countBeds()) + '/4', Base.countBeds() >= 4]];
+    return { ok: items.every((x) => x[1]), items };
+  }
+  function prepBar() {
+    if (!G.flags.prep || G.mode !== 'build') return;
+    const p = prepCheck();
+    const h = 'PLAN YOUR BASE <small class="prepck">' + p.items.map(([n, ok]) => `<span class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '○'} ${n}</span>`).join('') + '</small>';
+    if ($('bTtl').innerHTML !== h) $('bTtl').innerHTML = h;
+    $('bDone').classList.toggle('na', !p.ok);
   }
   function renderItems(S) {
     const el = $('bItems'); if (!el) return;
@@ -1048,8 +1062,8 @@ const UI = (() => {
       h += '<div id="bSub">' + sub.map(([k, n]) => `<button class="cat ${S.tool === k ? 'on' : ''}" data-s="${k}">${n}</button>`).join('') + '</div>';
     }
     if (S.tool === 'obj') {
-      const cnt = (c) => Object.entries(OBJ).filter(([k, d]) => !d.fixed && d.cat === c && !(S.level && (d.where === 'out' || d.needsUpper))).length;
-      const cats = [['recent', 'Recent'], ['all', 'All'], ...OBJ_CATS];
+      const cnt = (c) => Object.entries(OBJ).filter(([k, d]) => itemMatches({ cat: c, level: S.level }, k, d)).length;
+      const cats = [...(G.flags.prep ? [['start', 'Starter']] : []), ['recent', 'Recent'], ['all', 'All'], ...OBJ_CATS];
       h += `<div id="bCats"><input id="bSearch" type="search" placeholder="Search items…" value="${(S.q || '').replace(/"/g, '&quot;')}" autocomplete="off">${cats.map(([k, n]) => `<button class="cat ${S.cat === k && !S.q ? 'on' : ''}" data-c="${k}">${n}${k !== 'recent' && k !== 'all' ? ' <small>' + cnt(k) + '</small>' : ''}</button>`).join('')}</div><div id="bItems"></div>`;
     }
     $('bBody').innerHTML = h;
@@ -1113,7 +1127,7 @@ const UI = (() => {
     $('eTitle').onclick = () => { el.hidden = true; Game.toTitle(); };
   }
   function rotHint(on) { $('rotHint').hidden = !on; }
-  return {
+  return { prepCheck, prepBar,
     bubble, init, msg, toast, banner, damage, hitMarker, armorHit, whiz, shake, getShake, joy, lockHint, showHUD, update, updateObjective,
     openTerminal, openCrew, openMap, openMenu, openHelp, openInv, invDirty, closePanel, isPanelOpen, openPanel, btn, bindActs, esc, tabs,
     openRoomJob, openGarage, openCargo, showBuild, buildTools, buildInfo, buildConfirm, sleep, showTitle, hideTitle, end, buildMapCanvas, rotHint, renderPanel,

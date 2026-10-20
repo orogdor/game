@@ -1829,7 +1829,8 @@ const Crew = (() => {
     assignBeds();
   }
   // uus mäng algab kolme mehega: kaks kogujat ja jahimees, ametid juba antud
-  function starters() {
+  function starters(cx, cz) {
+    cx = cx || 0; cz = cz || 0;
     const used = new Set();
     const defs = [['kaevur', 'scrap', 'diamonds'], ['kaevur', 'diamonds', 'scrap'], ['jahimees', 'hunter', 'scrap']];
     const traits = Object.keys(TRAITS).filter((t) => t !== 'argpyks' && t !== 'laisk' && t !== 'vaikne' && t !== 'ahne' && t !== 'ookull');
@@ -1838,7 +1839,7 @@ const Crew = (() => {
       const tr = pick(traits), skill = 2;
       const hp = 95 * (tr === 'vintske' ? 1.5 : 1) * (tr === 'veteran' ? 1.3 : 1);   // algmeeskond on karastunud
       const a = -0.6 + i * 0.6;
-      Ents.spawn('human', 'crew', -1 + Math.sin(a) * 3.2, 4.5 + Math.cos(a) * 1.5, {
+      Ents.spawn('human', 'crew', cx + Math.sin(a) * 1.6, cz + Math.cos(a) * 1.2, {
         maxHp: hp, radius: 0.38, ai: crewAI, tint: null,
         crew: { name, look: Look.clean(Look.forName(name)), role, skill, trait: tr, fear: Math.min(0.45, rollFear(tr)), wage: Math.round(ROLES[role].wage * 0.85), story: 'Came with you on the shuttle to K-7.', spy: false,
           hunger: 90, thirst: 90, hygiene: 85, bladder: 85, energy: 95, morale: 75, rel: {}, bed: null, task: null, act: 'Looking around', carry: 0, carryKind: null, thefts: 0, stoleTonight: false, hiredDay: 1, unpaid: 0, job, job2 },

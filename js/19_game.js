@@ -248,7 +248,7 @@ const Game = (() => {
 
   function resetState() {
     G.time = { day: 1, t: 0.03, total: 0 };
-    G.res = { cr: 460, scrap: 270, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
+    G.res = { cr: 560, scrap: 400, kris: 0, lihv: 0, meat: 0, food: 6, ore: 0, acid: 0 };
     G.carry = { kris: 0, scrap: 0, meat: 0, stones: 0 };
     G.dk = DIFFS[G.diff] || DIFFS.tavaline;
     G.debt = { left: Math.round(30000 * G.dk.debt), nextDay: 4, amount: 0, idx: 0, grace: false, warned: false };
@@ -285,7 +285,6 @@ const Game = (() => {
     Boss.spawn();
     Econ.genCandidates();
     Inv.startKit();
-    Crew.starters();
     Player.reset(-1, 1.5, Math.PI); Player.fillMags();
     Player.yaw = Math.PI;
     G.gid = 'g' + Date.now().toString(36);
@@ -293,14 +292,22 @@ const Game = (() => {
     G.flags.prep = true;
     startPlay();
     Build.enter();
-    UI.banner('Plan your base', 'Time is frozen. Build two rooms, an autocannon and the basics, then press Start.');
-    UI.msg('Before day 1: the materials in storage are enough for about two rooms, one autocannon and the basic fittings (stove, water, toilet). Time does not run until you press Start.', 'good');
+    UI.banner('Plan your base', 'Empty ground. Build your first room, place the terminal, storage and generator, beds for 4 – then press Start.');
+    UI.msg('Before day 1: build the first room (Rooms → wall), then Items → Starter: comms terminal, storage and the old generator. You need 4 beds (you + 3 crew). The materials are enough for about three rooms, one autocannon and the basics. Your crew arrives when you press Start.', 'good');
     Objectives.check();
     Save.save();
   }
   // ettevalmistus läbi: päev 1 algab
   function beginDay1() {
     G.flags.prep = false;
+    // algmeeskond saabub alles nüüd: esimese toa keskele, mängija terminali juurde
+    let cx = 0, cz = 0, n = 0;
+    for (const r of Base.rooms.values()) { for (const [i, j] of r.cells) { const c = Base.cellCenter(i, j); cx += c.x; cz += c.z; n++; } break; }
+    if (n) { cx /= n; cz /= n; }
+    const tm = Base.objsOfType('terminal')[0];
+    Player.reset(tm ? tm.cx + (cx - tm.cx) * 0.4 : cx, tm ? tm.cz + (cz - tm.cz) * 0.4 : cz, Player.yaw);
+    Crew.starters(cx, cz);
+    UI.msg('The cargo shuttle dropped off your three crew.', 'good');
     UI.banner('Day 1', 'Mining station K-7 is yours. Bring it back to life.');
     setTimeout(() => { if (G.mode === 'play') UI.msg('This planet was abandoned when the Stoneheart\'s aliens took it over. The base heart\'s hum keeps the sandworms away – guard it.', 'warn'); }, 3000);
     setTimeout(() => { if (G.mode === 'play') UI.msg('Whoever brings in the Stoneheart\'s heartstones – proof of the kill – gets the colonisation rights. And your debt is gone.', 'good'); }, 9000);
