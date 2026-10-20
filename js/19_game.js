@@ -444,6 +444,7 @@ const Game = (() => {
       else if (P('KeyT')) UI.openTerminal();
       else if (P('KeyC')) UI.openCrew();
       else if (P('KeyV')) Crew.followNear(18);
+      else if (P('KeyJ')) Vehicles.callPickup();
       else if (P('KeyM')) UI.openMap();
       else if (P('Escape') || P('KeyP')) UI.openMenu();
     } else if (G.mode === 'build') {

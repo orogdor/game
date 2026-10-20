@@ -1391,6 +1391,20 @@ const Crew = (() => {
         }
         return;
       }
+      case 'pickup': {   // mängija kutsus: jookse sõiduki juurde, sõida mängija juurde, siis jää talle järgnema
+        const v = k.v; k.t += dt;
+        if (!v || v.dead || k.t > 300) { k.done = true; return; }
+        if (k.step === 0) { e._noRide = true; Ents.goTo(e, v.x, v.z); e._noRide = false; k.step = 1; setAct(e, 'Running to the vehicle to pick you up'); }
+        else if (k.step === 1) {
+          if (v.seats[0] || v.ai) { k.done = true; return; }
+          if (Ents.stepMove(e, dt, sp * 1.3) || Math.hypot(v.x - e.pos.x, v.z - e.pos.z) < 3.2) { if (Vehicles.startPickup(v, e)) k.step = 2; else k.done = true; }
+        } else {   // sõit on läbi (Vehicles laseb juhi maha) -> järgneb mängijale
+          k.done = true;
+          setFollow(e, true);
+          say(e, pick(['Your ride, boss.', 'Hop in!', 'Taxi\'s here.']), 5);
+        }
+        return;
+      }
       case 'salvage': {
         const w = k.wreck;
         if (k.step === 0) {
@@ -1834,6 +1848,19 @@ const Crew = (() => {
     G.flags.hiredOnce = true;
     assignBeds();
   }
+  // sõidukiga järeletulija: lähim vaba inimene baasis (ärkvel olijad eelistatud, mitte kaitsepostil)
+  function pickupDriver(v) {
+    const busy = (m) => { const k = m.crew.task; return k && !k.done && (k.type === 'post' && !k.watch || k.type === 'vgun' || k.type === 'pickup' || k.type === 'heal'); };
+    const c = members().filter((m) => m.alive && !m.downed && !m.crew.follow && !m.inVehicle && !m.toVeh && !busy(m) && Math.hypot(m.pos.x - v.x, m.pos.z - v.z) < 150)
+      .sort((a, b) => ((a.pose === 'lie') - (b.pose === 'lie')) || Math.hypot(a.pos.x - v.x, a.pos.z - v.z) - Math.hypot(b.pos.x - v.x, b.pos.z - v.z))[0];
+    if (!c) return null;
+    if (c.crew.task && c.crew.task.type === 'gchat') leaveGroup(c);
+    wakeUp(c); c.gesture = null;
+    if (c.crew.task) c.crew.task.done = true;
+    c.crew.task = { type: 'pickup', step: 0, v, t: 0 };
+    say(c, pick(['On my way, boss!', 'Hold tight, I\'m bringing the wheels.', 'Coming to get you!']), 5);
+    return c;
+  }
   function setFollow(e, on, who) {
     if (!e || !e.crew) return;
     e.crew.follow = !!on; e.crew.leader = on && who && who !== Player ? who : null;
@@ -1853,5 +1880,5 @@ const Crew = (() => {
     Audio2.ui && Audio2.ui();
   }
   function followers() { return members().filter((m) => m.crew.follow); }
-  return { starters, note, hear, torchLights, roomTypes, hasRoomJob, roomJobOf, setFollow, followNear, followers, MAX, members, count, freeBeds, canHire, hire, fire, payWages, afterSleep, onDeath, engineerBonus, scientistAtScanner, update, turretTargets, assignBeds, serialize, deserialize, crewAI };
+  return { starters, pickupDriver, note, hear, torchLights, roomTypes, hasRoomJob, roomJobOf, setFollow, followNear, followers, MAX, members, count, freeBeds, canHire, hire, fire, payWages, afterSleep, onDeath, engineerBonus, scientistAtScanner, update, turretTargets, assignBeds, serialize, deserialize, crewAI };
 })();
