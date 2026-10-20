@@ -549,14 +549,15 @@ const Crew = (() => {
     if (c.carryKind === 'scrap') { G.res.scrap += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' scrap'); }
     if (c.carryKind === 'ore') { G.res.ore = (G.res.ore || 0) + c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' iron ore'); }
     if (c.carryKind === 'acid') { G.res.acid = (G.res.acid || 0) + c.carry; G.flags.acid = true; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' acid glands'); }
+    if (c.carryKind === 'metal') { const v = c.carry * Geysers.VAL; G.res.cr += v; G.stats.metal = (G.stats.metal || 0) + c.carry; UI.toast(c.name.split(' ')[0] + ' brought precious metal: +' + v + ' ₵'); Audio2.cash && Audio2.cash(); }
     if (c.carryKind === 'meat') { G.res.meat += c.carry; UI.toast(c.name.split(' ')[0] + ' brought ' + c.carry + ' meat'); }
     c.carry = 0; c.carryKind = null;
   }
 
   // ---------- väljasõidud gruppides ----------
   // korjama / jahile minnakse võimalusel mitmekesi: sama sihtmärgi poole minejad ühinevad, vabad kaaslased kutsutakse kaasa
-  const OUT_TYPES = { mine: 1, salvage: 1, hunt: 1, drill: 1, scout: 1 }, IDLE_TYPES = { leisure: 1, wander: 1, explore: 1, sunset: 1, slack: 1, quiet: 1, warm: 1, tidy: 1 };
-  const goalOf = (k) => (k.type === 'salvage' ? k.wreck : k.type === 'drill' ? k.ore : k.type === 'mine' ? k.site : k.type === 'scout' ? k.spot : k.target);
+  const OUT_TYPES = { mine: 1, salvage: 1, hunt: 1, drill: 1, scout: 1, geyser: 1 }, IDLE_TYPES = { leisure: 1, wander: 1, explore: 1, sunset: 1, slack: 1, quiet: 1, warm: 1, tidy: 1 };
+  const goalOf = (k) => (k.type === 'salvage' ? k.wreck : k.type === 'drill' ? k.ore : k.type === 'mine' ? k.site : k.type === 'scout' ? k.spot : k.type === 'geyser' ? k.g : k.target);
   function outingOf(e, type, pred) {
     for (const m of members()) {
       if (m === e || !m.crew.task || m.crew.task.type !== type || m.crew.task.done || (m.crew.task.step || 0) > 1) continue;
@@ -630,18 +631,43 @@ const Crew = (() => {
     }
     return null;
   }
-  // teemandid: ainult täpselt teada leiukohad (raadiusega 150 m baasist ka umbkaudsed); automaatne kaevur läheb vanaviisi ka umbkaudsele kohale
+  // kaaslane kaugele retkele: võetakse baasist kaasa keegi vaba (eelistatult sama ametiga)
+  function escort(e, task) {
+    const jk = jobKey(e.crew);
+    const c = members().filter((m) => m !== e && canJoin(m) && Math.hypot(m.pos.x, m.pos.z) < 90)
+      .sort((p, q) => (jobKey(q.crew) === jk) - (jobKey(p.crew) === jk) || Math.hypot(p.pos.x - e.pos.x, p.pos.z - e.pos.z) - Math.hypot(q.pos.x - e.pos.x, q.pos.z - e.pos.z))[0];
+    if (!c) return null;
+    if (c.crew.task && c.crew.task.type === 'gchat') leaveGroup(c);
+    if (c.pose === 'sit' || c.pose === 'lie') c.pose = 'stand';
+    if (c.crew.task) c.crew.task.done = true;
+    task.goal = goalOf(task); task.buddy = c; task.far = true;
+    c.crew.task = Object.assign({}, task, { step: 0, t: 0, buddy: e, helper: jobKey(c.crew) !== jk });
+    say(c, pick(['Far out there? I\'ll cover you.', 'Not letting you go alone that far.', 'I\'ll come along, grab the water.']), 6);
+    say(e, pick(['Long trip – ' + first(c) + ', you\'re with me.', 'Coming, ' + first(c) + '? It\'s a long way.']), 6);
+    return task;
+  }
+  // teemandid / väärismetall:
+  //  1) lähedal täpselt teada komeet  2) baasi aurugeiser  3) kaugem komeet või rikas geiser – ainult kaaslasega
   function jobDiamonds(e, night, strict) {
     if (night) return null;
     { const o = outingOf(e, 'mine'); if (o) return { type: 'mine', step: 0, site: o.crew.task.site, t: 0, buddy: o, goal: o.crew.task.site }; }
-    const all = Comets.activeSites().filter((s) => Math.hypot(s.x, s.z) < 560);
-    const sites = all.filter((s) => s.exact || Math.hypot(s.x, s.z) < 150 || !strict && s.age > 20);
-    if (sites.length) { sites.sort(byDist(e)); return expedition(e, { type: 'mine', step: 0, site: sites[0], t: 0 }); }
-    const near = all.filter((s) => Math.hypot(s.x, s.z) < 330);
-    if (strict && near.length && !members().some((m) => m.crew.job === 'scout')) {   // pole avastajat: otsib ise (ainult lähemalt)
-      near.sort(byDist(e)); const s = near[0];
-      return expedition(e, { type: 'scout', step: 0, spot: { x: s.x + s.ox, z: s.z + s.oz }, site: s, t: 0 });
+    { const o = outingOf(e, 'geyser', (g) => g.stock > 2); if (o) return { type: 'geyser', step: 0, g: o.crew.task.g, t: 0, buddy: o, goal: o.crew.task.g }; }
+    const all = Comets.activeSites().filter((s) => Math.hypot(s.x, s.z) < 900);
+    const close = all.filter((s) => (s.exact || Math.hypot(s.x, s.z) < 150 || !strict && s.age > 20) && Math.hypot(s.x, s.z) < 330);
+    if (close.length) { close.sort(byDist(e)); return expedition(e, { type: 'mine', step: 0, site: close[0], t: 0 }); }
+    const busy = (g) => members().filter((m) => m !== e && m.crew.task && m.crew.task.type === 'geyser' && m.crew.task.g === g && !m.crew.task.done).length;
+    const hg = Geysers.forBase();
+    if (hg && hg.stock >= 3 && busy(hg) < 1) return { type: 'geyser', step: 0, g: hg, t: 0 };
+    // kaugem retk: täpne komeet, umbkaudne komeet (otsib ise) või rikas geiser
+    if (Econ.hour() < 14.5) {
+      const ex = all.filter((s) => s.exact && Math.hypot(s.x, s.z) >= 330).sort(byDist(e))[0];
+      if (ex) { const t = escort(e, { type: 'mine', step: 0, site: ex, t: 0 }); if (t) return t; }
+      const ap = all.filter((s) => !s.exact && Math.hypot(s.x, s.z) < (strict ? 700 : 500) && !members().some((m) => m.crew.task && m.crew.task.site === s)).sort(byDist(e))[0];
+      if (ap && strict && !members().some((m) => m.crew.job === 'scout')) { const t = escort(e, { type: 'scout', step: 0, spot: { x: ap.x + ap.ox, z: ap.z + ap.oz }, site: ap, t: 0 }); if (t) return t; }
+      const rg = Geysers.list.filter((g) => !g.home && g.stock >= 10 && Math.hypot(g.x, g.z) < 750 && Fog.seen(g.x, g.z) && !busy(g)).sort(byDist(e))[0];
+      if (rg) { const t = escort(e, { type: 'geyser', step: 0, g: rg, t: 0 }); if (t) return t; }
     }
+    if (hg && hg.stock >= 1 && busy(hg) < 1 && Math.random() < 0.5) return { type: 'geyser', step: 0, g: hg, t: 0 };
     return null;
   }
   function jobPolish(e) {
@@ -1340,6 +1366,28 @@ const Crew = (() => {
             if (c.carry >= cap) k.done = true;
             else if (k.cl.amount <= 0) k.step = 0;
           }
+        }
+        return;
+      }
+      case 'geyser': {   // väärismetalli korjamine aurugeisri juurest; kui varu otsas, oota natuke järgmist pursket
+        e.hasGun = true;
+        const g = k.g, cap = Math.round((c.trait === 'tugev' ? 26 : 18) * Levels.crewCarry(c) * HAUL);
+        if (!g) { k.done = true; return; }
+        if (k.step === 0) { const a = Math.atan2(e.pos.z - g.z, e.pos.x - g.x) + rand(-0.6, 0.6); Ents.goTo(e, g.x + Math.cos(a) * 2.6, g.z + Math.sin(a) * 2.6); k.step = 1; k.mt = 0; setAct(e, k.far ? 'Long trip to a steam geyser' : 'Going to the steam geyser'); }
+        else if (k.step === 1) { k.mt += dt; if (Ents.stepMove(e, dt, groupSpeed(e, k, sp)) || Math.hypot(e.pos.x - g.x, e.pos.z - g.z) < 3.4 || k.mt > 200) { k.step = 2; k.t = 0; k.w = 0; } }
+        else {
+          Ents.face(e, g.x, g.z, dt); e.hasGun = false;
+          if (g.stock > 0) {
+            setAct(e, 'Picking precious metal'); e.gesture = 'mine';
+            k.t += dt * workMult(c) * GATHER;
+            if (k.t > 1.6) { k.t = 0; const n = Geysers.take(g, 1); if (n) { c.carry += n; c.carryKind = 'metal'; } }
+            if (c.carry >= cap) { e.gesture = null; k.done = true; }
+          } else {
+            e.gesture = null; setAct(e, 'Waiting for the geyser to erupt'); k.w += dt;
+            if (k.w > (k.far ? 90 : 35) || c.carry >= cap * 0.5 && k.w > 10) k.done = true;
+            if (k.w > 4 && !c.carry && !k.far) k.done = true;
+          }
+          if (Econ.isNight()) k.done = true;
         }
         return;
       }

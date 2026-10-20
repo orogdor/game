@@ -336,6 +336,7 @@ const World = (() => {
     scatter(rng);
     if (typeof City !== 'undefined') City.build(mulberry32(s * 13 + 7));
     if (typeof Tunnels !== 'undefined') Tunnels.build(mulberry32(s * 17 + 3));
+    if (typeof Geysers !== 'undefined') Geysers.build(mulberry32(s * 19 + 5));
   }
 
   let tPos = null, tNor = null, tCol = null;
@@ -745,6 +746,7 @@ const World = (() => {
     for (const d of sites.decor || []) GFX.draw(d.mesh, d.m, null, null, { rust: 1.1 });
     if (typeof City !== 'undefined') City.draw();
     if (typeof Tunnels !== 'undefined') Tunnels.draw();
+    if (typeof Geysers !== 'undefined') Geysers.draw();
   }
 
   return {

@@ -18,7 +18,7 @@ const Save = (() => {
       base: Base.serialize(), crew: Crew.serialize(), rivals: Rivals.serialize(), boss: Boss.serialize(), comets: Comets.serialize(), pcore: Rivals.playerCoreHp(), vehicles: Vehicles.serialize(),
       wrecks: World.wrecks.map((w) => [w.scrap, w.known ? 1 : 0]), ores: World.ores.map((o) => [o.amount, o.known ? 1 : 0]), obj: Objectives.serialize(), log: G.log.slice(-25), waypoint: UI.waypoint,
       pickups: Ents.pickups.filter((p) => !p.gone).map((p) => ({ kind: p.kind, x: p.x, z: p.z, data: p.data, city: p.city || undefined, seen: p.seen || undefined })),
-      look: Look.clean(G.look), pname: G.pname, fog: Fog.serialize(), inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
+      look: Look.clean(G.look), pname: G.pname, fog: Fog.serialize(), geysers: Geysers.serialize(), inv: Inv.serialize(), pmag: Player.mag, gid: G.gid,
     };
   }
   function hash(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(16); }
@@ -324,6 +324,7 @@ const Game = (() => {
     Vehicles.deserialize(d.vehicles || []);
     Comets.deserialize(d.comets || {});
     Fog.deserialize(d.fog);
+    Geysers.deserialize(d.geysers);
     Crew.deserialize(d.crew);
     for (const p of d.pickups || []) Ents.pickups.push({ kind: p.kind, x: p.x, y: Ents.groundY(p.x, p.z), z: p.z, data: p.data, city: p.city, seen: p.seen });
     Objectives.deserialize(d.obj);
@@ -466,6 +467,7 @@ const Game = (() => {
     if (typeof Fauna !== 'undefined') Fauna.tick(dt);
     if (typeof Fauna2 !== 'undefined') Fauna2.tick(dt);
     Fog.tick(dt);
+    Geysers.tick(dt);
     Sandworm.update(dt);
     Ents.update(dt);
     Crew.update(dt);

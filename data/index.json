@@ -1,5 +1,5 @@
 {
- "version": "v82",
+ "version": "v83",
  "data": [
   {
    "var": "MODEL_DATA",
@@ -113,6 +113,7 @@
   "js/14i_fauna.js",
   "js/14j_fauna2.js",
   "js/14k_fog.js",
+  "js/14l_geysers.js",
   "js/15_objectives.js",
   "js/16_input.js",
   "js/17_build.js",
