@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-11-02T09:08:06.550Z",
+  "completed": 29,
+  "planned": 77,
+  "tests": true,
+  "build": true,
+  "screenshots": [
+    "2026-11-02T09-07-56-phone.png",
+    "2026-11-02T09-07-56-desktop.png"
+  ],
+  "errors": [],
+  "progress": [
+    "2026-11-02T09:01:37.853Z PASS src/enemies.js syntax+tests+build",
+    "2026-11-02T09:01:37.855Z Task 32 attempt 1 src/main.js",
+    "2026-11-02T09:04:33.420Z MODEL reasoning_tokens=520, total_output_tokens=2541, tokens_per_second=14.915100312975175",
+    "2026-11-02T09:04:40.123Z Retry cause: Browser: ",
+    "> sugaviku-varav-5h@0.0.1 smoke",
+    "> node tests/smoke.mjs",
+    "page.evaluate: TypeError: Cannot destructure property 'hero' of 'window.__rpg' as it is undefined.",
+    "    at eval (eval at evaluate (:370:30), <anonymous>:1:13)",
+    "    at UtilityScript.evaluate (<anonymous>:372:16)",
+    "    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+    "    at D:\\LocalAI\\RPG_5H_20261102\\game\\tests\\smoke.mjs:22:13",
+    "Command failed: cmd.exe /d /s /c npm run smoke",
+    "page.evaluate: TypeError: Cannot destructure property 'hero' of 'window.__rpg' as it is undefined.",
+    "    at eval (eval at evaluate (:370:30), <anonymous>:1:13)",
+    "    at UtilityScript.evaluate (<anonymous>:372:16)",
+    "    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+    "    at D:\\LocalAI\\RPG_5H_20261102\\game\\tests\\smoke.mjs:22:13",
+    "2026-11-02T09:04:40.124Z Task 32 attempt 2 src/main.js"
+  ],
+  "filename": "2026-11-02T09-07-56-report.json",
+  "smoke": true,
+  "verified_at": "2026-11-02T09:15:00Z",
+  "verified_note": "Independent npm test (1/1), npm run build and npm run smoke (playable canvas movement; errors=0) passed on 2026-11-02 around 11:15 Tallinn time. Latest screenshot is from 11:07:56 Tallinn time."
+}

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-const mats={grass:new THREE.MeshStandardMaterial({color:0x344d35,roughness:1}),dirt:new THREE.MeshStandardMaterial({color:0x6b6041,roughness:1}),bark:new THREE.MeshStandardMaterial({color:0x44392f}),leaves:new THREE.MeshStandardMaterial({color:0x244c36}),stone:new THREE.MeshStandardMaterial({color:0x5e696c,roughness:1})};
+const mats={grass:new THREE.MeshStandardMaterial({color:0x344d35,roughness:.9}),dirt:new THREE.MeshStandardMaterial({color:0x6b6041,roughness:.8}),bark:new THREE.MeshStandardMaterial({color:0x44392f,roughness:.7}),leaves:new THREE.MeshStandardMaterial({color:0x244c36,roughness:.5}),stone:new THREE.MeshStandardMaterial({color:0x5e696c,roughness:.8})};
 const rand=(n)=>{let x=Math.sin(n*93.71+1.43)*47521;return x-Math.floor(x);};
 export function createWorld(scene){
  scene.background=new THREE.Color(0x101e2a);scene.fog=new THREE.FogExp2(0x101e2a,0.024);
@@ -14,12 +14,12 @@ export function createWorld(scene){
    if(Math.abs(x)<7&&Math.abs(z)<63)continue;
    const tree=new THREE.Group(),trunk=new THREE.Mesh(trunkGeo,mats.bark);
    trunk.position.y=2.5;tree.add(trunk);
-   for(let j=0;j<2;j++){const crown=new THREE.Mesh(leafGeo,mats.leaves);crown.position.y=5.8+j*1.8;crown.scale.set(1-j*.16,1-j*.18,1-j*.16);tree.add(crown);}
+   for(let j=0;j<2;j++){const crown=new THREE.Mesh(leafGeo,mats.leaves);crown.position.y=5.8+j*1.8;crown.scale.setScalar(.84-j*.16,1-j*.18,.84-j*.16);tree.add(crown);}
    tree.position.set(x,0,z);tree.scale.setScalar(.7+rand(i+75)*.85);root.add(tree);
  }
  for(let i=0;i<65;i++){
    const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.5+rand(i+300)*1.2,0),mats.stone);
-   rock.position.set((rand(i+101)-.5)*140,.16,(rand(i+871)-.5)*140);
+   rock.position.set((rand(i+101)-.5)*140,.16+(rand(i+9)*.7)*.1,(rand(i+871)-.5)*140);
    rock.scale.set(1,.35+rand(i+9)*.7,.9);root.add(rock);
  }
  const ruin=new THREE.Group(),block=new THREE.BoxGeometry(1.6,5,1.6);

@@ -10,7 +10,7 @@ export function createEnemy(scene,x,z){
  const clawL=new THREE.Mesh(new THREE.TorusGeometry(.06,.03,4,8,Math.PI),skin);clawL.position.set(-.25,1.7,.2);clawL.rotation.x=Math.PI/2;root.add(clawL);
  const clawR=new THREE.Mesh(new THREE.TorusGeometry(.06,.03,4,8,Math.PI),skin);clawR.position.set(.25,1.7,.2);clawR.rotation.x=Math.PI/2;root.add(clawR);
  root.position.set(x,0,z);scene.add(root);
- return {group:root,hp:40,maxHp:40,speed:1.5,damage:7,attackCooldown:0};
+ return {group:root,hp:40,maxHp:40,speed:1.5,damage:7,attackCooldown:0,isDead:false};
 }
 export function spawnEnemies(scene,count=8){
  const enemies=[];
@@ -18,13 +18,21 @@ export function spawnEnemies(scene,count=8){
  return enemies;
 }
 export function updateEnemies(enemies,hero,dt){
- for(const e of enemies){e.attackCooldown-=dt;
+ for(const e of enemies){
+  if(e.isDead)continue;
+  e.attackCooldown-=dt;
   const dx=hero.group.position.x-e.group.position.x,dz=hero.group.position.z-e.group.position.z,d=Math.hypot(dx,dz);
   if(d<15&&d>1.25){e.group.position.x+=dx/d*e.speed*dt;e.group.position.z+=dz/d*e.speed*dt;e.group.rotation.y=Math.atan2(dx,dz);}
   else if(d<=1.25&&e.attackCooldown<=0){hero.hp=Math.max(0,hero.hp-e.damage);e.attackCooldown=1.3;}
   const distToHero=d/Math.max(1,d-1.25);
   e.group.children[0].scale.setScalar(1+Math.min(distToHero*.3,0.4));
-  if(e.group.children[2]&&e.group.children[3]){const cL=e.group.children[2],cR=e.group.children[3];
-   cL.position.x=-.25*(1+distToHero);cR.position.x=.25*(1+distToHero);}
+  if(e.group.children[2]&&e.group.children[3]){const cL=e.group.children[2],cR=e.group.children[3];cL.position.x=-.25*(1+distToHero);cR.position.x=.25*(1+distToHero);}
  }
 }
+export function takeDamage(enemies,amount){
+ for(const e of enemies)e.hp-=amount;
+ return enemies.filter(e=>e.hp>0);
+}
+export function killEnemy(enemy){enemy.hp=0;enemy.isDead=true;}
+export function getAliveEnemies(enemies){return enemies.filter(e=>!e.isDead);}
+export function scaleLevel(enemies,level){for(const e of enemies)e.speed+=level*0.25;}
