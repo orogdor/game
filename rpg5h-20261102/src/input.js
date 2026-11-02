@@ -13,6 +13,11 @@ export function createInput(){
   button.addEventListener('pointerdown',press);button.addEventListener('pointerup',release);
   button.addEventListener('pointercancel',release);button.addEventListener('pointerleave',release);
  }
+ const pause=new Set();
+ layer.addEventListener('pointerdown',e=>{if(e.target.classList.contains('dpad'))pause.add(e.pointerId)});
+ layer.addEventListener('pointerup',e=>{if(e.target.classList.contains('dpad'))pause.delete(e.pointerId)});
+ layer.addEventListener('pointercancel',e=>{if(e.target.classList.contains('dpad'))pause.delete(e.pointerId)});
+ const isPaused=()=>Array.from(pause).length>0;
  return {held,buttons,direction(){
   const x=Number(held.has('KeyD')||held.has('ArrowRight'))-Number(held.has('KeyA')||held.has('ArrowLeft'));
   const z=Number(held.has('KeyS')||held.has('ArrowDown'))-Number(held.has('KeyW')||held.has('ArrowUp'));
