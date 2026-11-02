@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-11-02T06:43:38Z",
-  "completed": 10,
+  "timestamp": "2026-11-02T06:47:46Z",
+  "completed": 13,
   "planned": 77,
   "tests": true,
   "build": true,
   "smoke": true,
   "screenshots": [
-    "2026-11-02T06-43-38-phone.png",
-    "2026-11-02T06-43-38-desktop.png"
+    "2026-11-02T06-47-46-phone.png",
+    "2026-11-02T06-47-46-desktop.png"
   ],
   "errors": [],
   "model": "qwen/qwen3.5-9b",
   "reasoning": "on",
   "notes": [
-    "Restored follow-camera and portal rotation",
-    "Repaired combat API: hit, damage, cooldown, loot counters",
-    "Expanded browser smoke: movement, camera tracking, combat"
+    "New enemy combat and camera follow tested in local and public browsers",
+    "Items manager, coin/potion/XP pickup integrated; local pickup test passed",
+    "Progression module created, integration task 14 currently running"
   ],
-  "source": "Locally verified after 10 completed tasks; screenshots captured 08:43:38 Europe/Tallinn"
+  "source": "Live local state at 08:47 Europe/Tallinn; public source updated through step 13"
 }
