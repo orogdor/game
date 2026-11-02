@@ -1,0 +1,2 @@
+import * as THREE from 'three';
+export function createPineTree(height=5){const g=new THREE.Group();const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.14,.22,height*.4,7),new THREE.MeshStandardMaterial({color:0x57402e}));trunk.position.y=height*.2;g.add(trunk);for(let i=0;i<3;i++){const c=new THREE.Mesh(new THREE.ConeGeometry(height*(.22-i*.035),height*.48,8),new THREE.MeshStandardMaterial({color:i%2?0x234d37:0x1b3d2e}));c.position.y=height*(.45+i*.19);g.add(c);}return g;}
