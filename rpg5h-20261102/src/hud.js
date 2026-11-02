@@ -1,4 +1,3 @@
-import './style.css';
 export function createHUD(){
  const hud=document.createElement('div');hud.id='hud';
  hud.innerHTML='<div class="top"><div class="brand">SÜGAVIKU VÄRAV</div><span id="stats"></span></div><div class="mission"><b>ESIMENE ÜLESANNE</b><p>Leidke põhja suunas hõõguv värav. Võitle koletistega!</p><small>WASD / nooled · tühik: rünnak · mobiilis ekraaninupud</small></div><div id="message">Sinu seiklus algab...</div><div class="inventory" style="display:none"><h3>VARUSTUS</h3><ul id="inv-list"></ul></div><div class="quests" style="display:none"><h3>ÜLESANDED</h3><ul id="quest-list"></ul></div>';
