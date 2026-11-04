@@ -1,0 +1,21 @@
+name: Fetch geographic coastline for Saaremaa Rally
+on:
+  push:
+    branches: [saaremaa-gis-toomalouka-2025]
+    paths: ['.github/workflows/saaremaa-coast.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install shapely
+      - run: python3 saaremaa_real_gis/fetch_coast.py
+      - name: Persist source-derived coastline only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add saaremaa_real_gis/osm_coastline_local.json saaremaa_real_gis/COAST_REPORT.txt
+          git diff --cached --quiet || (git commit -m 'Import OSM coastline for real Saaremaa route' && git push origin HEAD:saaremaa-gis-toomalouka-2025)
