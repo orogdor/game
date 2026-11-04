@@ -1,0 +1,13 @@
+{
+  "source": "OpenStreetMap contributors via Overpass API",
+  "download_time_utc": "2026-11-04T20:44:41.173109+00:00",
+  "corridor_m": 310,
+  "source_stage": "Saaremaa Rally official KML 2025",
+  "osm_elements_queried": 718,
+  "feature_counts": {
+    "roads": 28,
+    "landcover": 13,
+    "buildings": 85
+  },
+  "elevation_source": null
+}
