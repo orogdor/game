@@ -1,0 +1,67 @@
+name: Fetch Saaremaa Rally Toomalouka GIS data
+on:
+  push:
+    branches: [saaremaa-gis-toomalouka-2025]
+    paths:
+      - '.github/workflows/saaremaa-gis-fetch.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download public authoritative vector tracks and metadata
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.parse, json, pathlib, re, io, zipfile, xml.etree.ElementTree as ET
+          root=pathlib.Path("saaremaa_real_gis");root.mkdir(exist_ok=True)
+          lines=[]
+          def download(url):
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0 (GIS public data research)'})
+              with urllib.request.urlopen(req,timeout=40) as response:
+                  return response.read()
+          urls=[
+            ('official_map_2025.kml', 'https://www.google.com/maps/d/kml?mid=14S2MPiYDUhd3tmzASpX1LM6mFs3oQ9Q&forcekml=1'),
+            ('road_21108.geojson', 'https://tarktee.transpordiamet.ee/tarktee/rest/services/roads/MapServer/0/query?'+urllib.parse.urlencode({'where':'road_nr=21108','outFields':'*','returnGeometry':'true','outSR':4326,'f':'geojson'})),
+            ('road_21103.geojson', 'https://tarktee.transpordiamet.ee/tarktee/rest/services/roads/MapServer/0/query?'+urllib.parse.urlencode({'where':'road_nr=21103','outFields':'*','returnGeometry':'true','outSR':4326,'f':'geojson'})),
+          ]
+          for name,url in urls:
+              try:
+                  b=download(url)
+                  if b[:2] == b'PK':
+                      with zipfile.ZipFile(io.BytesIO(b)) as z:
+                          name0=next((n for n in z.namelist() if n.lower().endswith('.kml')),None)
+                          if not name0: raise ValueError('KMZ has no KML')
+                          b=z.read(name0)
+                  if name.endswith('kml'):
+                      r=ET.fromstring(b)
+                      counts=[]
+                      for p in r.findall('.//{*}Placemark'):
+                          nm=p.findtext('./{*}name') or ''
+                          n=sum(len((c.text or '').split()) for c in p.findall('.//{*}LineString/{*}coordinates'))
+                          if n: counts.append((nm,n))
+                      lines.append(f'{name}: {len(b)} bytes, LineStrings={counts}')
+                      if not counts: raise ValueError('No routes in KML; not a verified special stage')
+                  else:
+                      data=json.loads(b)
+                      features=data.get('features',[])
+                      if data.get('type')!='FeatureCollection' or not features:
+                          raise ValueError('No GeoJSON road features: '+str(data)[:200])
+                      n=sum(len(f.get('geometry',{}).get('coordinates',[])) for f in features)
+                      lines.append(f'{name}: {len(b)} bytes, features={len(features)}, outer coordinate groups={n}')
+                  (root/name).write_bytes(b)
+              except Exception as e:
+                  lines.append(f'{name}: FAILED {type(e).__name__}: {str(e)[:350]}')
+          (root/'GIS_REPORT.txt').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+          print('\n'.join(lines))
+          PY
+      - name: Commit results without overwriting game code
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add saaremaa_real_gis/
+          git diff --cached --quiet || (git commit -m 'Fetch verified Saaremaa GIS source datasets' && git push origin HEAD:saaremaa-gis-toomalouka-2025)
