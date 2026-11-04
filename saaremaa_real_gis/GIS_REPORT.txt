@@ -1,0 +1,3 @@
+official_map_2025.kml: 78138 bytes, LineStrings=[('SS1 - Laugu tee', 183), ('SS2 - Paatsa tee', 130), ('SS3 - Kuressaare tee', 40), ('SS4/6 - Kurevere tee', 472), ('SS5 - Leedri tee', 157), ('SS7/9 - Koimla tee', 256), ('SS8/10 - Toomalõuka tee', 197)]
+road_21108.geojson: 26212 bytes, features=1, outer coordinate groups=652
+road_21103.geojson: 46348 bytes, features=1, outer coordinate groups=4
