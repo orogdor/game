@@ -1,0 +1,26 @@
+name: Import actual Saaremaa surrounding buildings and landcover
+on:
+  push:
+    branches: [saaremaa-gis-toomalouka-2025]
+    paths:
+      - '.github/workflows/saaremaa-osm.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  osm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install geometry processor
+        run: python3 -m pip install shapely
+      - name: Fetch mapped real-world features
+        run: python3 saaremaa_real_gis/fetch_osm.py
+        continue-on-error: true
+      - name: Commit only GIS results
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add saaremaa_real_gis/osm_environment.geojson saaremaa_real_gis/OSM_REPORT.txt 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m 'Add OSM-source road-surroundings data' && git push origin HEAD:saaremaa-gis-toomalouka-2025)
